@@ -431,8 +431,56 @@ function write_FMTS_biff8(ba, NF/*:?SSFTable*/, opts) {
 	});
 }
 
+function write_ws_protect_biff8(sp) {
+	/* SheetProtection */
+	let flags = 0x0000;
+	[
+		["objects",             false, 0x0001], // fObjects - Bit 0 (Edit objects)
+		["scenarios",           false, 0x0002], // fScenarios - Bit 1 (Edit scenarios)
+		["formatCells",          true, 0x0004], // fFormatCells - Bit 2 (Change cell formatting)
+		["formatColumns",        true, 0x0008], // fFormatColumns - Bit 3 (Change column formatting)
+		["formatRows",           true, 0x0010], // fFormatRows - Bit 4 (Change row formatting)
+		["insertColumns",        true, 0x0020], // fInsertColumns - Bit 5 (Insert columns)
+		["insertRows",           true, 0x0040], // fInsertRows - Bit 6 (Insert rows)
+		["insertHyperlinks",     true, 0x0080], // fInsertHyperlinks - Bit Bit 7 (Insert hyperlinks)
+		["deleteColumns",        true, 0x0100], // fDeleteColumns - Bit 8 (Delete columns)
+		["deleteRows",           true, 0x0200], // fDeleteRows - Bit 9 (Delete rows)
+		["selectLockedCells",   false, 0x0400], // fSelLockedCells - Bit 10 (Select locked cells)
+		["sort",                 true, 0x0800], // fSort - Bit 11 (Sort a cell range)
+		["autoFilter",           true, 0x1000], // fAutoFilter - Bit 12 (Edit auto filters)
+		["pivotTables",          true, 0x2000], // fPivotTables - Bit 13 (Edit PivotTables)
+		["selectUnlockedCells", false, 0x4000]  // fSelUnlockedCells - Bit 14 (Select unlocked cells)
+	].forEach(function(n) {
+		if(n[1]) flags |= sp[n[0]] != null && !sp[n[0]] ? n[2] : 0x0000
+		else     flags |= sp[n[0]] != null && sp[n[0]] ? 0x0000 : n[2];
+	});
+
+	/* [MS-XLS] 2.4.112 */
+	const featHdr = new_buf(23);
+	/* [MS-XLS] 2.5.135 */
+	featHdr.write_shift(2, 0x0867)
+	featHdr.write_shift(2, 0x0000);
+	featHdr.write_shift(4, 0x00000000)
+	featHdr.write_shift(4, 0x00000000)
+	/* [MS-XLS] 2.5.237 */
+	featHdr.write_shift(2, 0x0002); // SharedFeatureType ISFPROTECTION
+	/* Reserved byte */
+	featHdr.write_shift(1, 0x01);
+	/* cbHdrData */
+	featHdr.write_shift(4, 0xffffffff);
+	/* [MS-XLS] 2.5.104 */
+	featHdr.write_shift(4, flags)
+
+	return featHdr
+}
+
 function write_FEAT(ba, ws) {
 	/* [MS-XLS] 2.4.112 */
+	/* ISFPROTECTION */
+	if(ws['!protect']){
+		write_biff_rec(ba, 0x0867 /* FeatHdr */, write_ws_protect_biff8(ws['!protect']))
+	}
+	/* ISFFEC2 */
 	var o = new_buf(19);
 	o.write_shift(4, 0x867); o.write_shift(4, 0); o.write_shift(4, 0);
 	o.write_shift(2, 3); o.write_shift(1, 1); o.write_shift(4, 0);
@@ -537,6 +585,14 @@ function write_ws_biff8(idx/*:number*/, opts, wb/*:Workbook*/) {
 	/* Footer (string) */
 	write_biff_rec(ba, 0x0083 /* HCenter */, writebool(false));
 	write_biff_rec(ba, 0x0084 /* VCenter */, writebool(false));
+	/* PROTECTION */
+	if(ws['!protect']){
+		const sp = ws['!protect']
+		/* [MS-XLS] 2.4.207 */
+		write_biff_rec(ba, 0x0012 /* Protect */, writeuint16(1));
+		/* [MS-XLS] 2.4.191 */
+		if(sp.password) write_biff_rec(ba, 0x0013 /* Password */, writeuint16(crypto_CreatePasswordVerifier_Method1(sp.password)));
+	}
 	/* ... */
 	if(b8) write_ws_cols_biff8(ba, ws["!cols"]);
 	/* ... */
