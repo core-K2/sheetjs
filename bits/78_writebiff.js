@@ -433,7 +433,7 @@ function write_FMTS_biff8(ba, NF/*:?SSFTable*/, opts) {
 
 function write_ws_protect_biff8(sp) {
 	/* SheetProtection */
-	let flags = 0x0000;
+	var flags = 0x0000;
 	[
 		["objects",             false, 0x0001], // fObjects - Bit 0 (Edit objects)
 		["scenarios",           false, 0x0002], // fScenarios - Bit 1 (Edit scenarios)
@@ -451,17 +451,17 @@ function write_ws_protect_biff8(sp) {
 		["pivotTables",          true, 0x2000], // fPivotTables - Bit 13 (Edit PivotTables)
 		["selectUnlockedCells", false, 0x4000]  // fSelUnlockedCells - Bit 14 (Select unlocked cells)
 	].forEach(function(n) {
-		if(n[1]) flags |= sp[n[0]] != null && !sp[n[0]] ? n[2] : 0x0000
+		if(n[1]) flags |= sp[n[0]] != null && !sp[n[0]] ? n[2] : 0x0000;
 		else     flags |= sp[n[0]] != null && sp[n[0]] ? 0x0000 : n[2];
 	});
 
 	/* [MS-XLS] 2.4.112 */
-	const featHdr = new_buf(23);
+	var featHdr = new_buf(23);
 	/* [MS-XLS] 2.5.135 */
-	featHdr.write_shift(2, 0x0867)
+	featHdr.write_shift(2, 0x0867);
 	featHdr.write_shift(2, 0x0000);
-	featHdr.write_shift(4, 0x00000000)
-	featHdr.write_shift(4, 0x00000000)
+	featHdr.write_shift(4, 0x00000000);
+	featHdr.write_shift(4, 0x00000000);
 	/* [MS-XLS] 2.5.237 */
 	featHdr.write_shift(2, 0x0002); // SharedFeatureType ISFPROTECTION
 	/* Reserved byte */
@@ -469,17 +469,15 @@ function write_ws_protect_biff8(sp) {
 	/* cbHdrData */
 	featHdr.write_shift(4, 0xffffffff);
 	/* [MS-XLS] 2.5.104 */
-	featHdr.write_shift(4, flags)
+	featHdr.write_shift(4, flags);
 
-	return featHdr
+	return featHdr;
 }
 
 function write_FEAT(ba, ws) {
 	/* [MS-XLS] 2.4.112 */
 	/* ISFPROTECTION */
-	if(ws['!protect']){
-		write_biff_rec(ba, 0x0867 /* FeatHdr */, write_ws_protect_biff8(ws['!protect']))
-	}
+	if(ws['!protect']) write_biff_rec(ba, 0x0867 /* FeatHdr */, write_ws_protect_biff8(ws['!protect']));
 	/* ISFFEC2 */
 	var o = new_buf(19);
 	o.write_shift(4, 0x867); o.write_shift(4, 0); o.write_shift(4, 0);
@@ -587,7 +585,7 @@ function write_ws_biff8(idx/*:number*/, opts, wb/*:Workbook*/) {
 	write_biff_rec(ba, 0x0084 /* VCenter */, writebool(false));
 	/* PROTECTION */
 	if(ws['!protect']){
-		const sp = ws['!protect']
+		var sp = ws['!protect'];
 		/* [MS-XLS] 2.4.207 */
 		write_biff_rec(ba, 0x0012 /* Protect */, writeuint16(1));
 		/* [MS-XLS] 2.4.191 */

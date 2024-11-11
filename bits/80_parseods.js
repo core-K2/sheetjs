@@ -764,6 +764,10 @@ function parse_content_xml(d/*:string*/, _opts, _nfm)/*:Workbook*/ {
 						_Ref = ods_to_csf_3D(atag.Target.slice(1));
 						atag.Target = "#" + _Ref[0] + "!" + _Ref[1];
 					} else if(atag.Target.match(/^\.\.[\\\/]/)) atag.Target = atag.Target.slice(3);
+					/* Appendix D.2 Hyperlink Titles */
+					if(atag.title) {
+						atag.Tooltip = unescapexml(atag.title); delete atag.title;
+					}
 				}
 				break;
 
