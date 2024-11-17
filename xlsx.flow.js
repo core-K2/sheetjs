@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3ex';
+XLSX.version = '0.20.3ex'; /* core-k2 スタイルリファレンス反映 */
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -22787,7 +22787,7 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
 		}
-		if (cell.ri) sp.ri = cell.ri;
+		if (cell && cell.ri) sp.ri = cell.ri;
 		sp.id = (o.id || "sjs") + "-" + coord;
 		oo.push(writextag('td', w, sp));
 	}

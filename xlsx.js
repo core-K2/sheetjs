@@ -22677,7 +22677,7 @@ function make_html_row(ws, r, R, o) {
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
 		}
-		if (cell.ri) sp.ri = cell.ri;
+		if (cell && cell.ri) sp.ri = cell.ri;
 		sp.id = (o.id || "sjs") + "-" + coord;
 		oo.push(writextag('td', w, sp));
 	}
