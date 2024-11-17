@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3ex'; /* core-k2 スタイルリファレンス反映 */
+XLSX.version = '0.20.3ex';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -11185,38 +11185,51 @@ function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
 	var pass = false;
-	(t.match(tagregex)||[]).forEach(function(x) {
+	(t.match(tagregex)||[]).forEach(function(x, i) {
 		var y = parsexmltag(x);
 		switch(strip_ns(y[0])) {
 			case '<borders': case '<borders>': case '</borders>': break;
 
 			/* 18.8.4 border CT_Border */
-			case '<border': case '<border>': case '<border/>':
+			case '<border/>':
+				styles.Borders.push({});
+				break;
+			case '<border': case '<border>':
 				border = /*::(*/{}/*:: :any)*/;
 				if(y.diagonalUp) border.diagonalUp = parsexmlbool(y.diagonalUp);
 				if(y.diagonalDown) border.diagonalDown = parsexmlbool(y.diagonalDown);
+				break;
+			case '</border>':
 				styles.Borders.push(border);
 				break;
-			case '</border>': break;
 
 			/* note: not in spec, appears to be CT_BorderPr */
-			case '<left/>': break;
-			case '<left': case '<left>': break;
+			case '<left/>':
+				break;
+			case '<left': case '<left>':
+				if (y.style) border.left = y.style;
+				break;
 			case '</left>': break;
 
 			/* note: not in spec, appears to be CT_BorderPr */
 			case '<right/>': break;
-			case '<right': case '<right>': break;
+			case '<right': case '<right>':
+				if (y.style) border.right = y.style;
+				break;
 			case '</right>': break;
 
 			/* 18.8.43 top CT_BorderPr */
 			case '<top/>': break;
-			case '<top': case '<top>': break;
+			case '<top': case '<top>':
+				if (y.style) border.top = y.style;
+				break;
 			case '</top>': break;
 
 			/* 18.8.6 bottom CT_BorderPr */
 			case '<bottom/>': break;
-			case '<bottom': case '<bottom>': break;
+			case '<bottom': case '<bottom>':
+				if (y.style) border.bottom = y.style;
+				break;
 			case '</bottom>': break;
 
 			/* 18.8.13 diagonal CT_BorderPr */
@@ -16379,7 +16392,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				}
 			}
 			safe_format(p, fmtid, fillid, opts, themes, styles, date1904);
-			p.ri = tag.s;
+			if (tag.s !== undefined) p.si = tag.s;
 			if(opts.cellDates && do_format && p.t == 'n' && fmt_is_date(table_fmt[fmtid])) { p.v = numdate(p.v + (date1904 ? 1462 : 0)); p.t = typeof p.v == "number" ? 'n' : 'd'; }
 			if(tag.cm && opts.xlmeta) {
 				var cm = (opts.xlmeta.Cell||[])[+tag.cm-1];
@@ -22787,7 +22800,7 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
 		}
-		if (cell && cell.ri) sp.ri = cell.ri;
+		if (cell && cell.si) sp.si = cell.si;
 		sp.id = (o.id || "sjs") + "-" + coord;
 		oo.push(writextag('td', w, sp));
 	}

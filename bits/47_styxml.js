@@ -3,38 +3,51 @@ function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
 	var pass = false;
-	(t.match(tagregex)||[]).forEach(function(x) {
+	(t.match(tagregex)||[]).forEach(function(x, i) {
 		var y = parsexmltag(x);
 		switch(strip_ns(y[0])) {
 			case '<borders': case '<borders>': case '</borders>': break;
 
 			/* 18.8.4 border CT_Border */
-			case '<border': case '<border>': case '<border/>':
+			case '<border/>':
+				styles.Borders.push({});
+				break;
+			case '<border': case '<border>':
 				border = /*::(*/{}/*:: :any)*/;
 				if(y.diagonalUp) border.diagonalUp = parsexmlbool(y.diagonalUp);
 				if(y.diagonalDown) border.diagonalDown = parsexmlbool(y.diagonalDown);
+				break;
+			case '</border>':
 				styles.Borders.push(border);
 				break;
-			case '</border>': break;
 
 			/* note: not in spec, appears to be CT_BorderPr */
-			case '<left/>': break;
-			case '<left': case '<left>': break;
+			case '<left/>':
+				break;
+			case '<left': case '<left>':
+				if (y.style) border.left = y.style;
+				break;
 			case '</left>': break;
 
 			/* note: not in spec, appears to be CT_BorderPr */
 			case '<right/>': break;
-			case '<right': case '<right>': break;
+			case '<right': case '<right>':
+				if (y.style) border.right = y.style;
+				break;
 			case '</right>': break;
 
 			/* 18.8.43 top CT_BorderPr */
 			case '<top/>': break;
-			case '<top': case '<top>': break;
+			case '<top': case '<top>':
+				if (y.style) border.top = y.style;
+				break;
 			case '</top>': break;
 
 			/* 18.8.6 bottom CT_BorderPr */
 			case '<bottom/>': break;
-			case '<bottom': case '<bottom>': break;
+			case '<bottom': case '<bottom>':
+				if (y.style) border.bottom = y.style;
+				break;
 			case '</bottom>': break;
 
 			/* 18.8.13 diagonal CT_BorderPr */
