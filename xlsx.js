@@ -11094,7 +11094,7 @@ function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
 	var pass = false;
-	(t.match(tagregex)||[]).forEach(function(x, i) {
+	(t.match(tagregex)||[]).forEach(function(x) {
 		var y = parsexmltag(x);
 		switch(strip_ns(y[0])) {
 			case '<borders': case '<borders>': case '</borders>': break;
