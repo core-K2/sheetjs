@@ -11093,6 +11093,7 @@ var XLMLPatternTypeMap = {
 function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
+	var diagonal = {};
 	var pass = false;
 	(t.match(tagregex)||[]).forEach(function(x) {
 		var y = parsexmltag(x);
@@ -11142,8 +11143,15 @@ function parse_borders(t, styles, themes, opts) {
 			case '</bottom>': break;
 
 			/* 18.8.13 diagonal CT_BorderPr */
-			case '<diagonal': case '<diagonal>': case '<diagonal/>': break;
-			case '</diagonal>': break;
+			case '<diagonal': case '<diagonal>':
+				diagonal = {};
+				if (y.style) diagonal.style = y.style;
+				border.diagonal = diagonal;
+				break;
+			case '<diagonal/>': break;
+			case '</diagonal>':
+				border.diagonal = diagonal;
+				break;
 
 			/* 18.8.25 horizontal CT_BorderPr */
 			case '<horizontal': case '<horizontal>': case '<horizontal/>': break;
@@ -11163,6 +11171,9 @@ function parse_borders(t, styles, themes, opts) {
 
 			/* 18.8.? color CT_Color */
 			case '<color': case '<color>':
+				diagonal.color = {};
+				if (y.rgb) diagonal.color.rgb = y.rgb;
+				if (y.theme) diagonal.color.theme = y.theme;
 				break;
 			case '<color/>': case '</color>': break;
 
