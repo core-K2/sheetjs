@@ -609,6 +609,9 @@ export interface Sheet2HTMLOpts {
     /** Add contenteditable to every cell */
     editable?: boolean;
 
+    /** Add span as inner child */
+    childSpan?: boolean;
+
     /** Header HTML */
     header?: string;
 
