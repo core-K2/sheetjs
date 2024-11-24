@@ -2,7 +2,7 @@
 function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
-	var diagonal = {};
+	var kind = {};
 	var pass = false;
 	(t.match(tagregex)||[]).forEach(function(x) {
 		var y = parsexmltag(x);
@@ -26,40 +26,46 @@ function parse_borders(t, styles, themes, opts) {
 			case '<left/>':
 				break;
 			case '<left': case '<left>':
-				if (y.style) border.left = y.style;
+				kind = {};
+				if (y.style) kind.style = y.style;
+			case '</left>':
+				border.left = kind;
 				break;
-			case '</left>': break;
 
 			/* note: not in spec, appears to be CT_BorderPr */
 			case '<right/>': break;
 			case '<right': case '<right>':
-				if (y.style) border.right = y.style;
+				kind = {};
+				if (y.style) kind.style = y.style;
+			case '</right>':
+				border.right = kind;
 				break;
-			case '</right>': break;
 
 			/* 18.8.43 top CT_BorderPr */
 			case '<top/>': break;
 			case '<top': case '<top>':
-				if (y.style) border.top = y.style;
+				kind = {};
+				if (y.style) kind.style = y.style;
+			case '</top>':
+				border.top = kind;
 				break;
-			case '</top>': break;
 
 			/* 18.8.6 bottom CT_BorderPr */
 			case '<bottom/>': break;
 			case '<bottom': case '<bottom>':
-				if (y.style) border.bottom = y.style;
+				kind = {};
+				if (y.style) kind.style = y.style;
+			case '</bottom>':
+				border.bottom = kind;
 				break;
-			case '</bottom>': break;
 
 			/* 18.8.13 diagonal CT_BorderPr */
-			case '<diagonal': case '<diagonal>':
-				diagonal = {};
-				if (y.style) diagonal.style = y.style;
-				border.diagonal = diagonal;
-				break;
 			case '<diagonal/>': break;
+			case '<diagonal': case '<diagonal>':
+				kind = {};
+				if (y.style) kind.style = y.style;
 			case '</diagonal>':
-				border.diagonal = diagonal;
+				border.diagonal = kind;
 				break;
 
 			/* 18.8.25 horizontal CT_BorderPr */
@@ -80,9 +86,9 @@ function parse_borders(t, styles, themes, opts) {
 
 			/* 18.8.? color CT_Color */
 			case '<color': case '<color>':
-				diagonal.color = {};
-				if (y.rgb) diagonal.color.rgb = y.rgb;
-				if (y.theme) diagonal.color.theme = y.theme;
+				kind.color = {};
+				if (y.rgb) kind.color.rgb = y.rgb;
+				if (y.theme) kind.color.theme = y.theme;
 				break;
 			case '<color/>': case '</color>': break;
 
