@@ -3651,23 +3651,37 @@ function str_match_xml(str, tag) {
 /* str.match(/<(?:\w+:)?tag\b[^<>]*?>([\s\S]*?)<\/(?:\w+:)?tag>/) --> str_match_xml(str, "tag") */
 var str_match_xml_ns = /*#__PURE__*/(function() {
 	var str_match_xml_ns_cache = {};
-	return function str_match_xml_ns(str, tag) {
+	return function str_match_xml_ns(str, tag, got) {
 		var res = str_match_xml_ns_cache[tag];
 		if(!res) str_match_xml_ns_cache[tag] = res = [
 			new RegExp('<(?:\\w+:)?'+tag+'\\b[^<>]*>', "g"),
 			new RegExp('</(?:\\w+:)?'+tag+'>', "g")
 		];
 		res[0].lastIndex = res[1].lastIndex = 0;
-		var m = res[0].exec(str);
-		if(!m) return null;
-		var si = m.index;
-		var sf = res[0].lastIndex;
-		res[1].lastIndex = res[0].lastIndex;
-		m = res[1].exec(str);
-		if(!m) return null;
-		var ei = m.index;
-		var ef = res[1].lastIndex;
-		return [str.slice(si, ef), str.slice(sf, ei)];
+		let m1 = res[0].exec(str);
+		if(!m1) return null;
+		let si = m1.index;
+		let sf = res[0].lastIndex;
+		let ei, ef;
+		if (m1[0].endsWith('/>')) {
+			// 終了タグがない場合
+			ei = ef = sf;
+		} else {
+			res[1].lastIndex = res[0].lastIndex;
+			let m = res[1].exec(str);
+			if(!m) return null;
+			ei = m.index;
+			ef = res[1].lastIndex;
+		}
+		let s = str.slice(si, ef);
+		if (got) {
+			let obj = Xml.xmlStrToObject(s);
+			if (typeof got === 'object') {
+				got[tag] = obj;
+			}
+			return obj;
+		}
+		return [s, str.slice(sf, ei)];
 	};
 })();
 
@@ -3746,6 +3760,77 @@ var str_match_xml_ig = /*#__PURE__*/(function() {
 		return out.length == 0 ? null : out;
 	};
 })();
+/**
+ * XML 処理
+ */
+var Xml = {
+	parser: new DOMParser(),
+	opts: {
+		prefixAttr: '',
+		prefixText: '',
+		asNumb: true,
+		asBool: true,
+		asDate: true,
+	},
+	toValue: function(v) {
+		if (v) {
+			if (this.opts.asNumb && !isNaN(v)) {
+				return Number(v);
+			}
+			if (this.opts.asBool) {
+				switch (v.toLowerCase()) {
+				case 'true': return true;
+				case 'false': return false;
+				}
+			}
+			if (this.opts.asBool) {
+				let dt = new Date(v);
+				if (!isNaN(dt)) return dt;
+			}
+		}
+		return v;
+	},
+	// XML文字列をオブジェクトに変換する
+	xmlStrToObject: function(xmlStr, opts) {
+		let xml = this.parser.parseFromString(xmlStr, 'application/xml');
+		if (typeof opts === 'object') {
+			Object.assign(this.opts. opts);
+		}
+		return this.xmlToObject(xml.documentElement);
+	},
+	// XMLノードをオブジェクトに変換する
+	xmlToObject: function(xmlNode) {
+		let obj = {};
+		// 子ノードを処理
+		for (let i = 0; i < xmlNode.childNodes.length; i++) {
+			let childNode = xmlNode.childNodes[i];
+			// テキストノードを無視
+			if (childNode.nodeType === 3) continue;
+			let nodeName = childNode.nodeName;
+			if (!obj[nodeName]) {
+				obj[nodeName] = this.xmlToObject(childNode);
+			} else {
+				if (!Array.isArray(obj[nodeName])) {
+					obj[nodeName] = [obj[nodeName]];
+				}
+				obj[nodeName].push(this.xmlToObject(childNode));
+			}
+		}
+		// 属性を処理
+		if (xmlNode.attributes) {
+			let prefix = this.opts.prefixAttr;
+			for (let j = 0; j < xmlNode.attributes.length; j++) {
+				let attribute = xmlNode.attributes[j];
+				obj[prefix + attribute.name] = this.toValue(attribute.value);
+			}
+		}
+		// テキストノードの値を追加
+		if (xmlNode.childNodes.length === 1 && xmlNode.childNodes[0].nodeType === 3) {
+			obj[this.opts.prefixText + 'text'] = xmlNode.childNodes[0].nodeValue;
+		}
+		return obj;
+	},
+};
 function getdatastr(data)/*:?string*/ {
 	if(!data) return null;
 	if(data.content && data.type) return cc2str(data.content, true);
@@ -15943,25 +16028,8 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	if(sheetPr) parse_ws_xml_sheetpr(sheetPr[0], s, wb, idx);
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
-	let mtchSheetFormatPr = str_match_xml_ns(data, 'sheetFormatPr');
-	if (mtchSheetFormatPr) {
-		let obj = s['sheetFormatPr'] = {};
-		(mtchSheetFormatPr[0].split(' ')||[]).forEach(function(x) {
-			let ar = x.split('=');
-			if (ar.length === 2) {
-				let v = ar[1];
-				if (v) {
-					let i = v.indexOf('>');
-					if (i > 0) v = v.substring(0, i);
-					v = v.replace(/\"/g, '');
-					if (!isNaN(v)) {
-						v = Number(v);
-					}
-				}
-				obj[ar[0]] = v;
-			}
-		});
-	}
+	/* sheetFormatPr があれば出力する */
+	str_match_xml_ns(data, 'sheetFormatPr', s);
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
