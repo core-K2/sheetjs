@@ -401,23 +401,22 @@ var Xml = {
 	opts: {
 		prefixAttr: '',	// prefix for attribute
 		prefixText: '',	// prefix for text data
-		asNumb: true,	// get value as Number
-		asBool: true,	// get value as Boolean
-		asDate: false,	// get value as Date
+		asValue: 3,		// get value as bitmask 1:Number, 2:Boolean, 4: Date
 	},
 	// convert value
 	toValue: function(v) {
-		if (v) {
-			if (this.opts.asNumb && !isNaN(v)) {
+		let asV;
+		if (v && (asV = this.opts.asValue)) {
+			if (asV & 1 && !isNaN(v)) {
 				return Number(v);
 			}
-			if (this.opts.asBool) {
+			if (asV & 2) {
 				switch (v.toLowerCase()) {
 				case 'true': return true;
 				case 'false': return false;
 				}
 			}
-			if (this.opts.asBool) {
+			if (asV & 4) {
 				let dt = new Date(v);
 				if (!isNaN(dt)) return dt;
 			}

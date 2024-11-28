@@ -3769,23 +3769,22 @@ var Xml = {
 	opts: {
 		prefixAttr: '',	// prefix for attribute
 		prefixText: '',	// prefix for text data
-		asNumb: true,	// get value as Number
-		asBool: true,	// get value as Boolean
-		asDate: false,	// get value as Date
+		asValue: 3,		// get value as bitmask 1:Number, 2:Boolean, 4: Date
 	},
 	// convert value
 	toValue: function(v) {
-		if (v) {
-			if (this.opts.asNumb && !isNaN(v)) {
+		let asV;
+		if (v && (asV = this.opts.asValue)) {
+			if (asV & 1 && !isNaN(v)) {
 				return Number(v);
 			}
-			if (this.opts.asBool) {
+			if (asV & 2) {
 				switch (v.toLowerCase()) {
 				case 'true': return true;
 				case 'false': return false;
 				}
 			}
-			if (this.opts.asBool) {
+			if (asV & 4) {
 				let dt = new Date(v);
 				if (!isNaN(dt)) return dt;
 			}
@@ -23091,6 +23090,7 @@ function parse_ods_styles(d/*:string*/, _opts, _nfm) {
 	var str = xlml_normalize(d);
 	xlmlregex.lastIndex = 0;
 	str = remove_doctype(str_remove_ng(str, "<!--", "-->"));
+console.log(Xml.xmlStrToObject(str));
 	var Rn, NFtag, NF = "", tNF = "", y, etpos = 0, tidx = -1, infmt = false, payload = "";
 	while((Rn = xlmlregex.exec(str))) {
 		switch((Rn[3]=Rn[3].replace(/_[\s\S]*$/,""))) {
