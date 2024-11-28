@@ -3577,6 +3577,7 @@ function str_match_xml(str, tag) {
 /* str.match(/<(?:\w+:)?tag\b[^<>]*?>([\s\S]*?)<\/(?:\w+:)?tag>/) --> str_match_xml(str, "tag") */
 var str_match_xml_ns = (function() {
 	var str_match_xml_ns_cache = {};
+	// got:get tag value as Object (core-K2 expansion)
 	return function str_match_xml_ns(str, tag, got) {
 		var res = str_match_xml_ns_cache[tag];
 		if(!res) str_match_xml_ns_cache[tag] = res = [
@@ -3584,17 +3585,17 @@ var str_match_xml_ns = (function() {
 			new RegExp('</(?:\\w+:)?'+tag+'>', "g")
 		];
 		res[0].lastIndex = res[1].lastIndex = 0;
-		let m1 = res[0].exec(str);
-		if(!m1) return null;
-		let si = m1.index;
+		let m = res[0].exec(str);
+		if(!m) return null;
+		let si = m.index;
 		let sf = res[0].lastIndex;
 		let ei, ef;
-		if (m1[0].endsWith('/>')) {
-			// 終了タグがない場合
+		if (m[0].endsWith('/>')) {
+			// none end tag case
 			ei = ef = sf;
 		} else {
 			res[1].lastIndex = res[0].lastIndex;
-			let m = res[1].exec(str);
+			m = res[1].exec(str);
 			if(!m) return null;
 			ei = m.index;
 			ef = res[1].lastIndex;
@@ -3687,17 +3688,18 @@ var str_match_xml_ig = (function() {
 	};
 })();
 /**
- * XML 処理
+ * XML proceccing (core-K2 expansion)
  */
 var Xml = {
 	parser: new DOMParser(),
 	opts: {
-		prefixAttr: '',
-		prefixText: '',
-		asNumb: true,
-		asBool: true,
-		asDate: true,
+		prefixAttr: '',	// prefix for attribute
+		prefixText: '',	// prefix for text data
+		asNumb: true,	// get value as Number
+		asBool: true,	// get value as Boolean
+		asDate: false,	// get value as Date
 	},
+	// convert value
 	toValue: function(v) {
 		if (v) {
 			if (this.opts.asNumb && !isNaN(v)) {
@@ -3716,7 +3718,7 @@ var Xml = {
 		}
 		return v;
 	},
-	// XML文字列をオブジェクトに変換する
+	// XML string to JavaScript Object
 	xmlStrToObject: function(xmlStr, opts) {
 		let xml = this.parser.parseFromString(xmlStr, 'application/xml');
 		if (typeof opts === 'object') {
@@ -3724,13 +3726,13 @@ var Xml = {
 		}
 		return this.xmlToObject(xml.documentElement);
 	},
-	// XMLノードをオブジェクトに変換する
+	// XML node to JavaScript Object
 	xmlToObject: function(xmlNode) {
 		let obj = {};
-		// 子ノードを処理
+		// child node process
 		for (let i = 0; i < xmlNode.childNodes.length; i++) {
 			let childNode = xmlNode.childNodes[i];
-			// テキストノードを無視
+			// ignore text node
 			if (childNode.nodeType === 3) continue;
 			let nodeName = childNode.nodeName;
 			if (!obj[nodeName]) {
@@ -3742,7 +3744,7 @@ var Xml = {
 				obj[nodeName].push(this.xmlToObject(childNode));
 			}
 		}
-		// 属性を処理
+		// attribute process
 		if (xmlNode.attributes) {
 			let prefix = this.opts.prefixAttr;
 			for (let j = 0; j < xmlNode.attributes.length; j++) {
@@ -3750,7 +3752,7 @@ var Xml = {
 				obj[prefix + attribute.name] = this.toValue(attribute.value);
 			}
 		}
-		// テキストノードの値を追加
+		// add text node
 		if (xmlNode.childNodes.length === 1 && xmlNode.childNodes[0].nodeType === 3) {
 			obj[this.opts.prefixText + 'text'] = xmlNode.childNodes[0].nodeValue;
 		}
@@ -11175,6 +11177,7 @@ var XLMLPatternTypeMap = {
 };
 
 /* 18.8.5 borders CT_Borders */
+// get border information (core-K2 expansion)
 function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
@@ -15934,7 +15937,7 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
 	if(sheetPr) parse_ws_xml_sheetpr(sheetPr[0], s, wb, idx);
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
-	/* sheetFormatPr があれば出力する */
+	// output sheetFormatPr if exist (core-K2 expansion)
 	str_match_xml_ns(data, 'sheetFormatPr', s);
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
@@ -16403,6 +16406,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb) {
 				}
 			}
 			safe_format(p, fmtid, fillid, opts, themes, styles, date1904);
+			// set style index (core-K2 expansion)
 			if (tag.s !== undefined) p.si = tag.s;
 			if(opts.cellDates && do_format && p.t == 'n' && fmt_is_date(table_fmt[fmtid])) { p.v = numdate(p.v + (date1904 ? 1462 : 0)); p.t = typeof p.v == "number" ? 'n' : 'd'; }
 			if(tag.cm && opts.xlmeta) {
@@ -22786,6 +22790,7 @@ function make_html_row(ws, r, R, o) {
 		sp = ({});
 		if(RS > 1) sp.rowspan = RS;
 		if(CS > 1) sp.colspan = CS;
+		// add span child if childSpan option (core-K2 expansion)
 		if(cell) {
 			sp["data-t"] = cell && cell.t || 'z';
 			// note: data-v is unaffected by the timezone interpretation

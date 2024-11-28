@@ -32,7 +32,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	if(sheetPr) parse_ws_xml_sheetpr(sheetPr[0], s, wb, idx);
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
-	/* sheetFormatPr があれば出力する */
+	// output sheetFormatPr if exist (core-K2 expansion)
 	str_match_xml_ns(data, 'sheetFormatPr', s);
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
@@ -501,6 +501,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				}
 			}
 			safe_format(p, fmtid, fillid, opts, themes, styles, date1904);
+			// set style index (core-K2 expansion)
 			if (tag.s !== undefined) p.si = tag.s;
 			if(opts.cellDates && do_format && p.t == 'n' && fmt_is_date(table_fmt[fmtid])) { p.v = numdate(p.v + (date1904 ? 1462 : 0)); p.t = typeof p.v == "number" ? 'n' : 'd'; }
 			if(tag.cm && opts.xlmeta) {

@@ -609,7 +609,7 @@ export interface Sheet2HTMLOpts {
     /** Add contenteditable to every cell */
     editable?: boolean;
 
-    /** Add span as inner child */
+    /** Add span as inner child (core-K2 expansion) */
     childSpan?: boolean;
 
     /** Header HTML */

@@ -1,4 +1,5 @@
 /* 18.8.5 borders CT_Borders */
+// get border information (core-K2 expansion)
 function parse_borders(t, styles, themes, opts) {
 	styles.Borders = [];
 	var border = {};
