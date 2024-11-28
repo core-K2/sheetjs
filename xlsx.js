@@ -15849,6 +15849,26 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
 	if(sheetPr) parse_ws_xml_sheetpr(sheetPr[0], s, wb, idx);
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
+	let mtchSheetFormatPr = str_match_xml_ns(data, 'sheetFormatPr');
+	if (mtchSheetFormatPr) {
+		let obj = s['sheetFormatPr'] = {};
+		(mtchSheetFormatPr[0].split(' ')||[]).forEach(function(x) {
+			let ar = x.split('=');
+			if (ar.length === 2) {
+				let v = ar[1];
+				if (v) {
+					let i = v.indexOf('>');
+					if (i > 0) v = v.substring(0, i);
+					v = v.replace(/\"/g, '');
+					if (!isNaN(v)) {
+						v = Number(v);
+					}
+				}
+				obj[ar[0]] = v;
+			}
+		});
+	}
+
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
 	if(ridx > 0) {
