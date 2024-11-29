@@ -3692,10 +3692,29 @@ var str_match_xml_ig = (function() {
  */
 var Xml = {
 	parser: new DOMParser(),
+	// options
 	opts: {
-		prefixAttr: '',	// prefix for attribute
-		prefixText: '',	// prefix for text data
-		asValue: 3,		// get value as bitmask 1:Number, 2:Boolean, 4: Date
+		noXmlIns: true,		// delete xmlIns name space
+		noNamePrefix: true,	// delete nodeName prefix(prefix:name=value -> name:value)
+		prefixAttr: '',		// prefix for attribute
+		prefixText: '',		// prefix for text data
+		asValue: 3,			// get value as bitmask 1:Number, 2:Boolean, 4: Date
+	},
+	// set options
+	setOpts: function(opts) {
+		if (typeof opts === 'object') {
+			Object.assign(this.opts. opts);
+		}
+	},
+	// get property name
+	getName: function(n) {
+		if (this.opts.noXmlIns && n.startsWith('xmlns:')) {
+			return '';
+		}
+		if (this.opts.noNamePrefix) {
+			return n.split(':').at(-1);
+		}
+		return n;
 	},
 	// convert value
 	toValue: function(v) {
@@ -3711,49 +3730,62 @@ var Xml = {
 				}
 			}
 			if (asV & 4) {
-				let dt = new Date(v);
-				if (!isNaN(dt)) return dt;
+				if (!isNaN((new Date(v)).getTime())) {
+					return dt;
+				}
 			}
 		}
 		return v;
 	},
+	// get XMLDocument object
+	getXmlDocument: function(v, mime) {
+		return v instanceof XMLDocument ? v : this.parser.parseFromString(v, mime || 'application/xml');
+	},
+	// get JavaScript Object from XML(XMLDocument or string)
+	getXmlAsObject: function(v, opts, mime) {
+		this.setOpts(opts);
+		return this.xmlToObject(this.getXmlDocument(v, mime));
+	},
 	// XML string to JavaScript Object
 	xmlStrToObject: function(xmlStr, opts) {
-		let xml = this.parser.parseFromString(xmlStr, 'application/xml');
-		if (typeof opts === 'object') {
-			Object.assign(this.opts. opts);
-		}
-		return this.xmlToObject(xml.documentElement);
+		this.setOpts(opts);
+		return this.xmlToObject(this.getXmlDocument(xmlStr).documentElement);
 	},
 	// XML node to JavaScript Object
 	xmlToObject: function(xmlNode) {
 		let obj = {};
 		// child node process
-		for (let i = 0; i < xmlNode.childNodes.length; i++) {
-			let childNode = xmlNode.childNodes[i];
-			// ignore text node
-			if (childNode.nodeType === 3) continue;
-			let nodeName = childNode.nodeName;
-			if (!obj[nodeName]) {
-				obj[nodeName] = this.xmlToObject(childNode);
-			} else {
-				if (!Array.isArray(obj[nodeName])) {
-					obj[nodeName] = [obj[nodeName]];
+		let len = xmlNode.childNodes.length;
+		for (let i = 0; i < len; i++) {
+			let node = xmlNode.childNodes[i];
+			let name = this.getName(node.nodeName);
+			if (!name) continue;
+			// nodeType 1:Element 3:text 8:comment
+			if (node.nodeType === 3) {
+				if (len === 1) {
+					obj[this.opts.prefixText + name] = node.nodeValue;
+					break;
 				}
-				obj[nodeName].push(this.xmlToObject(childNode));
+				continue;
+			}
+			if (!obj[name]) {
+				obj[name] = this.xmlToObject(node);
+			} else {
+				if (!Array.isArray(obj[name])) {
+					obj[name] = [obj[name]];
+				}
+				obj[name].push(this.xmlToObject(node));
 			}
 		}
 		// attribute process
 		if (xmlNode.attributes) {
 			let prefix = this.opts.prefixAttr;
-			for (let j = 0; j < xmlNode.attributes.length; j++) {
-				let attribute = xmlNode.attributes[j];
-				obj[prefix + attribute.name] = this.toValue(attribute.value);
+			for (let i = 0; i < xmlNode.attributes.length; i++) {
+				let attr = xmlNode.attributes[i];
+				let name = this.getName(attr.name);
+				if (!name) continue;
+				obj[prefix + name] = this.toValue(attr.value);
 			}
-		}
-		// add text node
-		if (xmlNode.childNodes.length === 1 && xmlNode.childNodes[0].nodeType === 3) {
-			obj[this.opts.prefixText + 'text'] = xmlNode.childNodes[0].nodeValue;
 		}
 		return obj;
 	},
@@ -22980,7 +23012,6 @@ function parse_ods_styles(d, _opts, _nfm) {
 	var str = xlml_normalize(d);
 	xlmlregex.lastIndex = 0;
 	str = remove_doctype(str_remove_ng(str, "<!--", "-->"));
-console.log(Xml.xmlStrToObject(str));
 	var Rn, NFtag, NF = "", tNF = "", y, etpos = 0, tidx = -1, infmt = false, payload = "";
 	while((Rn = xlmlregex.exec(str))) {
 		switch((Rn[3]=Rn[3].replace(/_[\s\S]*$/,""))) {
