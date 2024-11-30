@@ -816,6 +816,12 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		Xml.popOpts();
 		wb.Props = typeof xml.meta === 'object' ? xml.meta : parse_core_props(str);
 	}
+	if(opts.settings && safegetzipfile(zip, 'settings.xml')) {
+		let str = getzipstr(zip, 'settings.xml');
+		str = xlml_normalize(utf8read(str));
+		let xml = Xml.xmlStrToObject(str);
+		wb.Settings = xml.settings;
+	}
 	wb.bookType = "ods";
 	return wb;
 }

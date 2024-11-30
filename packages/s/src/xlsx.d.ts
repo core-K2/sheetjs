@@ -181,6 +181,9 @@ export interface ParsingOptions extends CommonOptions {
     raw?: boolean;
 
     dense?: boolean;
+
+    /* If true get ODS settings */
+    settings?: boolean;
 }
 
 /** Options for write and writeFile */
