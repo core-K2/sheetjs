@@ -3696,7 +3696,12 @@ var Xml = {
 	opts: {
 		noXmlns: true,		// delete XML name space (xmlns)
 		noNamePrefix: true,	// delete nodeName prefix (prefix:name=value -> name:value)
+		propName: 'name',	// object property name
 		textIsValue: true,	// not object when text node only case
+		textAttrs: true,	// text value has attributes
+		textPName: 'name',	// property name when text array convert to object
+		textTName: 'type',	// property name of text data type 
+		textVName: 'value',	// property name of text value 
 		prefixAttr: '',		// prefix for attribute
 		prefixText: '',		// prefix for text data
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
@@ -3737,22 +3742,27 @@ var Xml = {
 		return n;
 	},
 	// convert value
-	toValue: function(v) {
-		let asV;
-		if (v && (asV = this.opts.asValue)) {
-			if (asV & 1 && !isNaN(v)) {
-				return Number(v);
+	toValue: function(v, bTrim) {
+		if (v) {
+			if (bTrim) {
+				v = v.trim();
 			}
-			if (asV & 2) {
-				switch (v.toLowerCase()) {
-				case 'true': return true;
-				case 'false': return false;
+			let asV;
+			if ((asV = this.opts.asValue)) {
+				if (asV & 1 && !isNaN(v)) {
+					return Number(v);
 				}
-			}
-			if (asV & 4) {
-				let dt
-				if (!isNaN((dt = new Date(v)).getTime())) {
-					return dt;
+				if (asV & 2) {
+					switch (v.toLowerCase()) {
+					case 'true': return true;
+					case 'false': return false;
+					}
+				}
+				if (asV & 4) {
+					let dt
+					if (!isNaN((dt = new Date(v)).getTime())) {
+						return dt;
+					}
 				}
 			}
 		}
@@ -3773,19 +3783,37 @@ var Xml = {
 		return this.xmlToObject(this.getXmlDocument(xmlStr).documentElement);
 	},
 	// XML node to JavaScript Object
-	xmlToObject: function(xmlNode) {
+	xmlToObject: function(xmlNode, parent) {
 		let obj = {};
+		let attrs = this.parseAttributes(xmlNode.attributes);
 		// child node process
 		let len = xmlNode.childNodes.length;
 		for (let i = 0; i < len; i++) {
 			let node = xmlNode.childNodes[i];
 			let name = this.getName(node.nodeName);
-			if (!name) continue;
+			if (!name) {
+				continue;
+			}
 			// nodeType 1:Element 3:text 8:comment
 			if (node.nodeType === 3) {
 				if (len === 1) {
-					let v = this.toValue(node.nodeValue);
+					let v = this.toValue(node.nodeValue, true);
 					if (this.opts.textIsValue) {
+						if (this.opts.textAttrs && Object.keys(attrs).length > 0) {
+							let o, n;
+							if ((n = this.opts.textPName) && attrs.hasOwnProperty(n)) {
+								if (parent) {
+									parent[attrs[n]] = v;
+									return;
+								}
+								o = {};
+								o[attrs[n]] = v;
+							} else {
+								o = attrs;
+								o[this.opts.textVName] = v;
+							}
+							return o;
+						}
 						return v;
 					}
 					obj[this.opts.prefixText + name] = v;
@@ -3793,20 +3821,44 @@ var Xml = {
 				}
 				continue;
 			}
+			let val = this.xmlToObject(node, obj);
+			if (val === undefined) {
+				continue;
+			}
 			if (!obj[name]) {
-				obj[name] = this.xmlToObject(node);
+				obj[name] = val;
 			} else {
 				if (!Array.isArray(obj[name])) {
 					obj[name] = [obj[name]];
 				}
-				obj[name].push(this.xmlToObject(node));
+				obj[name].push(val);
 			}
 		}
-		// attribute process
-		if (xmlNode.attributes) {
+		if (attrs.hasOwnProperty(this.opts.propName)) {
+			let n = this.getName(attrs[this.opts.propName]);
+			if (Object.keys(obj).length < 1) {
+				obj = null;
+			}
+			if (parent) {
+				parent[n] = obj;
+				return;
+			}
+			let ret = {};
+			ret[n] = obj;
+			return ret;
+		}
+		if (obj) {
+			Object.assign(obj, attrs);
+		}
+		return obj;
+	},
+	// parse attributes
+	parseAttributes: function(attrs, obj) {
+		obj = obj || {};
+		if (attrs) {
 			let prefix = this.opts.prefixAttr;
-			for (let i = 0; i < xmlNode.attributes.length; i++) {
-				let attr = xmlNode.attributes[i];
+			for (let i = 0; i < attrs.length; i++) {
+				let attr = attrs[i];
 				let name = this.getName(attr.name);
 				if (!name) continue;
 				obj[prefix + name] = this.toValue(attr.value);
