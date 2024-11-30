@@ -400,24 +400,44 @@ var Xml = {
 	parser: new DOMParser(),
 	// options
 	opts: {
-		noXmlIns: true,		// delete xmlIns name space
-		noNamePrefix: true,	// delete nodeName prefix(prefix:name=value -> name:value)
+		noXmlns: true,		// delete XML name space (xmlns)
+		noNamePrefix: true,	// delete nodeName prefix (prefix:name=value -> name:value)
+		textIsValue: true,	// not object when text node only case
 		prefixAttr: '',		// prefix for attribute
 		prefixText: '',		// prefix for text data
-		asValue: 3,			// get value as bitmask 1:Number, 2:Boolean, 4: Date
+		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
+	},
+	_opts: [],
+	pushOpts: function() {
+		this._opts.push(Object.assign({}, this.opts));
+	},
+	popOpts: function() {
+		if (this._opts.length > 0) {
+			this.opts = this._opts.pop();
+		}
 	},
 	// set options
-	setOpts: function(opts) {
-		if (typeof opts === 'object') {
-			Object.assign(this.opts. opts);
+	setOpts: function(v) {
+		if (!v) return;
+		this.pushOpts();
+		if (typeof v === 'object') {
+			for (let n in v) {
+				this.opts[n] = v[n];
+			}
+		} else {
+			for (let i = 0; i < arguments.length; i++) {
+				let n = arguments[i];
+				if (this.opts.hasOwnProperty(n)) {
+					this.opts[n] = arguments[++i];
+				}
+			}
 		}
 	},
 	// get property name
 	getName: function(n) {
-		if (this.opts.noXmlIns && n.startsWith('xmlns:')) {
+		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
 			return '';
-		}
-		if (this.opts.noNamePrefix) {
+		} else if (this.opts.noNamePrefix) {
 			return n.split(':').at(-1);
 		}
 		return n;
@@ -436,7 +456,8 @@ var Xml = {
 				}
 			}
 			if (asV & 4) {
-				if (!isNaN((new Date(v)).getTime())) {
+				let dt
+				if (!isNaN((dt = new Date(v)).getTime())) {
 					return dt;
 				}
 			}
@@ -469,7 +490,11 @@ var Xml = {
 			// nodeType 1:Element 3:text 8:comment
 			if (node.nodeType === 3) {
 				if (len === 1) {
-					obj[this.opts.prefixText + name] = node.nodeValue;
+					let v = this.toValue(node.nodeValue);
+					if (this.opts.textIsValue) {
+						return v;
+					}
+					obj[this.opts.prefixText + name] = v;
 					break;
 				}
 				continue;

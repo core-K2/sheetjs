@@ -809,7 +809,13 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	var content = getzipstr(zip, 'content.xml');
 	if(!content) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = parse_content_xml(utf8read(content), opts, Styles);
-	if(safegetzipfile(zip, 'meta.xml')) wb.Props = parse_core_props(getzipdata(zip, 'meta.xml'));
+	if(safegetzipfile(zip, 'meta.xml')) {
+		let str = getzipstr(zip, 'meta.xml');
+		str = xlml_normalize(utf8read(str));
+		let xml = Xml.xmlStrToObject(str, {asValue:7});
+		Xml.popOpts();
+		wb.Props = typeof xml.meta === 'object' ? xml.meta : parse_core_props(str);
+	}
 	wb.bookType = "ods";
 	return wb;
 }
