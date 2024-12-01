@@ -23872,34 +23872,143 @@ function parse_content_xml(d, _opts, _nfm) {
 		return out;
 }
 
+function parse_ods_xml(zip, fname, xmlOpts) {
+	let str = '';
+	if(safegetzipfile(zip, fname)) {
+		str = getzipstr(zip, fname);
+		str = xlml_normalize(utf8read(str));
+		let xml = Xml.xmlStrToObject(str, xmlOpts);
+		if (xmlOpts) Xml.popOpts();
+		return xml;
+	}
+	return str;
+}
+
 function parse_ods(zip, opts) {
 	opts = opts || ({});
 	if(safegetzipfile(zip, 'META-INF/manifest.xml')) parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
-	var styles = getzipstr(zip, 'styles.xml');
-	var Styles = styles && parse_ods_styles(utf8read(styles), opts);
-	var content = getzipstr(zip, 'content.xml');
-	if(!content) throw new Error("Missing content.xml in ODS / UOF file");
-	var wb = parse_content_xml(utf8read(content), opts, Styles);
-	if(safegetzipfile(zip, 'meta.xml')) {
-		let str = getzipstr(zip, 'meta.xml');
-		str = xlml_normalize(utf8read(str));
-		let xml = Xml.xmlStrToObject(str, {asValue:7});
-		Xml.popOpts();
-		wb.Props = typeof xml.meta === 'object' ? xml.meta : parse_core_props(str);
-	}
-	if(opts.settings && safegetzipfile(zip, 'settings.xml')) {
-		let str = getzipstr(zip, 'settings.xml');
-		str = xlml_normalize(utf8read(str));
-		let xml = Xml.xmlStrToObject(str);
-		wb.Settings = xml.settings;
+	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
+	var wb = {};
+	if (opts.ck2Ex) {
+		let styles = opts.cellStyles ? parse_ods_xml(zip, 'styles.xml') : null;
+		let settings = opts.settings ? parse_ods_xml(zip, 'settings.xml') : null;
+		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
+		let content = parse_ods_xml(zip, 'content.xml');
+		wb = to_excel_workbook(content, styles, settings, meta);
+	} else {
+		var styles = getzipstr(zip, 'styles.xml');
+		var Styles = styles && parse_ods_styles(utf8read(styles), opts);
+		var content = getzipstr(zip, 'content.xml');
+		wb = parse_content_xml(utf8read(content), opts, Styles);
+		if(safegetzipfile(zip, 'meta.xml')) wb.Props = parse_core_props(getzipdata(zip, 'meta.xml'));
 	}
 	wb.bookType = "ods";
 	return wb;
 }
+
 function parse_fods(data, opts) {
 	var wb = parse_content_xml(data, opts);
 	wb.bookType = "fods";
 	return wb;
+}
+
+function to_excel_workbook(content, styles, settings, meta) {
+	var wb = {
+		Workbook: {
+			AppVersion: {},
+			WBProps: {},
+			WBView: [],
+			Sheets: [],
+			CalcPr: {},
+			Names: [],
+			Views: [],
+		},
+		Custprops: {},
+		Deps: {},
+		Sheets: {},
+		SheetNames: [],
+		Strings: [],
+		Styles: {
+			NumberFmt: [],
+			Fonts: [],
+			Fills: [],
+			Borders: [],
+			CellXf: [],
+		},
+		Themes: {
+			themeElements: {
+				clrScheme: [],
+			}
+		},
+		SSF: {},
+	};
+	if (content) {
+		if (styles) styles = styles.styles;
+		if (settings) settings = settings.settings;
+		if (meta) wb.Props = meta.meta;
+		convert_content(wb, content, styles, settings, meta);
+	}
+	return wb;
+}
+
+function convert_content(wb, content, styles, setting, meta) {
+	let body = content.body;
+	let ss = body.spreadsheet;
+	for (let n in ss) {
+		switch (n) {
+		case 'calculation-settings':
+		case 'named-expressions':
+			continue;
+		}
+		let sheet = ss[n];
+		let cols = sheet['table-column'];
+		if (!Array.isArray(cols)) continue;
+		let rows = sheet['table-row'];
+		if (!Array.isArray(rows)) continue;
+		let iCols = cols.length - 1, iRows = rows.length;
+		let sh = {
+			'!ref': 'A1:' + encode_col(iCols) + iRows,
+		};
+		wb.SheetNames.push(n);
+		wb.Sheets[n] = sh;
+		wb.Workbook.Sheets.push({
+			name: n,
+			sheetId: '' + wb.SheetNames.length,
+			Hidden: 0,
+		});
+		for (let i = 1; i <= iRows; i++) {
+			let row = rows[i - 1];
+			let cells = row['table-cell'];
+			if (!Array.isArray(cells)) cells = [cells];
+			for (let j = 0; j < cells.length; j++) {
+				let cell = cells[j];
+				let c = sh[encode_col(j) + i] = makeCell(cell);
+			}
+		}
+	}
+}
+function makeCell(cell) {
+	let c = {};
+	// boolean, float, date, time, string
+	let tn = cell['value-type'];
+	let v = cell[tn + '-value'] || cell.value || cell.p;
+	let t = 's';
+	switch (tn) {
+	case 'boolean':
+		t = 'b';
+		break;
+	case 'date':
+	case 'time':
+		v = (new Date(v)).getTime();
+	case 'float':
+	case 'currency':
+		t = 'n';
+		break;
+	}
+	c.v = v;
+	c.t = t;
+	c.w = cell.p;
+	return c;
 }
 /* OpenDocument */
 var write_styles_ods = /* @__PURE__ */(function() {
