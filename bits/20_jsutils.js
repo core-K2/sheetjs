@@ -540,8 +540,14 @@ var Xml = {
 				obj[name].push(val);
 			}
 		}
-		if (attrs.hasOwnProperty(this.opts.propName)) {
-			let n = this.getName(attrs[this.opts.propName]);
+		let pn = this.opts.propName;
+		if (pn && attrs.hasOwnProperty(pn)) {
+			let n = this.getName(attrs[pn]);
+			for (let a in attrs) {
+				if (a !== pn) {
+					obj[a] = attrs[a];
+				}
+			}
 			if (Object.keys(obj).length < 1) {
 				obj = null;
 			}

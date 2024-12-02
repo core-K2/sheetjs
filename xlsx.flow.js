@@ -3908,8 +3908,14 @@ var Xml = {
 				obj[name].push(val);
 			}
 		}
-		if (attrs.hasOwnProperty(this.opts.propName)) {
-			let n = this.getName(attrs[this.opts.propName]);
+		let pn = this.opts.propName;
+		if (pn && attrs.hasOwnProperty(pn)) {
+			let n = this.getName(attrs[pn]);
+			for (let a in attrs) {
+				if (a !== pn) {
+					obj[a] = attrs[a];
+				}
+			}
 			if (Object.keys(obj).length < 1) {
 				obj = null;
 			}
@@ -24057,12 +24063,15 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings, meta);
+		wb.content = content;
+		wb.styles = styles;
 	}
 	return wb;
 }
 
 function convert_content(wb, content, styles, setting, meta) {
 	let body = content.body;
+	let ass = content['automatic-styles'];
 	let ss = body.spreadsheet;
 	for (let n in ss) {
 		switch (n) {
@@ -24086,16 +24095,95 @@ function convert_content(wb, content, styles, setting, meta) {
 			sheetId: '' + wb.SheetNames.length,
 			Hidden: 0,
 		});
-		for (let i = 1; i <= iRows; i++) {
-			let row = rows[i - 1];
+		sh['!cols'] = makeColStyles(cols, ass);
+		let rss = sh['!rows'] = [];
+		let merges = sh['!merges'] = [] 
+		for (let i = 0; i < iRows; i++) {
+			let row = rows[i];
+			rss.push(makeRowStyle(row, ass))
 			let cells = row['table-cell'];
 			if (!Array.isArray(cells)) cells = [cells];
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
-				let c = sh[encode_col(j) + i] = makeCell(cell);
+				if (Object.keys(cell).length < 1) {
+					continue;
+				}
+				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
+				let cspan = cell['number-columns-spanned'];
+				let rspan = cell['number-rows-spanned'];
+				if (cspan > 0 || rspan > 0) {
+					cspan = cspan || 1;
+					rspan = rspan || 1;
+					merges.push({
+						s: {
+							r: i,
+							c: j
+						},
+						e: {
+							r: i + rspan - 1,
+							c: j + cspan - 1
+						}
+					});
+				}
 			}
 		}
 	}
+}
+function getPixelSize(v) {
+	if (!v) return v;
+	const re = /(\d+(\.\d+)?)([^0-9.]*)?/;
+	let m = v.match(re);
+	if (!m) throw new Error(`invalid number format "${v}"`);
+	let n = parseFloat(m[1]);
+	let unit = m[3].toLowerCase();
+	switch (unit) {
+	case 'mm':
+		n *= 10;
+	case 'cm':
+		n *= 96 / 2.54;
+		break;
+	case 'pt':
+		n *= 96 / 72;
+		break;
+	case 'inch':
+	case 'in':
+		n *= 96;
+		break;
+	}
+	return n;
+}
+function makeColStyles(cols, ass) {
+	let cs = [];
+	for (let i = 0; i < cols.length; i++) {
+		cs.push(makeColStyle(cols[i], ass));
+	}
+	return cs;
+}
+function makeColStyle(c, ass) {
+	let ret = {};
+	let s1 = ass[c['style-name']];
+	let s2 = ass[c['default-cell-style-name']];
+	if (s1) {
+		let cps = s1['table-column-properties'];
+		let w = cps && getPixelSize(cps['column-width']);
+		if (w) ret.wpx = w;
+	}
+	if (s2) {
+		let tcp = s2['table-cell-properties'];
+		let pps = s2['paragraph-properties'];
+		let tps = s2['text-properties'];
+	}
+	return ret;
+}
+function makeRowStyle(r, ass) {
+	let ret = {};
+	let s = ass[r['style-name']];
+	if (s) {
+		let rps = s['table-row-properties'];
+		let h = rps && getPixelSize(rps['row-height']);
+		if (h) ret.hpx = h;
+	}
+	return ret;
 }
 function makeCell(cell) {
 	let c = {};
@@ -24118,6 +24206,10 @@ function makeCell(cell) {
 	c.v = v;
 	c.t = t;
 	c.w = cell.p;
+	let f = cell['formula'];
+	if (f) {
+		c.f = f;
+	}
 	return c;
 }
 /* OpenDocument */
