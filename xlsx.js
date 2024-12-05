@@ -23961,7 +23961,9 @@ function to_excel_workbook(content, styles, settings, meta) {
 
 function convert_content(wb, content, styles, setting, meta) {
 	let body = content.body;
+	let fonts = content['font-face-decls'];
 	let ass = content['automatic-styles'];
+	let xfs = wb.Styles.CellXf;
 	let ss = body.spreadsheet;
 	for (let n in ss) {
 		switch (n) {
@@ -23987,7 +23989,7 @@ function convert_content(wb, content, styles, setting, meta) {
 		});
 		sh['!cols'] = makeColStyles(cols, ass);
 		let rss = sh['!rows'] = [];
-		let merges = sh['!merges'] = [] 
+		let merges = sh['!merges'] = [];
 		for (let i = 0; i < iRows; i++) {
 			let row = rows[i];
 			rss.push(makeRowStyle(row, ass))
@@ -23999,6 +24001,7 @@ function convert_content(wb, content, styles, setting, meta) {
 					continue;
 				}
 				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
+				setCellStyle(c, xfs, cell, ass, styles);
 				let cspan = cell['number-columns-spanned'];
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24059,9 +24062,9 @@ function makeColStyle(c, ass) {
 		if (w) ret.wpx = w;
 	}
 	if (s2) {
-		let tcp = s2['table-cell-properties'];
-		let pps = s2['paragraph-properties'];
-		let tps = s2['text-properties'];
+		let tc = s2['table-cell-properties'];
+		let pp = s2['paragraph-properties'];
+		let tp = s2['text-properties'];
 	}
 	return ret;
 }
@@ -24101,6 +24104,82 @@ function makeCell(cell) {
 		c.f = f;
 	}
 	return c;
+}
+function setCellStyle(c, xfs, cell, ass, styles) {
+	let st = cell['style-name'];
+	if (!st) return;
+	st = ass[st];
+	if (!st) return;
+	let dst = st['data-style-name'];
+	dst = dst && styles && styles[dst] || {};
+	let tc = getStyleObject('table-cell-properties', st, styles);
+	let pp = getStyleObject('paragraph-properties', st, styles);
+	let tp = getStyleObject('text-properties', st, styles);
+	let style = {};
+	style.alignment = makeAlignment(tc, pp);
+	style.applyAlignment = style.alignment !== null;
+	c.si = String(getOrAddStyle(xfs, style));
+}
+function cloneObject(obj) {
+	return !obj ? null : JSON.parse(JSON.stringify(obj));
+}
+function getStyleObject(name, st, styles) {
+	let obj = cloneObject(st[name]);
+	if (obj && styles) {
+		for (let o = obj;;) {
+			let p = o['parent-style-name'];
+			if (!p) {
+				break;
+			}
+			o = styles[p];
+			let v = o[name];
+			if (v && typeof v === 'object') {
+				for (let n in v) {
+					if (!obj.hasOwnProperty(n)) {
+						obj[n] = v[n];
+					}
+				}
+			}
+		}
+	}
+	return obj;
+}
+function makeAlignment(tc, pp) {
+	return {
+		"vertical": getProp('vertical-align', tc),
+		"horizontal": getProp('text-align', pp),
+		"textRotation": getProp('rotation-angle', tc),
+		// "indent": "0",
+		"wrapText": getProp('wrap-option', tc) == 'wrap'
+	};
+}
+function getProp(name) {
+	for (let i = 1; i < arguments.length; i++) {
+		let o = arguments[i];
+		if (o === null) {
+			// not exist object case
+			continue;
+		}
+		if (typeof o !== 'object') {
+			// default value
+			return o;
+		}
+		if (o.hasOwnProperty(name)) {
+			return o[name];
+		}
+	}
+	return null;
+}
+function getOrAddStyle(xfs, style) {
+	let s = JSON.stringify(style);
+	let i = xfs.findIndex(function(st) {
+		return JSON.stringify(st) === s;
+	});
+	if (i >= 0) {
+		return i + 1;
+	}
+	xfs.push(style);
+	return xfs.length;
 }
 /* OpenDocument */
 var write_styles_ods = /* @__PURE__ */(function() {
