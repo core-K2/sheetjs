@@ -24220,9 +24220,9 @@ function makeCell(cell) {
 		t = 'n';
 		break;
 	}
-	c.v = v;
+	c.v = Array.isArray(v) ? v.join('\n') : v;
 	c.t = t;
-	c.w = cell.p;
+	c.w = Array.isArray(cell.p) ? cell.p.join('\n') : cell.p;
 	let f = cell['formula'];
 	if (f) {
 		c.fr = f;
