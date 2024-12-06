@@ -23938,7 +23938,10 @@ function to_excel_workbook(content, styles, settings, meta) {
 			NumberFmt: [],
 			Fonts: [],
 			Fills: [],
-			Borders: [],
+			Borders: [{
+				diagonalUp: false,
+				diagonalDown: false
+			}],
 			CellXf: [],
 		},
 		Themes: {
@@ -23953,8 +23956,7 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings, meta);
-		wb.content = content;
-		wb.styles = styles;
+		console.log(content, styles);
 	}
 	return wb;
 }
@@ -23963,7 +23965,8 @@ function convert_content(wb, content, styles, setting, meta) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = content['automatic-styles'];
-	let xfs = wb.Styles.CellXf;
+	let Styles = wb.Styles;
+	let xfs = Styles.CellXf;
 	let ss = body.spreadsheet;
 	for (let n in ss) {
 		switch (n) {
@@ -24001,7 +24004,7 @@ function convert_content(wb, content, styles, setting, meta) {
 					continue;
 				}
 				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
-				setCellStyle(c, xfs, cell, ass, styles);
+				setCellStyle(c, xfs, cell, ass, styles, Styles);
 				let cspan = cell['number-columns-spanned'];
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24101,11 +24104,11 @@ function makeCell(cell) {
 	c.w = cell.p;
 	let f = cell['formula'];
 	if (f) {
-		c.f = f;
+		c.fr = f;
 	}
 	return c;
 }
-function setCellStyle(c, xfs, cell, ass, styles) {
+function setCellStyle(c, xfs, cell, ass, styles, Styles) {
 	let st = cell['style-name'];
 	if (!st) return;
 	st = ass[st];
@@ -24118,7 +24121,15 @@ function setCellStyle(c, xfs, cell, ass, styles) {
 	let style = {};
 	style.alignment = makeAlignment(tc, pp);
 	style.applyAlignment = style.alignment !== null;
-	c.si = String(getOrAddStyle(xfs, style));
+	let b = makeBorder(tc);
+	if (b) {
+		style.applyBorder = true;
+		style.borderId = getOrAddObject(Styles.Borders, b);
+	} else {
+		style.applyBorder = false;
+		style.borderId = 0;
+	}
+	c.si = getOrAddObject(xfs, style);
 }
 function cloneObject(obj) {
 	return !obj ? null : JSON.parse(JSON.stringify(obj));
@@ -24153,6 +24164,41 @@ function makeAlignment(tc, pp) {
 		"wrapText": getProp('wrap-option', tc) == 'wrap'
 	};
 }
+function makeBorder(tc) {
+	let b = getBorder(tc['border']);
+	let up = getBorder(tc['diagonal-bl-tr']);
+	let down = getBorder(tc['diagonal-tl-br']);
+	if (!b && !up && !down) return null;
+	let border = {};
+	if (b) {
+		border.border = b;
+		// border.left =
+		// border.right =
+		// border.top =
+		// border.bottom = parseBorder(b);
+	}
+	if (up || down) {
+		border.diagonalUp = !!up;
+		border.diagonalDown = !!down;
+		// border.diagonalUpCss = up;
+		// border.diagonalDwonCss = down;
+		border.diagonal = parseBorder(up || down);
+	}
+	return border;
+}
+function getBorder(v) {
+	return v && v !== 'none' ? v : null;
+}
+function parseBorder(v) {
+	let ar = ('' + v).split(' ');
+	if (ar.length < 3) return null;
+	return {
+		style: ar[1],
+		color: {
+			rgb: ar[2]
+		}
+	};
+}
 function getProp(name) {
 	for (let i = 1; i < arguments.length; i++) {
 		let o = arguments[i];
@@ -24170,16 +24216,16 @@ function getProp(name) {
 	}
 	return null;
 }
-function getOrAddStyle(xfs, style) {
-	let s = JSON.stringify(style);
-	let i = xfs.findIndex(function(st) {
-		return JSON.stringify(st) === s;
+function getOrAddObject(ar, obj) {
+	let s = JSON.stringify(obj);
+	let i = ar.findIndex(function(o) {
+		return JSON.stringify(o) === s;
 	});
 	if (i >= 0) {
-		return i + 1;
+		return i;
 	}
-	xfs.push(style);
-	return xfs.length;
+	ar.push(obj);
+	return ar.length - 1;
 }
 /* OpenDocument */
 var write_styles_ods = /* @__PURE__ */(function() {
