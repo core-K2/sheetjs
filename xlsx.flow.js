@@ -24046,7 +24046,15 @@ function to_excel_workbook(content, styles, settings, meta) {
 		Strings: [],
 		Styles: {
 			NumberFmt: [],
-			Fonts: [],
+			Fonts: [{
+				sz: 11,
+                color: {
+                    theme: 1,
+                    rgb: '000000'
+                },
+                name: 'Yu Gothic',
+                family: 2
+			}],
 			Fills: [{
 				patternType: 'none'
 			}],
@@ -24068,7 +24076,6 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings, meta);
-		console.log(content, styles);
 	}
 	return wb;
 }
@@ -24115,7 +24122,7 @@ function convert_content(wb, content, styles, setting, meta) {
 					continue;
 				}
 				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
-				setCellStyle(c, Styles, cell, ass, styles);
+				setCellStyle(c, Styles, cell, ass, fonts, styles);
 				let cspan = cell['number-columns-spanned'];
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24136,13 +24143,16 @@ function convert_content(wb, content, styles, setting, meta) {
 		}
 	}
 }
-function getPixelSize(v) {
+function getPixelSize(v, u) {
 	if (!v) return v;
 	const re = /(\d+(\.\d+)?)([^0-9.]*)?/;
 	let m = v.match(re);
 	if (!m) throw new Error(`invalid number format "${v}"`);
 	let n = parseFloat(m[1]);
 	let unit = m[3].toLowerCase();
+	if (u && u === unit) {
+		return n;
+	}
 	switch (unit) {
 	case 'mm':
 		n *= 10;
@@ -24219,7 +24229,7 @@ function makeCell(cell) {
 	}
 	return c;
 }
-function setCellStyle(c, Styles, cell, ass, styles) {
+function setCellStyle(c, Styles, cell, ass, fonts, styles) {
 	let st = cell['style-name'];
 	if (!st) return;
 	st = ass[st];
@@ -24230,6 +24240,8 @@ function setCellStyle(c, Styles, cell, ass, styles) {
 	let pp = getStyleObject('paragraph-properties', st, styles);
 	let tp = getStyleObject('text-properties', st, styles);
 	let style = {};
+	style.fontId = makeFont(tp, Styles.Fonts, fonts);
+	style.applyFont = style.fontId > 0;
 	style.fillId = makeFill(tc, tp, Styles.Fills);
 	style.alignment = makeAlignment(tc, pp);
 	style.applyAlignment = style.alignment !== null;
@@ -24266,6 +24278,60 @@ function getStyleObject(name, st, styles) {
 		}
 	}
 	return obj;
+}
+function makeFont(tp, fonts, decls) {
+	if (!tp) return 0;
+	let fn = tp['font-name-asian'] || tp['font-name'];
+	let fs = tp['font-size-asian'] || tp['font-size'];
+	if (!fn || !fs) return 0;
+	let f = {
+		sz: getPixelSize(fs, 'pt'),
+		name: fn,
+		family: getFontFamily(tp['font-family-generic-asian'] || tp['font-family-generic'], decls)
+	};
+	let fc = tp.color;
+	if (fc) {
+		f.color = {
+			rgb: fc
+		};
+	}
+	let fb = tp['font-weight'];
+	if (fb && fb === 'bold') f.bold = true;
+	let fi = tp['font-style'];
+	if (fi && fi === 'italic') f.italic = true;
+	let us = tp['text-underline-style'];
+	if (us && us !== 'none') f.underline = getUnderLine(us, tp['text-underline-type']);
+	let lt = tp['text-line-through-style'];
+	if (lt && lt !== 'none') f.strike = true;
+	return getOrAddObject(fonts, f);
+}
+function getFontFamily(ff, decls) {
+	let i = 0;
+	for (let d in decls) {
+		let v = decls[d];
+		if (v && v['font-family-generic'] == ff) return i;
+		i++;
+	}
+	return -1;
+}
+function getUnderLine(us, ut) {
+	let ul = 1;
+	switch (us) {
+	case 'none':
+		return 0;
+	case 'dash':
+	case 'dot-dash':
+	case 'dot-dot-dash':
+	case 'dotted':
+	case 'long-dash':
+	case 'wave':
+		ul = 3;
+		break;
+	case 'solid':
+	default:
+		break;
+	}
+	return ut === 'double' ? ++ul : ul;
 }
 function makeFill(tc, tp, fills) {
 	let bg = tc['background-color'];
