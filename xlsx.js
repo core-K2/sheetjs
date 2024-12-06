@@ -23937,7 +23937,9 @@ function to_excel_workbook(content, styles, settings, meta) {
 		Styles: {
 			NumberFmt: [],
 			Fonts: [],
-			Fills: [],
+			Fills: [{
+				patternType: 'none'
+			}],
 			Borders: [{
 				diagonalUp: false,
 				diagonalDown: false
@@ -24118,6 +24120,7 @@ function setCellStyle(c, Styles, cell, ass, styles) {
 	let pp = getStyleObject('paragraph-properties', st, styles);
 	let tp = getStyleObject('text-properties', st, styles);
 	let style = {};
+	style.fillId = makeFill(tc, tp, Styles.Fills);
 	style.alignment = makeAlignment(tc, pp);
 	style.applyAlignment = style.alignment !== null;
 	let b = makeBorder(tc);
@@ -24153,6 +24156,23 @@ function getStyleObject(name, st, styles) {
 		}
 	}
 	return obj;
+}
+function makeFill(tc, tp, fills) {
+	let bg = tc['background-color'];
+	if (!bg) return 0;
+	let f = {
+		patternType: 'solid',
+		bgColor: {
+			rgb: bg
+		}
+	};
+	let fg = tp && tp['color'];
+	if (fg) {
+		f.fgColor = {
+			rgb: fg
+		};
+	}
+	return getOrAddObject(fills, f);
 }
 function makeAlignment(tc, pp) {
 	return {
