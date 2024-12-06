@@ -94,7 +94,7 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			if(cell.z != null) sp["data-z"] = cell.z;
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
-			if (cell.si) sp.si = cell.si;
+			if (cell.si != null) sp.si = cell.si;
 			if (o.editable || o.childSpan) w = `<span${o.editable ? ' contenteditable="true"' : ''}>${w}</span>`;
 		}
 		sp.id = (o.id || "sjs") + "-" + coord;

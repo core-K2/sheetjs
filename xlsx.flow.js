@@ -23022,7 +23022,7 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			if(cell.z != null) sp["data-z"] = cell.z;
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
-			if (cell.si) sp.si = cell.si;
+			if (cell.si != null) sp.si = cell.si;
 			if (o.editable || o.childSpan) w = `<span${o.editable ? ' contenteditable="true"' : ''}>${w}</span>`;
 		}
 		sp.id = (o.id || "sjs") + "-" + coord;
@@ -24076,7 +24076,6 @@ function convert_content(wb, content, styles, setting, meta) {
 	let fonts = content['font-face-decls'];
 	let ass = content['automatic-styles'];
 	let Styles = wb.Styles;
-	let xfs = Styles.CellXf;
 	let ss = body.spreadsheet;
 	for (let n in ss) {
 		switch (n) {
@@ -24114,7 +24113,7 @@ function convert_content(wb, content, styles, setting, meta) {
 					continue;
 				}
 				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
-				setCellStyle(c, xfs, cell, ass, styles, Styles);
+				setCellStyle(c, Styles, cell, ass, styles);
 				let cspan = cell['number-columns-spanned'];
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24218,7 +24217,7 @@ function makeCell(cell) {
 	}
 	return c;
 }
-function setCellStyle(c, xfs, cell, ass, styles, Styles) {
+function setCellStyle(c, Styles, cell, ass, styles) {
 	let st = cell['style-name'];
 	if (!st) return;
 	st = ass[st];
@@ -24239,7 +24238,7 @@ function setCellStyle(c, xfs, cell, ass, styles, Styles) {
 		style.applyBorder = false;
 		style.borderId = 0;
 	}
-	c.si = getOrAddObject(xfs, style);
+	c.si = getOrAddObject(Styles.CellXf, style);
 }
 function cloneObject(obj) {
 	return !obj ? null : JSON.parse(JSON.stringify(obj));
