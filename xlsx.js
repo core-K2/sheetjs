@@ -23965,12 +23965,12 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (styles) styles = styles.styles;
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
-		convert_content(wb, content, styles, settings, meta);
+		convert_content(wb, content, styles, settings);
 	}
 	return wb;
 }
 
-function convert_content(wb, content, styles, setting, meta) {
+function convert_content(wb, content, styles, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = content['automatic-styles'];
@@ -24012,7 +24012,7 @@ function convert_content(wb, content, styles, setting, meta) {
 					continue;
 				}
 				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
-				setCellStyle(c, Styles, cell, ass, fonts, styles);
+				setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles);
 				let cspan = cell['number-columns-spanned'];
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24119,8 +24119,8 @@ function makeCell(cell) {
 	}
 	return c;
 }
-function setCellStyle(c, Styles, cell, ass, fonts, styles) {
-	let st = cell['style-name'];
+function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
+	let st = cell['style-name'] || col['default-cell-style-name'];
 	if (!st) return;
 	st = ass[st];
 	if (!st) return;
@@ -24202,7 +24202,7 @@ function getFontFamily(ff, decls) {
 		if (v && v['font-family-generic'] == ff) return i;
 		i++;
 	}
-	return -1;
+	return 0;
 }
 function getUnderLine(us, ut) {
 	let ul = 1;
@@ -24242,9 +24242,9 @@ function makeFill(tc, tp, fills) {
 }
 function makeAlignment(tc, pp) {
 	return {
-		"vertical": getProp('vertical-align', tc),
-		"horizontal": getProp('text-align', pp),
-		"textRotation": getProp('rotation-angle', tc),
+		"vertical": getProp('vertical-align', tc) || 'bottom',
+		"horizontal": getProp('text-align', pp) || 'general',
+		"textRotation": getProp('rotation-angle', tc) || 0,
 		// "indent": "0",
 		"wrapText": getProp('wrap-option', tc) == 'wrap'
 	};
