@@ -24224,7 +24224,7 @@ function getUnderLine(us, ut) {
 	return ut === 'double' ? ++ul : ul;
 }
 function makeFill(tc, tp, fills) {
-	let bg = tc['background-color'];
+	let bg = tc && tc['background-color'];
 	if (!bg) return 0;
 	let f = {
 		patternType: 'solid',
@@ -24250,6 +24250,7 @@ function makeAlignment(tc, pp) {
 	};
 }
 function makeBorder(tc) {
+	if (!tc) return null;
 	let b = getBorder(tc['border']);
 	let up = getBorder(tc['diagonal-bl-tr']);
 	let down = getBorder(tc['diagonal-tl-br']);
