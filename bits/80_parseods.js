@@ -889,6 +889,9 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings);
+		wb.content = content;
+		wb.styles = styles;
+		wb.settings = settings;
 	}
 	return wb;
 }
@@ -906,14 +909,21 @@ function convert_content(wb, content, styles, setting) {
 			continue;
 		}
 		let sheet = ss[n];
-		let cols = sheet['table-column'];
-		if (!Array.isArray(cols)) continue;
 		let rows = sheet['table-row'];
 		if (!Array.isArray(rows)) continue;
-		let iCols = cols.length - 1, iRows = rows.length;
-		let sh = {
-			'!ref': 'A1:' + encode_col(iCols) + iRows,
-		};
+		let cols = sheet['table-column'];
+		let thcols = sheet['table-header-columns'];
+		let hcols = thcols && thcols['table-column'];
+		if (!cols) {
+			if (!hcols) continue;
+			cols = [];
+		}
+		if (hcols) {
+			if (!Array.isArray(hcols)) hcols = [hcols];
+			cols.splice(0, 0, ...hcols);
+		}
+		let iRows = rows.length;
+		let sh = {};
 		wb.SheetNames.push(n);
 		wb.Sheets[n] = sh;
 		wb.Workbook.Sheets.push({
@@ -921,22 +931,28 @@ function convert_content(wb, content, styles, setting) {
 			sheetId: '' + wb.SheetNames.length,
 			Hidden: 0,
 		});
-		sh['!cols'] = makeColStyles(cols, ass);
 		let rss = sh['!rows'] = [];
 		let merges = sh['!merges'] = [];
+		let iColMax = -1;
 		for (let i = 0; i < iRows; i++) {
 			let row = rows[i];
 			rss.push(makeRowStyle(row, ass))
 			let cells = row['table-cell'];
 			if (!Array.isArray(cells)) cells = [cells];
+			let iCol = -1;
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
 				if (Object.keys(cell).length < 1) {
 					continue;
 				}
-				let c = sh[encode_col(j) + (i + 1)] = makeCell(cell);
+				let c = sh[encode_col(++iCol) + (i + 1)] = makeCell(cell);
 				setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles);
-				let cspan = cell['number-columns-spanned'];
+				let rep = cell['number-columns-repeated'] || 1
+				for (k = 1; k < rep; k++) {
+					sh[encode_col(++iCol) + (i + 1)] = c;
+				}
+				if (c.v && iColMax < iCol) iColMax = iCol;
+				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
 					cspan = cspan || 1;
@@ -954,6 +970,8 @@ function convert_content(wb, content, styles, setting) {
 				}
 			}
 		}
+		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRows;
+		sh['!cols'] = makeColStyles(cols, ass, iColMax);
 	}
 }
 function getPixelSize(v, u) {
@@ -982,10 +1000,18 @@ function getPixelSize(v, u) {
 	}
 	return n;
 }
-function makeColStyles(cols, ass) {
+function makeColStyles(cols, ass, iColMax) {
 	let cs = [];
-	for (let i = 0; i < cols.length; i++) {
-		cs.push(makeColStyle(cols[i], ass));
+	let i, j;
+	for (i = j = 0; i < cols.length; i++) {
+		let c = makeColStyle(cols[i], ass);
+		let rep = cols[i]['number-columns-repeated'] || 1;
+		for (k = 0; k < rep; k++) {
+			cs.push(c);
+			if (++j > iColMax) {
+				break;
+			}
+		}
 	}
 	return cs;
 }
@@ -995,8 +1021,7 @@ function makeColStyle(c, ass) {
 	let s2 = ass[c['default-cell-style-name']];
 	if (s1) {
 		let cps = s1['table-column-properties'];
-		let w = cps && getPixelSize(cps['column-width']);
-		if (w) ret.wpx = w;
+		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
 	}
 	if (s2) {
 		let tc = s2['table-cell-properties'];
@@ -1043,7 +1068,7 @@ function makeCell(cell) {
 	return c;
 }
 function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
-	let st = cell['style-name'] || col['default-cell-style-name'];
+	let st = (cell && cell['style-name']) || (col && col['default-cell-style-name']);
 	if (!st) return;
 	st = ass[st];
 	if (!st) return;
