@@ -24010,13 +24010,14 @@ function convert_content(wb, content, styles, setting) {
 		});
 		let rss = sh['!rows'] = [];
 		let merges = sh['!merges'] = [];
+		let iRow = 0;
 		let iColMax = -1;
 		for (let i = 0; i < iRows; i++) {
 			let row = rows[i];
-			rss.push(makeRowStyle(row, ass))
 			let cells = row['table-cell'];
 			if (!Array.isArray(cells)) cells = [cells];
 			let iCol = -1;
+			let bData = false;
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
 				if (Object.keys(cell).length < 1) {
@@ -24032,7 +24033,10 @@ function convert_content(wb, content, styles, setting) {
 						sh[encode_col(iCol) + (i + 1)] = c;
 					}
 				}
-				if (be && iColMax < iCol) iColMax = iCol;
+				if (be) {
+					bData |= be;
+					if (iColMax < iCol) iColMax = iCol;
+				}
 				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24040,18 +24044,25 @@ function convert_content(wb, content, styles, setting) {
 					rspan = rspan || 1;
 					merges.push({
 						s: {
-							r: i,
+							r: iRow,
 							c: iCol
 						},
 						e: {
-							r: i + rspan - 1,
+							r: iRow + rspan - 1,
 							c: iCol + cspan - 1
 						}
 					});
 				}
 			}
+			if (bData) {
+				let rep = row['number-rows-repeated'] || 1
+				let rs = makeRowStyle(row, ass);
+				for (let j = 0; j < rep; j++, iRow++) {
+					rss.push(rs);
+				}
+			}
 		}
-		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRows;
+		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRow;
 		sh['!cols'] = makeColStyles(cols, ass, iColMax);
 	}
 }
