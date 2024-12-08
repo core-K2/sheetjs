@@ -24022,13 +24022,17 @@ function convert_content(wb, content, styles, setting) {
 				if (Object.keys(cell).length < 1) {
 					continue;
 				}
-				let c = sh[encode_col(++iCol) + (i + 1)] = makeCell(cell);
-				setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles);
+				let c = makeCell(cell);
+				let be = setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles);
+				be |= !!c.v;
 				let rep = cell['number-columns-repeated'] || 1
-				for (k = 1; k < rep; k++) {
-					sh[encode_col(++iCol) + (i + 1)] = c;
+				for (k = 0; k < rep; k++) {
+					++iCol;
+					if (be) {
+						sh[encode_col(iCol) + (i + 1)] = c;
+					}
 				}
-				if (c.v && iColMax < iCol) iColMax = iCol;
+				if (be && iColMax < iCol) iColMax = iCol;
 				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'];
 				if (cspan > 0 || rspan > 0) {
@@ -24037,11 +24041,11 @@ function convert_content(wb, content, styles, setting) {
 					merges.push({
 						s: {
 							r: i,
-							c: j
+							c: iCol
 						},
 						e: {
 							r: i + rspan - 1,
-							c: j + cspan - 1
+							c: iCol + cspan - 1
 						}
 					});
 				}
@@ -24080,7 +24084,7 @@ function getPixelSize(v, u) {
 function makeColStyles(cols, ass, iColMax) {
 	let cs = [];
 	let i, j;
-	for (i = j = 0; i < cols.length; i++) {
+	for (i = j = 0; i < cols.length && j <= iColMax; i++) {
 		let c = makeColStyle(cols[i], ass);
 		let rep = cols[i]['number-columns-repeated'] || 1;
 		for (k = 0; k < rep; k++) {
@@ -24145,10 +24149,11 @@ function makeCell(cell) {
 	return c;
 }
 function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
+	let ret = false;
 	let st = (cell && cell['style-name']) || (col && col['default-cell-style-name']);
-	if (!st) return;
+	if (!st) return ret;
 	st = ass[st];
-	if (!st) return;
+	if (!st) return ret;
 	let dst = st['data-style-name'];
 	dst = dst && styles && styles[dst] || {};
 	let tc = getStyleObject('table-cell-properties', st, styles);
@@ -24164,11 +24169,13 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	if (b) {
 		style.applyBorder = true;
 		style.borderId = getOrAddObject(Styles.Borders, b);
+		ret = !!b.diagonal;
 	} else {
 		style.applyBorder = false;
 		style.borderId = 0;
 	}
 	c.si = getOrAddObject(Styles.CellXf, style);
+	return ret;
 }
 function cloneObject(obj) {
 	return !obj ? null : JSON.parse(JSON.stringify(obj));
