@@ -943,7 +943,7 @@ function convert_content(wb, content, styles, setting) {
 			let bData = false;
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
-				if (Object.keys(cell).length < 1) {
+				if (!Object.keys(cell).length) {
 					continue;
 				}
 				let c = makeCell(cell);
@@ -952,7 +952,7 @@ function convert_content(wb, content, styles, setting) {
 				let rep = cell['number-columns-repeated'] || 1
 				for (k = 0; k < rep; k++) {
 					++iCol;
-					if (be) {
+					if (be || iCol <= iColMax) {
 						sh[encode_col(iCol) + (i + 1)] = c;
 					}
 				}
@@ -1032,16 +1032,10 @@ function makeColStyles(cols, ass, iColMax) {
 }
 function makeColStyle(c, ass) {
 	let ret = {};
-	let s1 = ass[c['style-name']];
-	let s2 = ass[c['default-cell-style-name']];
-	if (s1) {
-		let cps = s1['table-column-properties'];
+	let s = ass[c['style-name']];
+	if (s) {
+		let cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
-	}
-	if (s2) {
-		let tc = s2['table-cell-properties'];
-		let pp = s2['paragraph-properties'];
-		let tp = s2['text-properties'];
 	}
 	return ret;
 }
@@ -1084,15 +1078,21 @@ function makeCell(cell) {
 }
 function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	let ret = false;
-	let st = (cell && cell['style-name']) || (col && col['default-cell-style-name']);
-	if (!st) return ret;
-	st = ass[st];
-	if (!st) return ret;
-	let dst = st['data-style-name'];
-	dst = dst && styles && styles[dst] || {};
-	let tc = getStyleObject('table-cell-properties', st, styles);
-	let pp = getStyleObject('paragraph-properties', st, styles);
-	let tp = getStyleObject('text-properties', st, styles);
+	let sts = existValues(cell && cell['style-name'], col && col['default-cell-style-name']);
+	if (!sts) return ret;
+	// let dst; // not implement yet
+	let tc, pp, tp;
+	for (let i = 0; i < sts.length; i++) {
+		let st = ass[sts[i]];
+		if (!st) {
+			st = styles && styles[sts[i]];
+			if (!st) continue;
+		}
+		// dst = getStyleObject(dst, 'data-style-name', st, styles);
+		tc = getStyleObject(tc, 'table-cell-properties', st, styles);
+		pp = getStyleObject(pp, 'paragraph-properties', st, styles);
+		tp = getStyleObject(tp, 'text-properties', st, styles);
+	}
 	let style = {};
 	style.fontId = makeFont(tp, Styles.Fonts, fonts);
 	style.applyFont = style.fontId > 0;
@@ -1111,26 +1111,44 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	c.si = getOrAddObject(Styles.CellXf, style);
 	return ret;
 }
+function existValues() {
+	ret = [];
+	for (let i = 0; i < arguments.length; i++) {
+		let v = arguments[i];
+		if (v) {
+			ret.push(v);
+		}
+	}
+	return ret.length > 0 && ret;
+}
 function cloneObject(obj) {
 	return !obj ? null : JSON.parse(JSON.stringify(obj));
 }
-function getStyleObject(name, st, styles) {
-	let obj = cloneObject(st[name]);
-	if (obj && styles) {
-		for (let o = obj;;) {
+function applyObject(obj, v) {
+	if (v && typeof v === 'object') {
+		if (!obj || !Object.keys(obj).length) {
+			obj = cloneObject(v);
+		} else {
+			for (let n in v) {
+				if (!obj.hasOwnProperty(n)) {
+					obj[n] = v[n];
+				}
+			}
+		}
+	}
+	return obj;
+}
+function getStyleObject(obj, name, st, styles) {
+	let o = st && st[name];
+	if (o) obj = applyObject(obj, o);
+	if (styles) {
+		for (o = st;;) {
 			let p = o['parent-style-name'];
 			if (!p) {
 				break;
 			}
 			o = styles[p];
-			let v = o[name];
-			if (v && typeof v === 'object') {
-				for (let n in v) {
-					if (!obj.hasOwnProperty(n)) {
-						obj[n] = v[n];
-					}
-				}
-			}
+			if (o) obj = applyObject(obj, o[name]);
 		}
 	}
 	return obj;
@@ -1218,22 +1236,25 @@ function makeAlignment(tc, pp) {
 function makeBorder(tc) {
 	if (!tc) return null;
 	let b = getBorder(tc['border']);
+	let bl = getBorder(tc['border-left']);
+	let br = getBorder(tc['border-right']);
+	let bt = getBorder(tc['border-top']);
+	let bb = getBorder(tc['border-bottom']);
 	let up = getBorder(tc['diagonal-bl-tr']);
 	let down = getBorder(tc['diagonal-tl-br']);
-	if (!b && !up && !down) return null;
+	if (!b && !bl && !br && !bt && !bb && !up && !down) return null;
 	let border = {};
 	if (b) {
 		border.border = b;
-		// border.left =
-		// border.right =
-		// border.top =
-		// border.bottom = parseBorder(b);
+	} else {
+		if (bl) border.left = bl;
+		if (br) border.right = br;
+		if (bt) border.top = bt;
+		if (bb) border.bottom = bb;
 	}
 	if (up || down) {
-		border.diagonalUp = !!up;
-		border.diagonalDown = !!down;
-		// border.diagonalUpCss = up;
-		// border.diagonalDwonCss = down;
+		border.diagonalUp = up;
+		border.diagonalDown = down;
 		border.diagonal = parseBorder(up || down);
 	}
 	return border;
