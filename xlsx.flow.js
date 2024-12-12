@@ -24016,6 +24016,11 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
 		let content = parse_ods_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
+		if (opts.debug) {
+			wb.content = content;
+			wb.styles = styles;
+			wb.settings = settings;
+		}
 	} else {
 		var styles = getzipstr(zip, 'styles.xml');
 		var Styles = styles && parse_ods_styles(utf8read(styles), opts);
@@ -24081,11 +24086,6 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings);
-/* for debug output
-		wb.content = content;
-		wb.styles = styles;
-		wb.settings = settings;
-*/
 	}
 	return wb;
 }

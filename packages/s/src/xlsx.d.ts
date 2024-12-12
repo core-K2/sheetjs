@@ -182,11 +182,14 @@ export interface ParsingOptions extends CommonOptions {
 
     dense?: boolean;
 
-    /* If true core-K2 expansion */
+    /* If true, core-K2 expansion */
     ck2Ex?: boolean;
 
-    /* If true get ODS settings(ck2Ex:true only) */
+    /* If true, get ODS settings(ck2Ex:true only) */
     settings?: boolean;
+
+    /* If true, output original objects */
+    debug?: boolean;
 }
 
 /** Options for write and writeFile */
