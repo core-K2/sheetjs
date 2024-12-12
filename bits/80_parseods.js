@@ -934,6 +934,7 @@ function convert_content(wb, content, styles, setting) {
 		let rss = sh['!rows'] = [];
 		let merges = sh['!merges'] = [];
 		let iRow = 0;
+		let iRowMax = -1;
 		let iColMax = -1;
 		for (let i = 0; i < iRows; i++) {
 			let row = rows[i];
@@ -943,49 +944,48 @@ function convert_content(wb, content, styles, setting) {
 			let bData = false;
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
-				if (!Object.keys(cell).length) {
-					continue;
-				}
-				let c = makeCell(cell);
-				let be = setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles);
-				be |= !!c.v;
+				let c = Object.keys(cell).length ? makeCell(cell) : null;
+				let be = c ? setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles) || !!c.v : false;
 				let rep = cell['number-columns-repeated'] || 1
+				let cspan = cell['number-columns-spanned'] || 0;
+				let rspan = cell['number-rows-spanned'] || 0;
 				for (k = 0; k < rep; k++) {
 					++iCol;
-					if (be || iCol <= iColMax) {
-						sh[encode_col(iCol) + (i + 1)] = c;
+					if (c && (be || iCol <= iColMax)) {
+						sh[encode_col(iCol) + (iRow + 1)] = c;
+					}
+					if (cspan > 0 || rspan > 0) {
+						cspan = cspan || 1;
+						rspan = rspan || 1;
+						merges.push({
+							s: {
+								r: iRow,
+								c: iCol
+							},
+							e: {
+								r: iRow + rspan - 1,
+								c: iCol + cspan - 1
+							}
+						});
+						if (cspan > 1) iCol += cspan - 1;
 					}
 				}
 				if (be) {
 					bData |= be;
 					if (iColMax < iCol) iColMax = iCol;
 				}
-				let cspan = cell['number-columns-spanned'] || 0;
-				let rspan = cell['number-rows-spanned'];
-				if (cspan > 0 || rspan > 0) {
-					cspan = cspan || 1;
-					rspan = rspan || 1;
-					merges.push({
-						s: {
-							r: iRow,
-							c: iCol
-						},
-						e: {
-							r: iRow + rspan - 1,
-							c: iCol + cspan - 1
-						}
-					});
-				}
 			}
+			let rep = row['number-rows-repeated'] || 1
+			iRow += rep;
 			if (bData) {
-				let rep = row['number-rows-repeated'] || 1
+				if (iRowMax < iRow) iRowMax = iRow;
 				let rs = makeRowStyle(row, ass);
-				for (let j = 0; j < rep; j++, iRow++) {
+				for (let j = 0; j < rep; j++) {
 					rss.push(rs);
 				}
 			}
 		}
-		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRow;
+		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!cols'] = makeColStyles(cols, ass, iColMax);
 	}
 }
@@ -1053,7 +1053,20 @@ function makeCell(cell) {
 	let c = {};
 	// boolean, float, date, time, string
 	let tn = cell['value-type'];
-	let v = cell[tn + '-value'] || cell.value || cell.p;
+	let p = cell.p;
+	let v = cell[tn + '-value'] || cell.value || p;
+	let w = p ? Array.isArray(p) ? p.join('\n') : p : v;
+	if (typeof v === 'object') {
+		let a = v.a;
+		if (a && a.href) {
+			// anchor
+			c.l = {
+				Target: a.href
+			};
+			w = a.value;
+		}
+		v = JSON.stringify(v);
+	}
 	let t = 's';
 	switch (tn) {
 	case 'boolean':
@@ -1067,9 +1080,9 @@ function makeCell(cell) {
 		t = 'n';
 		break;
 	}
-	c.v = Array.isArray(v) ? v.join('\n') : v;
 	c.t = t;
-	c.w = Array.isArray(cell.p) ? cell.p.join('\n') : cell.p;
+	c.v = v;
+	c.w = w;
 	let f = cell['formula'];
 	if (f) {
 		c.fr = f;
