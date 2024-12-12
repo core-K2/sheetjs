@@ -411,6 +411,7 @@ var Xml = {
 		prefixAttr: '',		// prefix for attribute
 		prefixText: '',		// prefix for text data
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
+		convNames: null,	// convert name map
 	},
 	_opts: [],
 	pushOpts: function() {
@@ -443,7 +444,11 @@ var Xml = {
 		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
-			return n.split(':').at(-1);
+			n = n.split(':').at(-1);
+		}
+		if (this.opts.convNames) {
+			let conv = this.opts.convNames[n];
+			if (conv) return conv;
 		}
 		return n;
 	},

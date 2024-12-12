@@ -822,7 +822,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let styles = opts.cellStyles ? parse_ods_xml(zip, 'styles.xml') : null;
 		let settings = opts.settings ? parse_ods_xml(zip, 'settings.xml') : null;
 		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_ods_xml(zip, 'content.xml');
+		let content = parse_ods_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
 	} else {
 		var styles = getzipstr(zip, 'styles.xml');
@@ -889,9 +889,11 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings);
+/* for debug output
 		wb.content = content;
 		wb.styles = styles;
 		wb.settings = settings;
+*/
 	}
 	return wb;
 }
@@ -967,7 +969,7 @@ function convert_content(wb, content, styles, setting) {
 								c: iCol + cspan - 1
 							}
 						});
-						if (cspan > 1) iCol += cspan - 1;
+						//if (cspan > 1) iCol += cspan - 1;
 					}
 				}
 				if (be) {

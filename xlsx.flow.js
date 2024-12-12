@@ -3779,6 +3779,7 @@ var Xml = {
 		prefixAttr: '',		// prefix for attribute
 		prefixText: '',		// prefix for text data
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
+		convNames: null,	// convert name map
 	},
 	_opts: [],
 	pushOpts: function() {
@@ -3811,7 +3812,11 @@ var Xml = {
 		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
-			return n.split(':').at(-1);
+			n = n.split(':').at(-1);
+		}
+		if (this.opts.convNames) {
+			let conv = this.opts.convNames[n];
+			if (conv) return conv;
 		}
 		return n;
 	},
@@ -24009,7 +24014,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let styles = opts.cellStyles ? parse_ods_xml(zip, 'styles.xml') : null;
 		let settings = opts.settings ? parse_ods_xml(zip, 'settings.xml') : null;
 		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_ods_xml(zip, 'content.xml');
+		let content = parse_ods_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
 	} else {
 		var styles = getzipstr(zip, 'styles.xml');
@@ -24076,9 +24081,11 @@ function to_excel_workbook(content, styles, settings, meta) {
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings);
+/* for debug output
 		wb.content = content;
 		wb.styles = styles;
 		wb.settings = settings;
+*/
 	}
 	return wb;
 }
@@ -24154,7 +24161,7 @@ function convert_content(wb, content, styles, setting) {
 								c: iCol + cspan - 1
 							}
 						});
-						if (cspan > 1) iCol += cspan - 1;
+						//if (cspan > 1) iCol += cspan - 1;
 					}
 				}
 				if (be) {
