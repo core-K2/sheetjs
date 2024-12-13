@@ -969,7 +969,10 @@ function convert_content(wb, content, styles, setting) {
 								c: iCol + cspan - 1
 							}
 						});
-						//if (cspan > 1) iCol += cspan - 1;
+						if (be && cspan > 1) {
+							let max = iCol + cspan - 1;
+							if (iColMax < max) iColMax = max;
+						}
 					}
 				}
 				if (be) {
@@ -988,7 +991,7 @@ function convert_content(wb, content, styles, setting) {
 			}
 		}
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
-		sh['!cols'] = makeColStyles(cols, ass, iColMax);
+		sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
 	}
 }
 function getPixelSize(v, u) {
@@ -1017,11 +1020,11 @@ function getPixelSize(v, u) {
 	}
 	return n;
 }
-function makeColStyles(cols, ass, iColMax) {
+function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	let cs = [];
 	let i, j;
 	for (i = j = 0; i < cols.length && j <= iColMax; i++) {
-		let c = makeColStyle(cols[i], ass);
+		let c = makeColStyle(cols[i], ass, styles, Styles, fonts);
 		let rep = cols[i]['number-columns-repeated'] || 1;
 		for (k = 0; k < rep; k++) {
 			cs.push(c);
@@ -1032,14 +1035,35 @@ function makeColStyles(cols, ass, iColMax) {
 	}
 	return cs;
 }
-function makeColStyle(c, ass) {
+function makeColStyle(c, ass, styles, Styles, fonts) {
 	let ret = {};
 	let s = ass[c['style-name']];
 	if (s) {
 		let cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
 	}
+	if (styles) {
+		s = ass[c['default-cell-style-name']];
+		if (s) {
+			let st = getDefaultStyle(styles, s['family']);
+			if (st) {
+				let tc = getStyleObject(null, 'table-cell-properties', st, styles);
+				let pp = getStyleObject(null, 'paragraph-properties', st, styles);
+				let tp = getStyleObject(null, 'text-properties', st, styles);
+				let style = {};
+				applyStyle(style, Styles, fonts, tc, pp, tp);
+				ret.styleIndex = getOrAddObject(Styles.CellXf, style);
+			}
+		}
+	}
 	return ret;
+}
+function getDefaultStyle(styles, family) {
+	let def = styles && styles['default-style'];
+	return !def ? null :
+		Array.isArray(def) ? def.find(function(s) {
+			return s.family === family;
+		}) : def.family === family ? def : null;
 }
 function makeRowStyle(r, ass) {
 	let ret = {};
@@ -1109,6 +1133,11 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 		tp = getStyleObject(tp, 'text-properties', st, styles);
 	}
 	let style = {};
+	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
+	c.si = getOrAddObject(Styles.CellXf, style);
+	return ret;
+}
+function applyStyle(style, Styles, fonts, tc, pp, tp) {
 	style.fontId = makeFont(tp, Styles.Fonts, fonts);
 	style.applyFont = style.fontId > 0;
 	style.fillId = makeFill(tc, tp, Styles.Fills);
@@ -1118,13 +1147,12 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	if (b) {
 		style.applyBorder = true;
 		style.borderId = getOrAddObject(Styles.Borders, b);
-		ret = !!b.diagonal;
+		return !!b.diagonal;
 	} else {
 		style.applyBorder = false;
 		style.borderId = 0;
 	}
-	c.si = getOrAddObject(Styles.CellXf, style);
-	return ret;
+	return false;
 }
 function existValues() {
 	ret = [];
