@@ -23014,13 +23014,15 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			// core-K2 customize
 			//if(isNaN(cell.v)) cell = ({t:'e', v:0x24, w:BErr[0x24]});
 			//else cell = ({t:'e', v:0x07, w:BErr[0x07]});
-			let v = isNaN(cell.v) ? 0x24 : 0x07;
-			cell.t = 'e';
-			cell.v = v;
-			cell.w = BErr[v];
+			if (!o.noCheck) {
+				let v = isNaN(cell.v) ? 0x24 : 0x07;
+				cell.t = 'e';
+				cell.v = v;
+				cell.w = BErr[v];
+			}
 		}
 		/* TODO: html entities */
-		var w = (cell && cell.v != null) && (cell.h || escapehtml(cell.w || (format_cell(cell), cell.w) || "")) || "";
+		var w = (cell && cell.v != null) && (cell.h || escapehtml(cell.w || (format_cell(cell), cell.w))) || "";
 		sp = ({}/*:any*/);
 		if(RS > 1) sp.rowspan = RS;
 		if(CS > 1) sp.colspan = CS;
