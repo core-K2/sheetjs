@@ -1013,7 +1013,7 @@ function getPixelSize(v, u) {
 		n *= 96;
 		break;
 	}
-	return n;
+	return n.toFixed(4);
 }
 function makeRowStyles(rows, ass, iRowMax) {
 	let rss = [];
