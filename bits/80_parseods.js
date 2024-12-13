@@ -1119,7 +1119,8 @@ function makeCell(cell) {
 	c.w = w;
 	let f = cell['formula'];
 	if (f) {
-		c.fr = f;
+		if (f.startsWith('of:=')) f = f.substring(4);
+		c.f = f;
 	}
 	return c;
 }
