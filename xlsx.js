@@ -24011,7 +24011,6 @@ function convert_content(wb, content, styles, setting) {
 			if (!Array.isArray(hcols)) hcols = [hcols];
 			cols.splice(0, 0, ...hcols);
 		}
-		let iRows = rows.length;
 		let sh = {};
 		wb.SheetNames.push(n);
 		wb.Sheets[n] = sh;
@@ -24020,12 +24019,11 @@ function convert_content(wb, content, styles, setting) {
 			sheetId: '' + wb.SheetNames.length,
 			Hidden: 0,
 		});
-		let rss = sh['!rows'] = [];
 		let merges = sh['!merges'] = [];
 		let iRow = 0;
 		let iRowMax = -1;
 		let iColMax = -1;
-		for (let i = 0; i < iRows; i++) {
+		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
 			if (!Array.isArray(cells)) cells = [cells];
@@ -24067,17 +24065,14 @@ function convert_content(wb, content, styles, setting) {
 					if (iColMax < iCol) iColMax = iCol;
 				}
 			}
-			let rep = row['number-rows-repeated'] || 1
+			let rep = row['number-rows-repeated'] || 1;
 			iRow += rep;
 			if (bData) {
 				if (iRowMax < iRow) iRowMax = iRow;
-				let rs = makeRowStyle(row, ass);
-				for (let j = 0; j < rep; j++) {
-					rss.push(rs);
-				}
 			}
 		}
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
+		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
 	}
 }
@@ -24106,6 +24101,19 @@ function getPixelSize(v, u) {
 		break;
 	}
 	return n;
+}
+function makeRowStyles(rows, ass, iRowMax) {
+	let rss = [];
+	let iRow = 0;
+	for (let i = 0; i < rows.length && iRow < iRowMax; i++) {
+		row = rows[i];
+		let rep = row['number-rows-repeated'] || 1;
+		let rs = makeRowStyle(row, ass);
+		for (let j = 0; j < rep && iRow < iRowMax; j++, iRow++) {
+			rss.push(rs);
+		}
+	}
+	return rss;
 }
 function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	let cs = [];
@@ -24355,13 +24363,15 @@ function makeFill(tc, tp, fills) {
 	return getOrAddObject(fills, f);
 }
 function makeAlignment(tc, pp) {
-	return {
-		"vertical": getProp('vertical-align', tc) || 'bottom',
-		"horizontal": getProp('text-align', pp) || 'general',
-		"textRotation": getProp('rotation-angle', tc) || 0,
-		// "indent": "0",
-		"wrapText": getProp('wrap-option', tc) == 'wrap'
-	};
+	let ret = {};
+	if (tc) {
+		ret.vertical = getProp('vertical-align', tc) || 'bottom';
+		ret.textRotation = getProp('rotation-angle', tc) || 0;
+		let v = getProp('wrap-option', tc);
+		if (v) ret.wrapText = v === 'wrap';
+	}
+	ret.horizontal = getProp('text-align', pp) || 'general';
+	return ret;
 }
 function makeBorder(tc) {
 	if (!tc) return null;
