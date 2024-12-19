@@ -24025,6 +24025,7 @@ function convert_content(wb, content, styles, setting) {
 		let iRow = 0;
 		let iRowMax = -1;
 		let iColMax = -1;
+		let noSi = [];
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
@@ -24041,7 +24042,11 @@ function convert_content(wb, content, styles, setting) {
 				for (k = 0; k < rep; k++) {
 					++iCol;
 					if (c && (be || iCol <= iColMax)) {
-						sh[encode_col(iCol) + (iRow + 1)] = c;
+						let cn = encode_col(iCol) + (iRow + 1);
+						sh[cn] = c;
+						if (!c.hasOwnProperty('si')) {
+							noSi.push({i: iCol, n:cn})
+						}
 					}
 					if (cspan > 0 || rspan > 0) {
 						cspan = cspan || 1;
@@ -24075,7 +24080,10 @@ function convert_content(wb, content, styles, setting) {
 		}
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
-		sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
+		let csts = sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
+		noSi.forEach(function(v) {
+			sh[v.n].si = csts[v.i].si;
+		});
 	}
 }
 function getPixelSize(v, u) {
@@ -24149,7 +24157,7 @@ function makeColStyle(c, ass, styles, Styles, fonts) {
 				let tp = getStyleObject(null, 'text-properties', st, styles);
 				let style = {};
 				applyStyle(style, Styles, fonts, tc, pp, tp);
-				ret.styleIndex = getOrAddObject(Styles.CellXf, style);
+				ret.si = getOrAddObject(Styles.CellXf, style);
 			}
 		}
 	}
@@ -24201,6 +24209,9 @@ function makeCell(cell) {
 	case 'float':
 	case 'currency':
 		t = 'n';
+		break;
+	case 'string':
+		if (p === 0) w = '';
 		break;
 	}
 	c.t = t;

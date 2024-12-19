@@ -621,6 +621,9 @@ export interface Sheet2HTMLOpts {
     /** Add span as inner child (core-K2 expansion) */
     childSpan?: boolean;
 
+    /** no check value (core-K2 expansion) */
+    noCheck?: boolean;
+
     /** Header HTML */
     header?: string;
 
