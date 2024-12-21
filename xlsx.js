@@ -12253,7 +12253,7 @@ function parse_theme_xml(data, opts) {
 	/* themeElements CT_BaseStyles */
 	if(!(t=str_match_xml(data, "a:themeElements"))) throw new Error('themeElements not found in theme');
 	parse_themeElements(t[0], themes, opts);
-	themes.raw = data;
+	//themes.raw = data;
 	return themes;
 }
 
@@ -16025,6 +16025,7 @@ function check_ws(ws, sname, i) {
 function parse_ws_xml_dim(ws, s) {
 	var d = safe_decode_range(s);
 	if(d.s.r<=d.e.r && d.s.c<=d.e.c && d.s.r>=0 && d.s.c>=0) ws["!ref"] = encode_range(d);
+	return d;
 }
 var mergecregex = /<(?:\w+:)?mergeCell ref=["'][A-Z0-9:]+['"]\s*[\/]?>/g;
 var hlinkregex = /<(?:\w+:)?hyperlink [^<>]*>/mg;
@@ -16061,9 +16062,15 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
+	let iColMax = Number.MAX_SAFE_INTEGER;
+	let iRowMax = Number.MAX_SAFE_INTEGER;
 	if(ridx > 0) {
 		var ref = data1.slice(ridx,ridx+50).match(dimregex);
-		if(ref && !(opts && opts.nodim)) parse_ws_xml_dim(s, ref[1]);
+		if(ref && !(opts && opts.nodim)) {
+			let d = parse_ws_xml_dim(s, ref[1]);
+			iColMax = d.e.c;
+			iRowMax = d.e.r;
+		}
 	}
 
 	/* 18.3.1.88 sheetViews CT_SheetViews */
@@ -16075,11 +16082,11 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
 	if(opts.cellStyles) {
 		/* 18.3.1.13 col CT_Col */
 		var cols = data1.match(colregex);
-		if(cols) parse_ws_xml_cols(columns, cols);
+		if(cols) parse_ws_xml_cols(columns, cols, iColMax);
 	}
 
 	/* 18.3.1.80 sheetData CT_SheetData ? */
-	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb);
+	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, iRowMax);
 
 	/* 18.3.1.2  autoFilter CT_AutoFilter */
 	var afilter = data2.match(afregex);
@@ -16220,7 +16227,7 @@ function write_ws_xml_margins(margin) {
 	return writextag('pageMargins', null, margin);
 }
 
-function parse_ws_xml_cols(columns, cols) {
+function parse_ws_xml_cols(columns, cols, iMax) {
 	var seencol = false;
 	for(var coli = 0; coli != cols.length; ++coli) {
 		var coll = parsexmltag(cols[coli], true);
@@ -16230,6 +16237,7 @@ function parse_ws_xml_cols(columns, cols) {
 		delete coll.min; delete coll.max; coll.width = +coll.width;
 		if(!seencol && coll.width) { seencol = true; find_mdw_colw(coll.width); }
 		process_col(coll);
+		if (iMax < colM) colM = iMax;
 		while(colm <= colM) columns[colm++] = dup(coll);
 	}
 }
@@ -16348,7 +16356,7 @@ var parse_ws_xml_data = (function() {
 	var rregex = /r=["']([^"']*)["']/;
 	var refregex = /ref=["']([^"']*)["']/;
 
-return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb) {
+return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, iMax) {
 	var ri = 0, x = "", cells = [], cref = [], idx=0, i=0, cc=0, d="", p;
 	var tag, tagr = 0, tagc = 0;
 	var sstr, ftag;
@@ -16374,7 +16382,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb) {
 					// TODO: avoid duplication
 					tag = parsexmltag(x.slice(rstarti,ri), true);
 					tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
-					if(opts.sheetRows && opts.sheetRows < tagr) continue;
+					if(opts.sheetRows && opts.sheetRows < tagr || iMax <= tagr) continue;
 					rowobj = {}; rowrite = false;
 					if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 					if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
@@ -16384,7 +16392,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb) {
 				break;
 			case "<" /*60*/: rstarti = ri; break;
 		}
-		if(rstarti >= ri) break;
+		if(rstarti >= ri || iMax <= tagr) break;
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;

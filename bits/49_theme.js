@@ -100,7 +100,7 @@ function parse_theme_xml(data/*:string*/, opts) {
 	/* themeElements CT_BaseStyles */
 	if(!(t=str_match_xml(data, "a:themeElements"))) throw new Error('themeElements not found in theme');
 	parse_themeElements(t[0], themes, opts);
-	themes.raw = data;
+	//themes.raw = data;
 	return themes;
 }
 
