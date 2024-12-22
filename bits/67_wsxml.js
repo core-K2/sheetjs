@@ -38,31 +38,30 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
-	let iColMax = Number.MAX_SAFE_INTEGER;
-	let iRowMax = Number.MAX_SAFE_INTEGER;
+	let d;
 	if(ridx > 0) {
 		var ref = data1.slice(ridx,ridx+50).match(dimregex);
 		if(ref && !(opts && opts.nodim)) {
-			let d = parse_ws_xml_dim(s, ref[1]);
-			iColMax = d.e.c;
-			iRowMax = d.e.r;
+			d = parse_ws_xml_dim(s, ref[1]);
 		}
 	}
+	if (!d) d = {s: {r: 0, c: 0}, e: {r: 0, c: 0}};
 
 	/* 18.3.1.88 sheetViews CT_SheetViews */
 	var svs = str_match_xml_ns(data1, "sheetViews");
 	if(svs && svs[1]) parse_ws_xml_sheetviews(svs[1], wb);
+
+	/* 18.3.1.80 sheetData CT_SheetData ? */
+	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, d.e);
+	s['!ref'] = encode_range(d);
 
 	/* 18.3.1.17 cols CT_Cols */
 	var columns/*:Array<ColInfo>*/ = [];
 	if(opts.cellStyles) {
 		/* 18.3.1.13 col CT_Col */
 		var cols = data1.match(colregex);
-		if(cols) parse_ws_xml_cols(columns, cols, iColMax);
+		if(cols) parse_ws_xml_cols(columns, cols, d.e);
 	}
-
-	/* 18.3.1.80 sheetData CT_SheetData ? */
-	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, iRowMax);
 
 	/* 18.3.1.2  autoFilter CT_AutoFilter */
 	var afilter = data2.match(afregex);
@@ -203,7 +202,7 @@ function write_ws_xml_margins(margin)/*:string*/ {
 	return writextag('pageMargins', null, margin);
 }
 
-function parse_ws_xml_cols(columns, cols, iMax) {
+function parse_ws_xml_cols(columns, cols, endCell) {
 	var seencol = false;
 	for(var coli = 0; coli != cols.length; ++coli) {
 		var coll = parsexmltag(cols[coli], true);
@@ -213,7 +212,8 @@ function parse_ws_xml_cols(columns, cols, iMax) {
 		delete coll.min; delete coll.max; coll.width = +coll.width;
 		if(!seencol && coll.width) { seencol = true; find_mdw_colw(coll.width); }
 		process_col(coll);
-		if (iMax < colM) colM = iMax;
+		let iMaxCol = endCell.c;
+		if (iMaxCol > 0 && iMaxCol < colM) colM = iMaxCol;
 		while(colm <= colM) columns[colm++] = dup(coll);
 	}
 }
@@ -332,7 +332,7 @@ var parse_ws_xml_data = /*#__PURE__*/(function() {
 	var rregex = /r=["']([^"']*)["']/;
 	var refregex = /ref=["']([^"']*)["']/;
 
-return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, themes, styles, wb, iMax) {
+return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, themes, styles, wb, endCell) {
 	var ri = 0, x = "", cells/*:Array<string>*/ = [], cref/*:?Array<string>*/ = [], idx=0, i=0, cc=0, d="", p/*:any*/;
 	var tag, tagr = 0, tagc = 0;
 	var sstr, ftag;
@@ -344,6 +344,9 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 	var rows/*:Array<RowInfo>*/ = [], rowobj = {}, rowrite = false;
 	var sheetStubs = !!opts.sheetStubs;
 	var date1904 = !!((wb||{}).WBProps||{}).date1904;
+	let iMaxRow = endCell.r;
+	if (!iMaxRow) iMaxRow = Number.MAX_SAFE_INTEGER;
+	let iMaxCol = 0;
 	for(var marr = sdata.split(rowregex), mt = 0, marrlen = marr.length; mt != marrlen; ++mt) {
 		x = marr[mt].trim();
 		var xlen = x.length;
@@ -358,7 +361,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 					// TODO: avoid duplication
 					tag = parsexmltag(x.slice(rstarti,ri), true);
 					tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
-					if(opts.sheetRows && opts.sheetRows < tagr || iMax <= tagr) continue;
+					if(opts.sheetRows && opts.sheetRows < tagr || iMaxRow <= tagr) continue;
 					rowobj = {}; rowrite = false;
 					if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 					if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
@@ -368,7 +371,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				break;
 			case "<" /*60*/: rstarti = ri; break;
 		}
-		if(rstarti >= ri || iMax <= tagr) break;
+		if(rstarti >= ri || iMaxRow <= tagr) break;
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;
@@ -452,6 +455,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				else p.t = "z";
 			}
 			else p.t = tag.t || "n";
+			if (tag.t && iMaxCol < tagc) iMaxCol = tagc;
 			if(guess.s.c > tagc) guess.s.c = tagc;
 			if(guess.e.c < tagc) guess.e.c = tagc;
 			/* 18.18.11 t ST_CellType */
@@ -529,6 +533,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 			} else s[tag.r] = p;
 		}
 	}
+	if (iMaxCol > 0) endCell.c = iMaxCol;
 	if(rows.length > 0) s['!rows'] = rows;
 }; })();
 
