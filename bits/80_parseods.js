@@ -805,10 +805,7 @@ function parse_ods_xml(zip, fname, xmlOpts) {
 	let str = '';
 	if(safegetzipfile(zip, fname)) {
 		str = getzipstr(zip, fname);
-		str = xlml_normalize(utf8read(str));
-		let xml = Xml.xmlStrToObject(str, xmlOpts);
-		if (xmlOpts) Xml.popOpts();
-		return xml;
+		return parse_xml(str, xmlOpts);
 	}
 	return str;
 }

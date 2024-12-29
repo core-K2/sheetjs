@@ -361,7 +361,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 					// TODO: avoid duplication
 					tag = parsexmltag(x.slice(rstarti,ri), true);
 					tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
-					if(opts.sheetRows && opts.sheetRows < tagr || iMaxRow <= tagr) continue;
+					if(opts.sheetRows && opts.sheetRows < tagr || iMaxRow < tagr) continue;
 					rowobj = {}; rowrite = false;
 					if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 					if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
@@ -371,7 +371,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				break;
 			case "<" /*60*/: rstarti = ri; break;
 		}
-		if(rstarti >= ri || iMaxRow <= tagr) break;
+		if(rstarti >= ri || iMaxRow < tagr) break;
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;

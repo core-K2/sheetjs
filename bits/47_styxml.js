@@ -414,6 +414,9 @@ var parse_sty_xml= /*#__PURE__*/(function make_pstyx() {
 return function parse_sty_xml(data, themes, opts) {
 	var styles = {};
 	if(!data) return styles;
+	if (opts.ck2Ex) {
+		return parse_sty_xml_ck2(data, themes, opts);
+	}
 	data = remove_doctype(str_remove_ng(data, "<!--", "-->"));
 	/* 18.8.39 styleSheet CT_Stylesheet */
 	var t;
@@ -462,4 +465,143 @@ function write_sty_xml(wb/*:Workbook*/, opts)/*:string*/ {
 
 	if(o.length>2){ o[o.length] = ('</styleSheet>'); o[1]=o[1].replace("/>",">"); }
 	return o.join("");
+}
+
+function isEmpty(v) {
+	if (v === null || v === undefined) {
+		return true;
+	} else if (v instanceof Array) {
+		return v.length < 1;
+	} else if (typeof v === 'object') {
+		return Object.keys(v).length < 1;
+	}
+	return false;
+}
+function toCamelCase(str) {
+	return str.replace(/[-_](\w)/g, function() {
+		var v1 = arguments[1];
+		return v1 ? v1.toUpperCase() : '';
+	});
+}
+function toUpperCamelCase(str) {
+	return toCamelCase(str).replace(/^[a-z]/, function(match) {
+		return match.toUpperCase();
+	});
+}
+
+function parse_xml(str, xmlOpts) {
+	str = xlml_normalize(utf8read(str));
+	let xml = Xml.xmlStrToObject(str, xmlOpts);
+	if (xmlOpts) Xml.popOpts();
+	return xml;
+}
+
+function parse_sty_xml_ck2(data, themes, opts) {
+	let styles = {};
+	let dt = parse_xml(data);
+	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
+	styles.Fonts = makeFonts(dt.fonts, themes);
+	styles.Fills = makeFills(dt.fills, themes);
+	styles.Borders = makeBorders(dt.borders, themes);
+	styles.CellXf = makeXfs(dt.cellXfs, dt.cellStyleXfs, themes);
+	return styles;
+}
+function makeNumberFmt(v, themes) {
+	let ar = [];
+	let dt = v.numFmt;
+	if (Array.isArray(dt)) {
+		dt.forEach(function(f) {
+			ar[f.numFmtId] = f.formatCode;
+		});
+	}
+	return ar;
+}
+function makeFonts(v, themes) {
+	let ar = [];
+	let dt = v.font;
+	if (Array.isArray(dt)) {
+		dt.forEach(function(f) {
+			let obj = {};
+			for (let n in f) {
+				let o = f[n];
+				let v = o.val;
+				let name;
+				switch (n) {
+				case 'b': name = 'bold'; break;
+				case 'i': name = 'italic'; break;
+				case 'u': name = 'underline'; break;
+				case 'color':
+					v = adjustColor(o, themes);
+					break;
+				}
+				obj[name || n] = v;
+			}
+			ar.push(obj);
+		});
+	}
+	return ar;
+}
+function makeFills(v, themes) {
+	let ar = [];
+	let dt = v.fill;
+	if (Array.isArray(dt)) {
+		dt.forEach(function(f) {
+			let obj = f.patternFill;
+			if (obj.fgColor) adjustColor(obj.fgColor, themes);
+			if (obj.bgColor) adjustColor(obj.bgColor, themes);
+			ar.push(obj);
+		});
+	}
+	return ar;
+}
+function makeBorders(v, themes) {
+	let ar = [];
+	let dt = v.border;
+	if (Array.isArray(dt)) {
+		dt.forEach(function(o) {
+			let obj = {};
+			for (let n in o) {
+				let v = o[n];
+				if (isEmpty(v)) continue;
+				if (v.color) adjustColor(v.color, themes);
+				obj[n] = v;
+			}
+			ar.push(obj);
+		});
+	}
+	return ar;
+}
+function makeXfs(v, bv, themes) {
+	let ar = [];
+	bv = bv.xf;
+	let dt = v.xf;
+	if (Array.isArray(dt)) {
+		dt.forEach(function(x) {
+			let obj = x;
+			let bs = bv[x.xfId];
+			if (!x.applyFont) x.applyFont = bs.applyFont;
+			if (!x.applyBorder) x.applyBorder = bs.applyBorder;
+			if (!x.applyProtection) x.applyProtection = bs.applyProtection;
+			if (!x.applyAlignment) {
+				x.applyAlignment = bs.applyAlignment;
+				extendObject(x.alignment, bs.alignment);
+			}
+			ar.push(obj);
+		});
+	}
+	return ar;
+}
+function adjustColor(o, themes) {
+	if (o.rgb === undefined) {
+		o.rgb = getTheme(o.theme, themes).rgb;
+	}
+	return o;
+}
+function getTheme(n, themes) {
+	return isNaN(n) ? {} : themes.themeElements.clrScheme[Number(n)];
+}
+function extendObject(d, s) {
+	for (let n in s) {
+		if (d[n] === undefined) d[n] = s[n];
+	}
 }
