@@ -12034,19 +12034,19 @@ function makeXfs(v, bv, themes) {
 	if (Array.isArray(dt)) {
 		dt.forEach(function(x) {
 			let bs = bv[x.xfId];
-			if (!x.applyFont && bs.applyFont) {
+			if (!x.applyFont && bs?.applyFont) {
 				x.applyFont = bs.applyFont;
 				x.fontId = bs.fontId;
 			}
-			if (!x.applyBorder && bs.applyBorder) {
+			if (!x.applyBorder && bs?.applyBorder) {
 				x.applyBorder = bs.applyBorder;
 				x.borderId = bs.borderId;
 			}
-			if (!x.applyProtection && bs.applyProtection) {
+			if (!x.applyProtection && bs?.applyProtection) {
 				x.applyProtection = bs.applyProtection;
 				x.protection = bs.protection;
 			}
-			if (!x.applyAlignment && bs.applyAlignment) {
+			if (!x.applyAlignment && bs?.applyAlignment) {
 				x.applyAlignment = bs.applyAlignment;
 				x.alignment = bs.alignment;
 			}
