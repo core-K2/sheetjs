@@ -5573,6 +5573,64 @@ var XLSLblBuiltIn = [
 	"_xlnm._FilterDatabase"
 ];
 
+var XLSIndexedColors = [
+    "000000",  // Black
+    "FFFFFF",  // White
+    "FF0000",  // Red
+    "00FF00",  // Green
+    "0000FF",  // Blue
+    "FFFF00",  // Yellow
+    "FF00FF",  // Magenta
+    "00FFFF",  // Cyan
+    "800000",  // Maroon
+    "808000",  // Olive
+    "008000",  // Dark Green
+    "800080",  // Purple
+    "008080",  // Teal
+    "000080",  // Navy
+    "808080",  // Gray
+    "C0C0C0",  // Silver
+    "FF8080",  // Light Red
+    "80FF80",  // Light Green
+    "8080FF",  // Light Blue
+    "FFFF80",  // Light Yellow
+    "FF80FF",  // Light Magenta
+    "80FFFF",  // Light Cyan
+    "FF80C0",  // Pink
+    "FF8000",  // Orange
+    "FFFF40",  // Light Yellow
+    "FFFFE0",  // Pale Yellow
+    "A6A6A6",  // Gray-40%
+    "D9D9D9",  // Gray-10%
+    "333333",  // Gray-80%
+    "808080",  // Gray-50%
+    "E0E0E0",  // Gray-20%
+    "A0A0A0",  // Gray-60%
+    "400040",  // Dark Purple
+    "C0C0C0",  // Light Silver
+    "FF0000",  // Red
+    "FF00FF",  // Magenta
+    "FFFF00",  // Yellow
+    "00FF00",  // Green
+    "00FFFF",  // Cyan
+    "0000FF",  // Blue
+    "FF00FF",  // Magenta
+    "00FFFF",  // Cyan
+    "808080",  // Gray-50%
+    "C0C0C0",  // Gray-25%
+    "000080",  // Navy Blue
+    "800080",  // Purple
+    "808000",  // Olive
+    "800000",  // Maroon
+    "80C080",  // Light Green
+    "C080FF",  // Light Purple
+    "80C0FF",  // Light Blue
+    "FF4000",  // Orange
+    "C00040",  // Rose
+    "A04000",  // Brown
+    "FF8080",  // Light Red
+    "FFC080"   // Light Orange
+ ];
 /* Parts enumerated in OPC spec, MS-XLSB and MS-XLSX */
 /* 12.3 Part Summary <SpreadsheetML> */
 /* 14.2 Part Summary <DrawingML> */
@@ -11887,6 +11945,7 @@ function parse_xml(str, xmlOpts) {
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
 	let dt = parse_xml(data);
+	themes.indexedColors = dt.colors?.indexedColors || XLSIndexedColors;
 	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
 	styles.Fonts = makeFonts(dt.fonts, themes);
 	styles.Fills = makeFills(dt.fills, themes);
@@ -11896,10 +11955,15 @@ function parse_sty_xml_ck2(data, themes, opts) {
 }
 function makeNumberFmt(v, themes) {
 	let ar = [];
+	for (let n in table_fmt) {
+		ar[n] = table_fmt[n];
+	}
 	let dt = v.numFmt;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			ar[f.numFmtId] = f.formatCode;
+			SSF__load(f.formatCode, f.numFmtId);
 		});
 	}
 	return ar;
@@ -11907,6 +11971,7 @@ function makeNumberFmt(v, themes) {
 function makeFonts(v, themes) {
 	let ar = [];
 	let dt = v.font;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			let obj = {};
@@ -11932,6 +11997,7 @@ function makeFonts(v, themes) {
 function makeFills(v, themes) {
 	let ar = [];
 	let dt = v.fill;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			let obj = f.patternFill;
@@ -11945,6 +12011,7 @@ function makeFills(v, themes) {
 function makeBorders(v, themes) {
 	let ar = [];
 	let dt = v.border;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(o) {
 			let obj = {};
@@ -11963,25 +12030,46 @@ function makeXfs(v, bv, themes) {
 	let ar = [];
 	bv = bv.xf;
 	let dt = v.xf;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(x) {
-			let obj = x;
 			let bs = bv[x.xfId];
-			if (!x.applyFont) x.applyFont = bs.applyFont;
-			if (!x.applyBorder) x.applyBorder = bs.applyBorder;
-			if (!x.applyProtection) x.applyProtection = bs.applyProtection;
-			if (!x.applyAlignment) {
-				x.applyAlignment = bs.applyAlignment;
-				extendObject(x.alignment, bs.alignment);
+			if (!x.applyFont && bs.applyFont) {
+				x.applyFont = bs.applyFont;
+				x.fontId = bs.fontId;
 			}
-			ar.push(obj);
+			if (!x.applyBorder && bs.applyBorder) {
+				x.applyBorder = bs.applyBorder;
+				x.borderId = bs.borderId;
+			}
+			if (!x.applyProtection && bs.applyProtection) {
+				x.applyProtection = bs.applyProtection;
+				x.protection = bs.protection;
+			}
+			if (!x.applyAlignment && bs.applyAlignment) {
+				x.applyAlignment = bs.applyAlignment;
+				x.alignment = bs.alignment;
+			}
+			ar.push(x);
 		});
 	}
 	return ar;
 }
 function adjustColor(o, themes) {
 	if (o.rgb === undefined) {
-		o.rgb = getTheme(o.theme, themes).rgb;
+		if (o.theme !== undefined) {
+			o.rgb = getTheme(o.theme, themes).rgb;
+		} else {
+			let i = o.indexed;
+			if (i !== undefined) {
+				let colors = themes.indexedColors;
+				if (i < colors.length) {
+					o.rgb = colors[i];
+				} else {
+					o.rgb = getTheme(i - colors.length, themes).rgb;
+				}
+			}
+		} 
 	}
 	return o;
 }

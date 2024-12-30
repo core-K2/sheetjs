@@ -321,3 +321,61 @@ var XLSLblBuiltIn = [
 	"_xlnm._FilterDatabase"
 ];
 
+var XLSIndexedColors = [
+    "000000",  // Black
+    "FFFFFF",  // White
+    "FF0000",  // Red
+    "00FF00",  // Green
+    "0000FF",  // Blue
+    "FFFF00",  // Yellow
+    "FF00FF",  // Magenta
+    "00FFFF",  // Cyan
+    "800000",  // Maroon
+    "808000",  // Olive
+    "008000",  // Dark Green
+    "800080",  // Purple
+    "008080",  // Teal
+    "000080",  // Navy
+    "808080",  // Gray
+    "C0C0C0",  // Silver
+    "FF8080",  // Light Red
+    "80FF80",  // Light Green
+    "8080FF",  // Light Blue
+    "FFFF80",  // Light Yellow
+    "FF80FF",  // Light Magenta
+    "80FFFF",  // Light Cyan
+    "FF80C0",  // Pink
+    "FF8000",  // Orange
+    "FFFF40",  // Light Yellow
+    "FFFFE0",  // Pale Yellow
+    "A6A6A6",  // Gray-40%
+    "D9D9D9",  // Gray-10%
+    "333333",  // Gray-80%
+    "808080",  // Gray-50%
+    "E0E0E0",  // Gray-20%
+    "A0A0A0",  // Gray-60%
+    "400040",  // Dark Purple
+    "C0C0C0",  // Light Silver
+    "FF0000",  // Red
+    "FF00FF",  // Magenta
+    "FFFF00",  // Yellow
+    "00FF00",  // Green
+    "00FFFF",  // Cyan
+    "0000FF",  // Blue
+    "FF00FF",  // Magenta
+    "00FFFF",  // Cyan
+    "808080",  // Gray-50%
+    "C0C0C0",  // Gray-25%
+    "000080",  // Navy Blue
+    "800080",  // Purple
+    "808000",  // Olive
+    "800000",  // Maroon
+    "80C080",  // Light Green
+    "C080FF",  // Light Purple
+    "80C0FF",  // Light Blue
+    "FF4000",  // Orange
+    "C00040",  // Rose
+    "A04000",  // Brown
+    "FF8080",  // Light Red
+    "FFC080"   // Light Orange
+ ];

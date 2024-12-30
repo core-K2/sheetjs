@@ -499,6 +499,7 @@ function parse_xml(str, xmlOpts) {
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
 	let dt = parse_xml(data);
+	themes.indexedColors = dt.colors?.indexedColors || XLSIndexedColors;
 	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
 	styles.Fonts = makeFonts(dt.fonts, themes);
 	styles.Fills = makeFills(dt.fills, themes);
@@ -508,10 +509,15 @@ function parse_sty_xml_ck2(data, themes, opts) {
 }
 function makeNumberFmt(v, themes) {
 	let ar = [];
+	for (let n in table_fmt) {
+		ar[n] = table_fmt[n];
+	}
 	let dt = v.numFmt;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			ar[f.numFmtId] = f.formatCode;
+			SSF__load(f.formatCode, f.numFmtId);
 		});
 	}
 	return ar;
@@ -519,6 +525,7 @@ function makeNumberFmt(v, themes) {
 function makeFonts(v, themes) {
 	let ar = [];
 	let dt = v.font;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			let obj = {};
@@ -544,6 +551,7 @@ function makeFonts(v, themes) {
 function makeFills(v, themes) {
 	let ar = [];
 	let dt = v.fill;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			let obj = f.patternFill;
@@ -557,6 +565,7 @@ function makeFills(v, themes) {
 function makeBorders(v, themes) {
 	let ar = [];
 	let dt = v.border;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(o) {
 			let obj = {};
@@ -575,25 +584,46 @@ function makeXfs(v, bv, themes) {
 	let ar = [];
 	bv = bv.xf;
 	let dt = v.xf;
+	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(x) {
-			let obj = x;
 			let bs = bv[x.xfId];
-			if (!x.applyFont) x.applyFont = bs.applyFont;
-			if (!x.applyBorder) x.applyBorder = bs.applyBorder;
-			if (!x.applyProtection) x.applyProtection = bs.applyProtection;
-			if (!x.applyAlignment) {
-				x.applyAlignment = bs.applyAlignment;
-				extendObject(x.alignment, bs.alignment);
+			if (!x.applyFont && bs.applyFont) {
+				x.applyFont = bs.applyFont;
+				x.fontId = bs.fontId;
 			}
-			ar.push(obj);
+			if (!x.applyBorder && bs.applyBorder) {
+				x.applyBorder = bs.applyBorder;
+				x.borderId = bs.borderId;
+			}
+			if (!x.applyProtection && bs.applyProtection) {
+				x.applyProtection = bs.applyProtection;
+				x.protection = bs.protection;
+			}
+			if (!x.applyAlignment && bs.applyAlignment) {
+				x.applyAlignment = bs.applyAlignment;
+				x.alignment = bs.alignment;
+			}
+			ar.push(x);
 		});
 	}
 	return ar;
 }
 function adjustColor(o, themes) {
 	if (o.rgb === undefined) {
-		o.rgb = getTheme(o.theme, themes).rgb;
+		if (o.theme !== undefined) {
+			o.rgb = getTheme(o.theme, themes).rgb;
+		} else {
+			let i = o.indexed;
+			if (i !== undefined) {
+				let colors = themes.indexedColors;
+				if (i < colors.length) {
+					o.rgb = colors[i];
+				} else {
+					o.rgb = getTheme(i - colors.length, themes).rgb;
+				}
+			}
+		} 
 	}
 	return o;
 }
