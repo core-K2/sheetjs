@@ -16399,8 +16399,14 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	var svs = str_match_xml_ns(data1, "sheetViews");
 	if(svs && svs[1]) parse_ws_xml_sheetviews(svs[1], wb);
 
+	/* 18.3.1.55 mergeCells CT_MergeCells */
+	var merges/*:Array<Range>*/ = [];
+	var _merge = data2.match(mergecregex);
+	if(_merge) for(ridx = 0; ridx != _merge.length; ++ridx)
+		merges[ridx] = safe_decode_range(_merge[ridx].slice(_merge[ridx].indexOf("=")+2));
+
 	/* 18.3.1.80 sheetData CT_SheetData ? */
-	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, d.e);
+	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, d.e, merges);
 	s['!ref'] = encode_range(d);
 
 	/* 18.3.1.17 cols CT_Cols */
@@ -16414,12 +16420,6 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	/* 18.3.1.2  autoFilter CT_AutoFilter */
 	var afilter = data2.match(afregex);
 	if(afilter) s['!autofilter'] = parse_ws_xml_autofilter(afilter[0]);
-
-	/* 18.3.1.55 mergeCells CT_MergeCells */
-	var merges/*:Array<Range>*/ = [];
-	var _merge = data2.match(mergecregex);
-	if(_merge) for(ridx = 0; ridx != _merge.length; ++ridx)
-		merges[ridx] = safe_decode_range(_merge[ridx].slice(_merge[ridx].indexOf("=")+2));
 
 	/* 18.3.1.48 hyperlinks CT_Hyperlinks */
 	var hlink = data2.match(hlinkregex);
@@ -16680,7 +16680,7 @@ var parse_ws_xml_data = /*#__PURE__*/(function() {
 	var rregex = /r=["']([^"']*)["']/;
 	var refregex = /ref=["']([^"']*)["']/;
 
-return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, themes, styles, wb, endCell) {
+return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, themes, styles, wb, endCell, merges) {
 	var ri = 0, x = "", cells/*:Array<string>*/ = [], cref/*:?Array<string>*/ = [], idx=0, i=0, cc=0, d="", p/*:any*/;
 	var tag, tagr = 0, tagc = 0;
 	var sstr, ftag;
@@ -16805,8 +16805,17 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 			}
 			else p.t = tag.t || "n";
 			if (tag.t) {
-				if (iMaxRow < tagr) iMaxRow = tagr;
-				if (iMaxCol < tagc) iMaxCol = tagc;
+				let r = tagr;
+				let c = tagc;
+				let m = merges.find(function(m) {
+					return m.s.r === r && m.s.c === c;
+				});
+				if (m) {
+					r = m.e.r;
+					c = m.e.c;
+				}
+				if (iMaxRow < r) iMaxRow = r;
+				if (iMaxCol < c) iMaxCol = c;
 			}
 			if(guess.s.c > tagc) guess.s.c = tagc;
 			if(guess.e.c < tagc) guess.e.c = tagc;
