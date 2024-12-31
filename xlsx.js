@@ -16598,8 +16598,9 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 	var rows = [], rowobj = {}, rowrite = false;
 	var sheetStubs = !!opts.sheetStubs;
 	var date1904 = !!((wb||{}).WBProps||{}).date1904;
-	let iMaxRow = endCell.r;
-	if (!iMaxRow) iMaxRow = Number.MAX_SAFE_INTEGER;
+	let iChkRow = endCell.r;
+	if (!iChkRow) iChkRow = Number.MAX_SAFE_INTEGER;
+	let iMaxRow = 0;
 	let iMaxCol = 0;
 	for(var marr = sdata.split(rowregex), mt = 0, marrlen = marr.length; mt != marrlen; ++mt) {
 		x = marr[mt].trim();
@@ -16615,7 +16616,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 					// TODO: avoid duplication
 					tag = parsexmltag(x.slice(rstarti,ri), true);
 					tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
-					if(opts.sheetRows && opts.sheetRows < tagr || iMaxRow < tagr) continue;
+					if(opts.sheetRows && opts.sheetRows < tagr || iChkRow < tagr) continue;
 					rowobj = {}; rowrite = false;
 					if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 					if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
@@ -16625,7 +16626,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 				break;
 			case "<" /*60*/: rstarti = ri; break;
 		}
-		if(rstarti >= ri || iMaxRow < tagr) break;
+		if(rstarti >= ri || iChkRow < tagr) break;
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;
@@ -16709,7 +16710,10 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 				else p.t = "z";
 			}
 			else p.t = tag.t || "n";
-			if (tag.t && iMaxCol < tagc) iMaxCol = tagc;
+			if (tag.t) {
+				if (iMaxRow < tagr) iMaxRow = tagr;
+				if (iMaxCol < tagc) iMaxCol = tagc;
+			}
 			if(guess.s.c > tagc) guess.s.c = tagc;
 			if(guess.e.c < tagc) guess.e.c = tagc;
 			/* 18.18.11 t ST_CellType */
@@ -16787,6 +16791,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 			} else s[tag.r] = p;
 		}
 	}
+	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0) endCell.c = iMaxCol;
 	if(rows.length > 0) s['!rows'] = rows;
 }; })();
