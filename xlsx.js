@@ -24468,15 +24468,14 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	let ret = false;
 	let sts = existValues(cell && cell['style-name'], col && col['default-cell-style-name']);
 	if (!sts) return ret;
-	// let dst; // not implement yet
-	let tc, pp, tp;
+	let dst, tc, pp, tp;
 	for (let i = 0; i < sts.length; i++) {
 		let st = ass[sts[i]];
 		if (!st) {
 			st = styles && styles[sts[i]];
 			if (!st) continue;
 		}
-		// dst = getStyleObject(dst, 'data-style-name', st, styles);
+		dst = getStyleObject(dst, 'data-style-name', st, styles, ass);
 		tc = getStyleObject(tc, 'table-cell-properties', st, styles);
 		pp = getStyleObject(pp, 'paragraph-properties', st, styles);
 		tp = getStyleObject(tp, 'text-properties', st, styles);
@@ -24484,6 +24483,9 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	let style = {};
 	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
 	c.si = getOrAddObject(Styles.CellXf, style);
+	if (dst) {
+		setDataFormat(c, cell, dst);
+	}
 	return ret;
 }
 function applyStyle(style, Styles, fonts, tc, pp, tp) {
@@ -24530,17 +24532,22 @@ function applyObject(obj, v) {
 	}
 	return obj;
 }
-function getStyleObject(obj, name, st, styles) {
+function getStyleObject(obj, name, st, styles, ass) {
 	let o = st && st[name];
+	if (ass && typeof o === 'string') o = ass[o];
 	if (o) obj = applyObject(obj, o);
 	if (styles) {
 		for (o = st;;) {
-			let p = o['parent-style-name'];
+			let p = o && o['parent-style-name'];
 			if (!p) {
 				break;
 			}
 			o = styles[p];
-			if (o) obj = applyObject(obj, o[name]);
+			if (o) {
+				o = o[name];
+				if (ass && typeof o === 'string') o = ass[o];
+				obj = applyObject(obj, o);
+			}
 		}
 	}
 	return obj;
@@ -24665,6 +24672,16 @@ function parseBorder(v) {
 			rgb: ar[2]
 		}
 	};
+}
+function setDataFormat(c, cell, dst) {
+	if (c.t === 'n') {
+		if (typeof c.w === 'number') {
+			let n = dst.number;
+			if (n) {
+				c.w = c.w.toFixed(n['decimal-places']);
+			}
+		}
+	}
 }
 function getProp(name) {
 	for (let i = 1; i < arguments.length; i++) {
