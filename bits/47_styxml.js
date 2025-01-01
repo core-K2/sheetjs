@@ -620,7 +620,7 @@ function adjustColor(o, themes) {
 				if (i < colors.length) {
 					o.rgb = colors[i];
 				} else {
-					o.rgb = getTheme(i - colors.length, themes).rgb;
+					o.rgb = '#80' + colors[i % colors.length];
 				}
 			}
 		} 

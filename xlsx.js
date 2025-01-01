@@ -5495,57 +5495,67 @@ var XLSIndexedColors = [
     "00FF00",  // Green
     "0000FF",  // Blue
     "FFFF00",  // Yellow
-    "FF00FF",  // Magenta
     "00FFFF",  // Cyan
+    "FF00FF",  // Magenta
+    "808080",  // Gray 50%
     "800000",  // Maroon
-    "808000",  // Olive
-    "008000",  // Dark Green
-    "800080",  // Purple
-    "008080",  // Teal
+    "008000",  // Green 50%
     "000080",  // Navy
-    "808080",  // Gray
-    "C0C0C0",  // Silver
-    "FF8080",  // Light Red
-    "80FF80",  // Light Green
-    "8080FF",  // Light Blue
-    "FFFF80",  // Light Yellow
-    "FF80FF",  // Light Magenta
-    "80FFFF",  // Light Cyan
-    "FF80C0",  // Pink
-    "FF8000",  // Orange
-    "FFFF40",  // Light Yellow
-    "FFFFE0",  // Pale Yellow
-    "A6A6A6",  // Gray-40%
-    "D9D9D9",  // Gray-10%
-    "333333",  // Gray-80%
-    "808080",  // Gray-50%
-    "E0E0E0",  // Gray-20%
-    "A0A0A0",  // Gray-60%
-    "400040",  // Dark Purple
-    "C0C0C0",  // Light Silver
-    "FF0000",  // Red
-    "FF00FF",  // Magenta
-    "FFFF00",  // Yellow
-    "00FF00",  // Green
-    "00FFFF",  // Cyan
-    "0000FF",  // Blue
-    "FF00FF",  // Magenta
-    "00FFFF",  // Cyan
-    "808080",  // Gray-50%
-    "C0C0C0",  // Gray-25%
-    "000080",  // Navy Blue
-    "800080",  // Purple
     "808000",  // Olive
-    "800000",  // Maroon
-    "80C080",  // Light Green
-    "C080FF",  // Light Purple
-    "80C0FF",  // Light Blue
-    "FF4000",  // Orange
-    "C00040",  // Rose
-    "A04000",  // Brown
-    "FF8080",  // Light Red
-    "FFC080"   // Light Orange
- ];
+    "008080",  // Teal
+    "800080",  // Purple 50%
+    "C0C0C0",  // Silver
+    "999999",  // Gray 40%
+    "CCCCCC",  // Gray 30%
+    "E5E5E5",  // Gray 20%
+    "F2F2F2",  // Gray 10%
+    "800000",  // Dark Red
+    "008000",  // Dark Green
+    "000080",  // Dark Blue
+    "556B2F",  // Dark Olive
+    "800000",  // Dark Maroon
+    "663399",  // Dark Purple
+    "4B0082",  // Indigo
+    "4B0082",  // Indigo
+    "006400",  // Dark Green
+    "8B0000",  // Dark Red
+    "FF8C00",  // Dark Orange
+    "B8860B",  // Dark Goldenrod
+    "DC143C",  // Crimson
+    "FF6347",  // Tomato
+    "FF7F50",  // Coral
+    "E9967A",  // Dark Salmon
+    "5F9EA0",  // Cadet Blue
+    "4682B4",  // Steel Blue
+    "1E90FF",  // Dodger Blue
+    "00BFFF",  // Deep Sky Blue
+    "6495ED",  // Cornflower Blue
+    "9400D3",  // Dark Violet
+    "9932CC",  // Dark Orchid
+    "B8860B",  // Dark Goldenrod
+    "6B8E23",  // Dark Khaki
+    "8FBC8F",  // Dark Sea Green
+    "483D8B",  // Dark Slate Blue
+    "2F4F4F",  // Dark Slate Gray
+    "00CED1",  // Dark Turquoise
+    "9932CC",  // Dark Orchid
+    "9400D3",  // Dark Violet
+    "8B0000",  // Dark Red
+    "FF8C00",  // Dark Orange
+    "E9967A",  // Dark Salmon
+    "8FBC8F",  // Dark Sea Green
+    "A9A9A9",   // Dark Gray
+
+	"808080",
+	"0f243f",
+	"1e1c11",
+	"254061",
+	"632523",
+	"4f6228",
+	"403152",
+	"215968",
+	"dce6f2",
+];
 /* Parts enumerated in OPC spec, MS-XLSB and MS-XLSX */
 /* 12.3 Part Summary <SpreadsheetML> */
 /* 14.2 Part Summary <DrawingML> */
@@ -11975,7 +11985,7 @@ function adjustColor(o, themes) {
 				if (i < colors.length) {
 					o.rgb = colors[i];
 				} else {
-					o.rgb = getTheme(i - colors.length, themes).rgb;
+					o.rgb = '#80' + colors[i % colors.length];
 				}
 			}
 		} 
