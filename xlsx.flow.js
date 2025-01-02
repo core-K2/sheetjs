@@ -12020,7 +12020,7 @@ function makeBorders(v, themes) {
 			for (let n in o) {
 				let v = o[n];
 				if (isEmpty(v)) continue;
-				if (v.color) adjustColor(v.color, themes);
+				if (v.color) adjustColor(v.color, themes, [64]);
 				obj[n] = v;
 			}
 			ar.push(obj);
@@ -12057,18 +12057,22 @@ function makeXfs(v, bv, themes) {
 	}
 	return ar;
 }
-function adjustColor(o, themes) {
+function adjustColor(o, themes, avoidIndexes) {
 	if (o.rgb === undefined) {
 		if (o.theme !== undefined) {
 			o.rgb = getTheme(o.theme, themes).rgb;
 		} else {
 			let i = o.indexed;
 			if (i !== undefined) {
-				let colors = themes.indexedColors;
-				if (i < colors.length) {
-					o.rgb = colors[i];
+				if (Array.isArray(avoidIndexes) && avoidIndexes.indexOf(i) >= 0) {
+					// avoid setting color
 				} else {
-					o.rgb = '#80' + colors[i % colors.length];
+					let colors = themes.indexedColors;
+					if (i < colors.length) {
+						o.rgb = colors[i];
+					} else {
+						o.rgb = '#80' + colors[i % colors.length];
+					}
 				}
 			}
 		} 
