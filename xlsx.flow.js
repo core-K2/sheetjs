@@ -5630,16 +5630,6 @@ var XLSIndexedColors = [
     "E9967A",  // Dark Salmon
     "8FBC8F",  // Dark Sea Green
     "A9A9A9",   // Dark Gray
-
-	"808080",
-	"0f243f",
-	"1e1c11",
-	"254061",
-	"632523",
-	"4f6228",
-	"403152",
-	"215968",
-	"dce6f2",
 ];
 /* Parts enumerated in OPC spec, MS-XLSB and MS-XLSX */
 /* 12.3 Part Summary <SpreadsheetML> */
@@ -11955,7 +11945,9 @@ function parse_xml(str, xmlOpts) {
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
 	let dt = parse_xml(data);
-	themes.indexedColors = dt.colors?.indexedColors || XLSIndexedColors;
+	let colors = dt.colors?.indexedColors || opts?.indexedColors;
+	if (!colors) colors = XLSIndexedColors.concat(opts?.addIndexedColors || []);
+	themes.indexedColors = colors;
 	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
 	styles.Fonts = makeFonts(dt.fonts, themes);
 	styles.Fills = makeFills(dt.fills, themes);

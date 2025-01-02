@@ -499,7 +499,9 @@ function parse_xml(str, xmlOpts) {
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
 	let dt = parse_xml(data);
-	themes.indexedColors = dt.colors?.indexedColors || XLSIndexedColors;
+	let colors = dt.colors?.indexedColors || opts?.indexedColors;
+	if (!colors) colors = XLSIndexedColors.concat(opts?.addIndexedColors || []);
+	themes.indexedColors = colors;
 	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
 	styles.Fonts = makeFonts(dt.fonts, themes);
 	styles.Fills = makeFills(dt.fills, themes);

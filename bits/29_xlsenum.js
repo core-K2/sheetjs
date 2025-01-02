@@ -378,14 +378,4 @@ var XLSIndexedColors = [
     "E9967A",  // Dark Salmon
     "8FBC8F",  // Dark Sea Green
     "A9A9A9",   // Dark Gray
-
-	"808080",
-	"0f243f",
-	"1e1c11",
-	"254061",
-	"632523",
-	"4f6228",
-	"403152",
-	"215968",
-	"dce6f2",
 ];

@@ -190,6 +190,12 @@ export interface ParsingOptions extends CommonOptions {
 
     /* If true, output original objects */
     debug?: boolean;
+
+    /* indexed colors */
+    indexedColors?: Array<String>;
+
+    /* add indexed colors */
+    addIndexedColors?: Array<String>;
 }
 
 /** Options for write and writeFile */
