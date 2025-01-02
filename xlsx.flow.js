@@ -16696,6 +16696,8 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 	var date1904 = !!((wb||{}).WBProps||{}).date1904;
 	let iChkRow = endCell.r;
 	if (!iChkRow) iChkRow = Number.MAX_SAFE_INTEGER;
+	let iChkCol = endCell.c;
+	if (!iChkCol) iChkCol = Number.MAX_SAFE_INTEGER;
 	let iMaxRow = 0;
 	let iMaxCol = 0;
 	for(var marr = sdata.split(rowregex), mt = 0, marrlen = marr.length; mt != marrlen; ++mt) {
@@ -16806,12 +16808,12 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 				else p.t = "z";
 			}
 			else p.t = tag.t || "n";
-			if (tag.t) {
-				let r = tagr;
-				let c = tagc;
-				let m = merges.find(function(m) {
-					return m.s.r === r && m.s.c === c;
-				});
+			let r = tagr;
+			let c = tagc;
+			let m = merges.find(function(m) {
+				return m.s.r === r && m.s.c === c;
+			});
+			if (tag.t || m) {
 				if (m) {
 					r = m.e.r;
 					c = m.e.c;
@@ -16866,7 +16868,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 			/* formatting */
 			fmtid = fillid = 0;
 			cf = null;
-			if(do_format && tag.s !== undefined) {
+			if(do_format && tag.s !== undefined && tagc <= iChkCol) {
 				cf = styles.CellXf[tag.s];
 				if(cf != null) {
 					if(cf.numFmtId != null) fmtid = cf.numFmtId;
