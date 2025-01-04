@@ -454,17 +454,150 @@ function write_sty_xml(wb/*:Workbook*/, opts)/*:string*/ {
 		'xmlns:vt': XMLNS.vt
 	})], w;
 	if(wb.SSF && (w = write_numFmts(wb.SSF)) != null) o[o.length] = w;
-	o[o.length] = ('<fonts count="1"><font><sz val="12"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>');
-	o[o.length] = ('<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>');
-	o[o.length] = ('<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>');
-	o[o.length] = ('<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>');
-	if((w = write_cellXfs(opts.cellXfs))) o[o.length] = (w);
-	o[o.length] = ('<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>');
+	if (opts.stayStyle) {
+		o[o.length] = writeFonts(wb.Styles.Fonts, opts);
+		o[o.length] = writeFills(wb.Styles.Fills, opts);
+		o[o.length] = writeBorders(wb.Styles.Borders, opts);
+		o[o.length] = writeCellStyleXfs(wb.Styles.cellStyleXfs, opts);
+		o[o.length] = writeCellXfs(wb.Styles.CellXf, opts);
+		o[o.length] = writeCellStyles(wb.Styles.cellStyles, opts);
+	} else {
+		o[o.length] = ('<fonts count="1"><font><sz val="12"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>');
+		o[o.length] = ('<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>');
+		o[o.length] = ('<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>');
+		o[o.length] = ('<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>');
+		if((w = write_cellXfs(opts.cellXfs))) o[o.length] = (w);
+		o[o.length] = ('<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>');
+	}
 	o[o.length] = ('<dxfs count="0"/>');
 	o[o.length] = ('<tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleMedium4"/>');
 
 	if(o.length>2){ o[o.length] = ('</styleSheet>'); o[1]=o[1].replace("/>",">"); }
 	return o.join("");
+}
+function makeXmlTag(tag, v, cb, attrs) {
+	let s = `<${tag}`;
+	if (Array.isArray(attrs)) {
+		attrs.forEach(function(attr) {
+			let d = v[attr];
+			if (d !== undefined) {
+				s += ` ${attr}="${d}"`;
+			}
+		});
+	}
+	let c = '';
+	if (attrs === '*') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (typeof cb === 'function') {
+		c = cb(v, attrs);
+	}
+	if (!c) return s + '/>';
+	s += '>';
+	return s + c + `</${tag}>`;
+}
+function makeXmlSingleTag(tag, v, vn) {
+	let s = `<${tag}`;
+	if (typeof v === 'object') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (vn) {
+		s += ` ${vn}="${v}"`;
+	}
+	return s + '/>';
+}
+function writeFonts(dt, opts) {
+	var o = [];
+	o[o.length] = `<fonts count="${dt.length}">`;
+	dt.forEach(function(f) {
+		o[o.length] = makeXmlTag('font', f, function(f) {
+			let s = '';
+			for (let n in f) {
+				let v = f[n];
+				let name;
+				switch (n) {
+				case 'bold':
+				case 'italic':
+				case 'underline':
+					name = n.substring(0, 1);
+					break;
+				}
+				s += makeXmlSingleTag(name || n, v, 'val');
+			}
+			return s;
+		});
+	});
+	return o.join("") + '</fonts>';
+}
+function writeFills(dt, opts) {
+	var o = [];
+	o[o.length] = `<fills count="${dt.length}">`;
+	dt.forEach(function(f) {
+		o[o.length] = makeXmlTag('fill', f, function(f) {
+			return makeXmlTag('patternFill', f, function(f, attrs) {
+				let s = '';
+				for (let n in f) {
+					if (attrs.indexOf(n) >= 0) continue;
+					s += makeXmlSingleTag(n, f[n]);
+				}
+				return s;
+			}, ['patternType']);
+		});
+	});
+	return o.join("") + '</fills>';
+}
+function writeBorders(dt, opts) {
+	var o = [];
+	o[o.length] = `<borders count="${dt.length}">`;
+	dt.forEach(function(b) {
+		o[o.length] = makeXmlTag('border', b, function(b, attrs) {
+			let s = '';
+			for (let n in b) {
+				if (attrs.indexOf(n) >= 0) continue;
+				s += makeXmlTag(n, b[n], function(v, vattrs) {
+					let vs = '';
+					for (let vn in v) {
+						if (vattrs.indexOf(vn) >= 0) continue;
+						vs += makeXmlSingleTag(vn, v[vn]);
+					}
+					return vs;
+				}, ['style']);
+			}
+			return s;
+		}, ['diagonalUp', 'diagonalDown']);
+	});
+	return o.join("") + '</borders>';
+}
+function makeXfTag(tag, dt) {
+	var o = [];
+	o[o.length] = `<${tag} count="${dt.length}">`;
+	dt.forEach(function(x) {
+		o[o.length] = makeXmlTag('xf', x, function(x, attrs) {
+			let s = '';
+			for (let n in x) {
+				if (attrs.indexOf(n) >= 0) continue;
+				s += makeXmlTag(n, x[n], null, '*');
+			}
+			return s;
+		}, ['xfId', 'numFmtId', 'fontId', 'fillId', 'borderId', 'applyFont', 'applyBorder', 'applyAlignment', 'applyProtection']);
+	});
+	return o.join("") + `</${tag}>`;
+}
+function writeCellStyleXfs(dt, opts) {
+	return makeXfTag('cellStyleXfs', dt, opts);
+}
+function writeCellXfs(dt, opts) {
+	return makeXfTag('cellXfs', dt, opts);
+}
+function writeCellStyles(dt, opts) {
+	var o = [];
+	o[o.length] = `<cellStyles count="${dt.length}">`;
+	dt.forEach(function(x) {
+		o[o.length] = makeXmlTag('cellStyle', x, null, '*');
+	});
+	return o.join("") + '</cellStyles>';
 }
 
 function isEmpty(v) {
@@ -498,15 +631,24 @@ function parse_xml(str, xmlOpts) {
 
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
-	let dt = parse_xml(data);
+	let dt = parse_xml(data, {propName: ''});
 	let colors = dt.colors?.indexedColors || opts?.indexedColors;
 	if (!colors) colors = XLSIndexedColors.concat(opts?.addIndexedColors || []);
+	else if (Array.isArray(colors?.rgbColor)) {
+		let ar = [];
+		colors.rgbColor.forEach(function(c, i) {
+			ar[i] = c?.rgb;
+		});
+		colors = ar;
+	}
 	themes.indexedColors = colors;
 	styles.NumberFmt = makeNumberFmt(dt.numFmts, themes);
 	styles.Fonts = makeFonts(dt.fonts, themes);
 	styles.Fills = makeFills(dt.fills, themes);
 	styles.Borders = makeBorders(dt.borders, themes);
 	styles.CellXf = makeXfs(dt.cellXfs, dt.cellStyleXfs, themes);
+	styles.cellStyleXfs = dt.cellStyleXfs.xf;
+	styles.cellStyles = dt.cellStyles.cellStyle;
 	return styles;
 }
 function makeNumberFmt(v, themes) {

@@ -175,7 +175,7 @@ function write_zip_xlsx(wb/*:Workbook*/, opts/*:WriteOpts*/)/*:ZIP*/ {
 	var zip = zip_new();
 	var f = "", rId = 0;
 
-	opts.cellXfs = [];
+	opts.cellXfs = opts.stayStyle ? wb.Styles.CellXf : [];
 	get_cell_style(opts.cellXfs, {}, {revssf:{"General":0}});
 
 	if(!wb.Props) wb.Props = {};
