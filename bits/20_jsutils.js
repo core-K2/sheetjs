@@ -393,6 +393,7 @@ var str_match_xml_ig = /*#__PURE__*/(function() {
 		return out.length == 0 ? null : out;
 	};
 })();
+
 /**
  * XML proceccing (core-K2 expansion)
  */
@@ -584,3 +585,37 @@ var Xml = {
 		return obj;
 	},
 };
+
+function parse_xml(str, xmlOpts) {
+	str = xlml_normalize(utf8read(str));
+	let xml = Xml.xmlStrToObject(str, xmlOpts);
+	if (xmlOpts) Xml.popOpts();
+	return xml;
+}
+
+function isEmpty(v) {
+	if (v === null || v === undefined) {
+		return true;
+	} else if (v instanceof Array) {
+		return v.length < 1;
+	} else if (typeof v === 'object') {
+		return Object.keys(v).length < 1;
+	}
+	return false;
+}
+function toCamelCase(str) {
+	return str.replace(/[-_](\w)/g, function() {
+		var v1 = arguments[1];
+		return v1 ? v1.toUpperCase() : '';
+	});
+}
+function toUpperCamelCase(str) {
+	return toCamelCase(str).replace(/^[a-z]/, function(match) {
+		return match.toUpperCase();
+	});
+}
+function extendObject(d, s) {
+	for (let n in s) {
+		if (d[n] === undefined) d[n] = s[n];
+	}
+}

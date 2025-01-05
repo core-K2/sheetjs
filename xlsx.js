@@ -3687,6 +3687,7 @@ var str_match_xml_ig = (function() {
 		return out.length == 0 ? null : out;
 	};
 })();
+
 /**
  * XML proceccing (core-K2 expansion)
  */
@@ -3878,6 +3879,40 @@ var Xml = {
 		return obj;
 	},
 };
+
+function parse_xml(str, xmlOpts) {
+	str = xlml_normalize(utf8read(str));
+	let xml = Xml.xmlStrToObject(str, xmlOpts);
+	if (xmlOpts) Xml.popOpts();
+	return xml;
+}
+
+function isEmpty(v) {
+	if (v === null || v === undefined) {
+		return true;
+	} else if (v instanceof Array) {
+		return v.length < 1;
+	} else if (typeof v === 'object') {
+		return Object.keys(v).length < 1;
+	}
+	return false;
+}
+function toCamelCase(str) {
+	return str.replace(/[-_](\w)/g, function() {
+		var v1 = arguments[1];
+		return v1 ? v1.toUpperCase() : '';
+	});
+}
+function toUpperCamelCase(str) {
+	return toCamelCase(str).replace(/^[a-z]/, function(match) {
+		return match.toUpperCase();
+	});
+}
+function extendObject(d, s) {
+	for (let n in s) {
+		if (d[n] === undefined) d[n] = s[n];
+	}
+}
 function getdatastr(data) {
 	if(!data) return null;
 	if(data.content && data.type) return cc2str(data.content, true);
@@ -4281,6 +4316,40 @@ var XLMLNS = ({
 	'v':    'urn:schemas-microsoft-com:vml',
 	'html': 'http://www.w3.org/TR/REC-html40'
 });
+
+function makeXmlTag(tag, v, cb, attrs) {
+	let s = `<${tag}`;
+	if (Array.isArray(attrs)) {
+		attrs.forEach(function(attr) {
+			let d = v[attr];
+			if (d !== undefined) {
+				s += ` ${attr}="${d}"`;
+			}
+		});
+	}
+	let c = '';
+	if (attrs === '*') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (typeof cb === 'function') {
+		c = cb(v, attrs);
+	}
+	if (!c) return s + '/>';
+	s += '>';
+	return s + c + `</${tag}>`;
+}
+function makeXmlSingleTag(tag, v, vn) {
+	let s = `<${tag}`;
+	if (typeof v === 'object') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (vn) {
+		s += ` ${vn}="${v}"`;
+	}
+	return s + '/>';
+}
 function read_double_le(b, idx) {
 	var s = 1 - 2 * (b[idx + 7] >>> 7);
 	var e = ((b[idx + 7] & 0x7f) << 4) + ((b[idx + 6] >>> 4) & 0x0f);
@@ -11830,39 +11899,6 @@ function write_sty_xml(wb, opts) {
 	if(o.length>2){ o[o.length] = ('</styleSheet>'); o[1]=o[1].replace("/>",">"); }
 	return o.join("");
 }
-function makeXmlTag(tag, v, cb, attrs) {
-	let s = `<${tag}`;
-	if (Array.isArray(attrs)) {
-		attrs.forEach(function(attr) {
-			let d = v[attr];
-			if (d !== undefined) {
-				s += ` ${attr}="${d}"`;
-			}
-		});
-	}
-	let c = '';
-	if (attrs === '*') {
-		for (let n in v) {
-			s += ` ${n}="${v[n]}"`;
-		}
-	} else if (typeof cb === 'function') {
-		c = cb(v, attrs);
-	}
-	if (!c) return s + '/>';
-	s += '>';
-	return s + c + `</${tag}>`;
-}
-function makeXmlSingleTag(tag, v, vn) {
-	let s = `<${tag}`;
-	if (typeof v === 'object') {
-		for (let n in v) {
-			s += ` ${n}="${v[n]}"`;
-		}
-	} else if (vn) {
-		s += ` ${vn}="${v}"`;
-	}
-	return s + '/>';
-}
 function writeFonts(dt, opts) {
 	var o = [];
 	o[o.length] = `<fonts count="${dt.length}">`;
@@ -11953,35 +11989,6 @@ function writeCellStyles(dt, opts) {
 		o[o.length] = makeXmlTag('cellStyle', x, null, '*');
 	});
 	return o.join("") + '</cellStyles>';
-}
-
-function isEmpty(v) {
-	if (v === null || v === undefined) {
-		return true;
-	} else if (v instanceof Array) {
-		return v.length < 1;
-	} else if (typeof v === 'object') {
-		return Object.keys(v).length < 1;
-	}
-	return false;
-}
-function toCamelCase(str) {
-	return str.replace(/[-_](\w)/g, function() {
-		var v1 = arguments[1];
-		return v1 ? v1.toUpperCase() : '';
-	});
-}
-function toUpperCamelCase(str) {
-	return toCamelCase(str).replace(/^[a-z]/, function(match) {
-		return match.toUpperCase();
-	});
-}
-
-function parse_xml(str, xmlOpts) {
-	str = xlml_normalize(utf8read(str));
-	let xml = Xml.xmlStrToObject(str, xmlOpts);
-	if (xmlOpts) Xml.popOpts();
-	return xml;
 }
 
 function parse_sty_xml_ck2(data, themes, opts) {
@@ -12132,11 +12139,6 @@ function adjustColor(o, themes, avoidIndexes) {
 }
 function getTheme(n, themes) {
 	return isNaN(n) ? {} : themes.themeElements.clrScheme[Number(n)];
-}
-function extendObject(d, s) {
-	for (let n in s) {
-		if (d[n] === undefined) d[n] = s[n];
-	}
 }
 /* [MS-XLSB] 2.4.657 BrtFmt */
 function parse_BrtFmt(data, length) {

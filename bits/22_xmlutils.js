@@ -293,3 +293,37 @@ var XLMLNS = ({
 	'v':    'urn:schemas-microsoft-com:vml',
 	'html': 'http://www.w3.org/TR/REC-html40'
 }/*:any*/);
+
+function makeXmlTag(tag, v, cb, attrs) {
+	let s = `<${tag}`;
+	if (Array.isArray(attrs)) {
+		attrs.forEach(function(attr) {
+			let d = v[attr];
+			if (d !== undefined) {
+				s += ` ${attr}="${d}"`;
+			}
+		});
+	}
+	let c = '';
+	if (attrs === '*') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (typeof cb === 'function') {
+		c = cb(v, attrs);
+	}
+	if (!c) return s + '/>';
+	s += '>';
+	return s + c + `</${tag}>`;
+}
+function makeXmlSingleTag(tag, v, vn) {
+	let s = `<${tag}`;
+	if (typeof v === 'object') {
+		for (let n in v) {
+			s += ` ${n}="${v[n]}"`;
+		}
+	} else if (vn) {
+		s += ` ${vn}="${v}"`;
+	}
+	return s + '/>';
+}
