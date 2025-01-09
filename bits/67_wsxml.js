@@ -59,6 +59,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 
 	/* 18.3.1.80 sheetData CT_SheetData ? */
 	if(mtch) parse_ws_xml_data(mtch[1], s, opts, refguess, themes, styles, wb, d.e, merges);
+	d.s.c = 0;
 	s['!ref'] = encode_range(d);
 
 	/* 18.3.1.17 cols CT_Cols */
