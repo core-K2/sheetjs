@@ -23333,7 +23333,23 @@ function make_html_row(ws, r, R, o) {
 			if(cell.z != null) sp["data-z"] = cell.z;
 			if(cell.f != null) sp["data-f"] = escapehtml(cell.f);
 			if(cell.l && (cell.l.Target || "#").charAt(0) != "#") w = '<a href="' + escapehtml(cell.l.Target) +'">' + w + '</a>';
-			if (cell.si != null) sp.si = cell.si;
+			if (cell.si != null) {
+				sp.si = cell.si;
+				if (CS > 1) {
+					let sis = [cell.si];
+					for (let j = 0; j < RS; j++) {
+						for (let i = j === 0 ? 1 : 0; i < CS; i++) {
+							let ce = dense ? (ws["!data"][R + j]||[])[C + i] : ws[encode_col(C + i) + encode_row(R + j)];
+							let si = ce?.si;
+							if (si !== undefined && !sis.includes(si)) sis.push(si);
+						}
+					}
+					if (sis.length > 1) {
+						sis.shift();
+						sp.sis = '|' + sis.join('|') + '|';
+					}
+				}
+			}
 			if (o.editable || o.childSpan) w = `<span${o.editable ? ' contenteditable="true"' : ''}>${w}</span>`;
 		}
 		sp.id = (o.id || "sjs") + "-" + coord;
