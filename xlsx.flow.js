@@ -17048,7 +17048,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 		}
 	}
 	if (iMaxRow > 0) endCell.r = iMaxRow;
-	if (iMaxCol > 0) endCell.c = iMaxCol;
+	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
 	if(rows.length > 0) s['!rows'] = rows;
 }; })();
 
