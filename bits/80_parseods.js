@@ -898,18 +898,16 @@ function to_excel_workbook(content, styles, settings, meta) {
 function convert_content(wb, content, styles, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
-	let ass = content['automatic-styles'];
+	let ass = toNameObjects(content['automatic-styles']);
 	let Styles = wb.Styles;
 	let ss = body.spreadsheet;
-	for (let n in ss) {
-		switch (n) {
-		case 'calculation-settings':
-		case 'named-expressions':
-			continue;
-		}
-		let sheet = ss[n];
+	let sheets = ss.table;
+	if (!Array.isArray(sheets)) sheets = [sheets];
+	for (let n in sheets) {
+		let sheet = sheets[n];
 		let rows = sheet['table-row'];
-		if (!Array.isArray(rows)) continue;
+		if (!rows) continue;
+		else if (!Array.isArray(rows)) rows = [rows];
 		let cols = sheet['table-column'];
 		let thcols = sheet['table-header-columns'];
 		let hcols = thcols && thcols['table-column'];
@@ -922,6 +920,7 @@ function convert_content(wb, content, styles, setting) {
 			cols.splice(0, 0, ...hcols);
 		}
 		let sh = {};
+		n = sheet.name;
 		wb.SheetNames.push(n);
 		wb.Sheets[n] = sh;
 		wb.Workbook.Sheets.push({
@@ -993,6 +992,20 @@ function convert_content(wb, content, styles, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+}
+function toNameObjects(v) {
+	let o = {};
+	for (let i in v) {
+		let ar = v[i];
+		if (!Array.isArray(ar)) ar = [ar];
+		ar.forEach(function(t) {
+			let n = t?.name;
+			if (n) {
+				o[n] = t;
+			}
+		});
+	}
+	return o;
 }
 function getPixelSize(v, u) {
 	if (!v) return v;

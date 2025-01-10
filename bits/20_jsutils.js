@@ -403,7 +403,7 @@ var Xml = {
 	opts: {
 		noXmlns: true,		// delete XML name space (xmlns)
 		noNamePrefix: true,	// delete nodeName prefix (prefix:name=value -> name:value)
-		propName: 'name',	// object property name
+		propName: '',		// object property name
 		textIsValue: true,	// not object when text node only case
 		textAttrs: true,	// text value has attributes
 		textPName: 'name',	// property name when text array convert to object
