@@ -801,7 +801,7 @@ function parse_content_xml(d/*:string*/, _opts, _nfm)/*:Workbook*/ {
 		return out;
 }
 
-function parse_ods_xml(zip, fname, xmlOpts) {
+function parse_zip_xml(zip, fname, xmlOpts) {
 	let str = '';
 	if(safegetzipfile(zip, fname)) {
 		str = getzipstr(zip, fname);
@@ -816,14 +816,16 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
-		let styles = opts.cellStyles ? parse_ods_xml(zip, 'styles.xml') : null;
-		let settings = opts.settings ? parse_ods_xml(zip, 'settings.xml') : null;
-		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_ods_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
+		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml') : null;
+		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
+		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
+		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
+		if (opts.cellStyles) {
+			wb.styles = styles;
+		}
 		if (opts.debug) {
 			wb.content = content;
-			wb.styles = styles;
 			wb.settings = settings;
 		}
 	} else {

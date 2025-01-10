@@ -294,8 +294,9 @@ var XLMLNS = ({
 	'html': 'http://www.w3.org/TR/REC-html40'
 }/*:any*/);
 
-function makeXmlTag(tag, v, cb, attrs) {
+function makeXmlTag(tag, v, cb, attrs, prefix) {
 	let s = `<${tag}`;
+	let c = '';
 	if (Array.isArray(attrs)) {
 		attrs.forEach(function(attr) {
 			let d = v[attr];
@@ -304,13 +305,26 @@ function makeXmlTag(tag, v, cb, attrs) {
 			}
 		});
 	}
-	let c = '';
-	if (attrs === '*') {
+	if (typeof attrs === 'function') {
+		s += attrs(v);
+	} else if (attrs === '*') {
 		for (let n in v) {
 			s += ` ${n}="${v[n]}"`;
 		}
-	} else if (typeof cb === 'function') {
-		c = cb(v, attrs);
+	} else if (attrs === '?') {
+		for (let n in v) {
+			let pre = typeof prefix === 'function' ? prefix(n) : '';
+			if (pre) pre += ':';
+			let val = v[n];
+			if (typeof val === 'object') {
+				c += makeXmlTag(pre + n, val, cb, attrs, prefix);
+			} else {
+				s += ` ${pre}${n}="${escapexml(val)}"`;
+			}
+		}
+	}
+	if (typeof cb === 'function') {
+		c += cb(v, attrs);
 	}
 	if (!c) return s + '/>';
 	s += '>';

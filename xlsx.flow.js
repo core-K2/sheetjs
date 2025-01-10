@@ -4391,8 +4391,9 @@ var XLMLNS = ({
 	'html': 'http://www.w3.org/TR/REC-html40'
 }/*:any*/);
 
-function makeXmlTag(tag, v, cb, attrs) {
+function makeXmlTag(tag, v, cb, attrs, prefix) {
 	let s = `<${tag}`;
+	let c = '';
 	if (Array.isArray(attrs)) {
 		attrs.forEach(function(attr) {
 			let d = v[attr];
@@ -4401,13 +4402,26 @@ function makeXmlTag(tag, v, cb, attrs) {
 			}
 		});
 	}
-	let c = '';
-	if (attrs === '*') {
+	if (typeof attrs === 'function') {
+		s += attrs(v);
+	} else if (attrs === '*') {
 		for (let n in v) {
 			s += ` ${n}="${v[n]}"`;
 		}
-	} else if (typeof cb === 'function') {
-		c = cb(v, attrs);
+	} else if (attrs === '?') {
+		for (let n in v) {
+			let pre = typeof prefix === 'function' ? prefix(n) : '';
+			if (pre) pre += ':';
+			let val = v[n];
+			if (typeof val === 'object') {
+				c += makeXmlTag(pre + n, val, cb, attrs, prefix);
+			} else {
+				s += ` ${pre}${n}="${escapexml(val)}"`;
+			}
+		}
+	}
+	if (typeof cb === 'function') {
+		c += cb(v, attrs);
 	}
 	if (!c) return s + '/>';
 	s += '>';
@@ -24426,7 +24440,7 @@ function parse_content_xml(d/*:string*/, _opts, _nfm)/*:Workbook*/ {
 		return out;
 }
 
-function parse_ods_xml(zip, fname, xmlOpts) {
+function parse_zip_xml(zip, fname, xmlOpts) {
 	let str = '';
 	if(safegetzipfile(zip, fname)) {
 		str = getzipstr(zip, fname);
@@ -24441,14 +24455,16 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
-		let styles = opts.cellStyles ? parse_ods_xml(zip, 'styles.xml') : null;
-		let settings = opts.settings ? parse_ods_xml(zip, 'settings.xml') : null;
-		let meta = parse_ods_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_ods_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
+		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml') : null;
+		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
+		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
+		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
+		if (opts.cellStyles) {
+			wb.styles = styles;
+		}
 		if (opts.debug) {
 			wb.content = content;
-			wb.styles = styles;
 			wb.settings = settings;
 		}
 	} else {
@@ -25018,8 +25034,8 @@ function getOrAddObject(ar, obj) {
 	return ar.length - 1;
 }
 /* OpenDocument */
-var write_styles_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function() {
-	var master_styles = [
+function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
+	var master_styles = opts.stayStyle ? mekeOdsStyles(wb, opts) : [
 		'<office:master-styles>',
 			'<style:master-page style:name="mp1" style:page-layout-name="mp1">',
 				'<style:header/>',
@@ -25030,6 +25046,7 @@ var write_styles_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function(
 		'</office:master-styles>'
 	].join("");
 
+	let ver = wb?.styles?.version || '1.2';
 	var payload = '<office:document-styles ' + wxt_helper({
 		'xmlns:office':   "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
 		'xmlns:table':    "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
@@ -25042,13 +25059,11 @@ var write_styles_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function(
 		'xmlns:number':   "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
 		'xmlns:svg':      "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
 		'xmlns:of':       "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
-		'office:version': "1.2"
+		'office:version': `${ver}`
 	}) + '>' + master_styles + '</office:document-styles>';
 
-	return function wso(/*::wb, opts*/) {
-		return XML_HEADER + payload;
-	};
-})();
+	return XML_HEADER + payload;
+};
 
 // TODO: find out if anyone actually read the spec.  LO has some wild errors
 function write_number_format_ods(nf/*:string*/, nfidx/*:string*/)/*:string*/ {
@@ -25532,6 +25547,121 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 	zip_add_file(zip, f, write_manifest(manifest/*, opts*/));
 
 	return zip;
+}
+
+function mekeOdsStyles(wb, opts) {
+	let styles = wb?.styles;
+	if (!styles) return '';
+	let outs = [];
+	let v = styles['font-face-decls'];
+	if (v) outs.push(makeOdsFontFace(v));
+	v = styles['styles'];
+	if (v) outs.push(makeOdsStyles(v));
+	return outs.join('');
+}
+function makeOdsFontFace(v) {
+	return makeXmlTag('office:font-face-decls', v, function(f) {
+		let vs = [];
+		let ar = f['font-face'];
+		if (!Array.isArray(ar)) ar = [ar];
+		ar.forEach(function(d) {
+			vs.push(makeXmlTag('style:font-face', d, null, function(d) {
+				let s = '';
+				for (let n in d) {
+					let pre;
+					switch (n) {
+					case 'font-family':
+						pre = 'svg';
+						break;
+					default:
+						pre = 'style';
+						break;
+					}
+					s += ` ${pre}:${n}="${escapexml(d[n])}"`;
+				}
+				return s;
+			}));
+		});
+		return vs.join('');
+	});
+}
+function makeOdsStyles(v) {
+	return makeXmlTag('office:styles', v, function(ss) {
+		let vs = [];
+		for (let pro in ss) {
+			switch (pro) {
+			case 'default-style':
+			case 'style':
+				vs.push(makeOdsStyle(ss[pro], pro));
+				break;
+			case 'number-style':
+			case 'date-style':
+			case 'text-style':
+			case 'time-style':
+				vs.push(makeOdsNumberStyle(ss[pro], pro));
+				break;
+			case 'marker':
+			case 'theme':
+				break;
+			default:
+				console.warn('unknown property ' + pro);
+				break;
+			}
+		}
+		return vs.join('');
+	});
+}
+const ODS_STYLE_ATTRS = ['name', 'family', 'parent-style-name', 'display-name', 'next-style-name'];
+const ODS_STYLE_SUBS = ['table-cell-properties', 'paragraph-properties', 'text-properties', 'graphic-properties'];
+const ODS_FONTS_PREFIX = ['background-color', 'color', 'country', 'language',
+	'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
+	'wrap-option',
+	'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+	'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+	'border-top', 'border-bottom', 'border-left', 'border-right',
+];
+const ODS_SVG_PREFIX = ['stroke-color', 'viewBox', 'd'];
+const ODS_DRAW_PREFIX = ['fill', 'fill-color', 'stroke',
+	'shadow', 'shadow-offset-x', 'shadow-offset-y',
+	'marker-start', 'marker-start-width', 'marker-start-center',
+	'auto-grow-height', 'auto-grow-width',
+];
+const ODS_PREFIXES = {
+	'fo': ODS_FONTS_PREFIX,
+	'svg': ODS_SVG_PREFIX,
+	'draw': ODS_DRAW_PREFIX,
+};
+function getOdsPrefix(n) {
+	for (let pre in ODS_PREFIXES) {
+		if (ODS_PREFIXES[pre].includes(n)) return pre;
+	}
+	return 'style';
+}
+function makeOdsStyle(v, pro) {
+	let vs = [];
+	if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		vs.push(makeXmlTag('style:' + pro, d, function(d) {
+			let s = '';
+			for (let n in d) {
+				if (ODS_STYLE_SUBS.includes(n)) {
+					s += makeXmlTag('style:' + n, d[n], null, '?', getOdsPrefix);
+				}
+			}
+			return s;
+		}, function(d) {
+			let s = '';
+			for (let n in d) {
+				if (ODS_STYLE_ATTRS.includes(n)) {
+					s += ` ${getOdsPrefix(n)}:${n}="${escapexml(d[n])}"`;
+				}
+			}
+			return s;
+		}));
+	});
+	return vs.join('');
+}
+function makeOdsNumberStyle(v, pro) {
 }
 
 /*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
