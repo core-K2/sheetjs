@@ -294,7 +294,7 @@ var XLMLNS = ({
 	'html': 'http://www.w3.org/TR/REC-html40'
 }/*:any*/);
 
-function makeXmlTag(tag, v, cb, attrs, prefix) {
+function makeXmlTag(tag, v, cb, attrs, prefix, trap) {
 	let s = `<${tag}`;
 	let c = '';
 	if (Array.isArray(attrs)) {
@@ -316,8 +316,16 @@ function makeXmlTag(tag, v, cb, attrs, prefix) {
 			let pre = typeof prefix === 'function' ? prefix(n) : '';
 			if (pre) pre += ':';
 			let val = v[n];
+			if (typeof trap === 'function') {
+				let ret = trap(n, val, pre);
+				if (ret) {
+					c += ret.c;
+					s += ret.s;
+					continue;
+				}
+			}
 			if (typeof val === 'object') {
-				c += makeXmlTag(pre + n, val, cb, attrs, prefix);
+				c += makeXmlTag(pre + n, val, cb, attrs, prefix, trap);
 			} else {
 				s += ` ${pre}${n}="${escapexml(val)}"`;
 			}

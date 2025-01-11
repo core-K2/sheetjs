@@ -4317,7 +4317,7 @@ var XLMLNS = ({
 	'html': 'http://www.w3.org/TR/REC-html40'
 });
 
-function makeXmlTag(tag, v, cb, attrs, prefix) {
+function makeXmlTag(tag, v, cb, attrs, prefix, trap) {
 	let s = `<${tag}`;
 	let c = '';
 	if (Array.isArray(attrs)) {
@@ -4339,8 +4339,16 @@ function makeXmlTag(tag, v, cb, attrs, prefix) {
 			let pre = typeof prefix === 'function' ? prefix(n) : '';
 			if (pre) pre += ':';
 			let val = v[n];
+			if (typeof trap === 'function') {
+				let ret = trap(n, val, pre);
+				if (ret) {
+					c += ret.c;
+					s += ret.s;
+					continue;
+				}
+			}
 			if (typeof val === 'object') {
-				c += makeXmlTag(pre + n, val, cb, attrs, prefix);
+				c += makeXmlTag(pre + n, val, cb, attrs, prefix, trap);
 			} else {
 				s += ` ${pre}${n}="${escapexml(val)}"`;
 			}
@@ -25516,16 +25524,34 @@ const ODS_DRAW_PREFIX = ['fill', 'fill-color', 'stroke',
 	'marker-start', 'marker-start-width', 'marker-start-center',
 	'auto-grow-height', 'auto-grow-width',
 ];
+const ODS_LOEXT_PREFIX = ['tab-stop-distance', 'opacity',
+	'blank-width-char', 'max-blank-integer-digits'
+];
+const ODS_STYLE_PREFIX = ['name', 'volatile', 'map', 'condition',
+	'apply-style-name'
+];
 const ODS_PREFIXES = {
 	'fo': ODS_FONTS_PREFIX,
 	'svg': ODS_SVG_PREFIX,
 	'draw': ODS_DRAW_PREFIX,
+	'loext': ODS_LOEXT_PREFIX,
 };
-function getOdsPrefix(n) {
-	for (let pre in ODS_PREFIXES) {
-		if (ODS_PREFIXES[pre].includes(n)) return pre;
+const ODS_NUMBER_PREFIXES = {
+	'style': ODS_STYLE_PREFIX,
+	'loext': ODS_LOEXT_PREFIX,
+	'fo': ODS_FONTS_PREFIX,
+};
+function getPrefix(obj, def, n) {
+	for (let pre in obj) {
+		if (obj[pre].includes(n)) return pre;
 	}
-	return 'style';
+	return def;
+}
+function getOdsPrefix(n) {
+	return getPrefix(ODS_PREFIXES, 'style', n);
+}
+function getOdsNumberPrefix(n) {
+	return getPrefix(ODS_NUMBER_PREFIXES, 'number', n);
 }
 function makeOdsStyle(v, pro) {
 	let vs = [];
@@ -25552,6 +25578,43 @@ function makeOdsStyle(v, pro) {
 	return vs.join('');
 }
 function makeOdsNumberStyle(v, pro) {
+	let vs = [];
+	if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		vs.push(makeXmlTag('number:' + pro, d, null, '?', getOdsNumberPrefix, function(n, val, pre) {
+			let c = '', s = '';
+			switch (n) {
+			case 'text':
+			case 'map':
+			case 'fill-character':
+				if (!Array.isArray(val)) val = [val];
+				console.log(n, val, pre);
+				val.forEach(function(v) {
+					c += makeXmlTag(pre + n, v, function(v) {
+						let s = typeof v === 'object' ? v.value : v;
+						return s === 0 ? ' ' : s || '';
+					}, function(v) {
+						let s = '';
+						if (typeof v === 'object') {
+							for (let vn in v) {
+								if (vn !== 'value') {
+									let pre = getOdsNumberPrefix(vn);
+									if (pre) pre += ':';
+									s += ` ${pre}${vn}="${escapexml(v[vn])}"`;
+								}
+							}
+						}
+						return s;
+					});
+				});
+				break;
+			default:
+				return null;
+			}
+			return {c:c, s:s};
+		}));
+	});
+	return vs.join('');
 }
 
 /*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
