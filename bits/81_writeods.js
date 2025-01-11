@@ -566,7 +566,10 @@ function makeOdsStyles(v) {
 				vs.push(makeOdsNumberStyle(ss[pro], pro));
 				break;
 			case 'marker':
+				vs.push(makeOdsMarkerStyle(ss[pro], pro));
+				break;
 			case 'theme':
+				vs.push(makeOdsThemeStyle(ss[pro], pro));
 				break;
 			default:
 				console.warn('unknown property ' + pro);
@@ -608,6 +611,9 @@ const ODS_NUMBER_PREFIXES = {
 	'loext': ODS_LOEXT_PREFIX,
 	'fo': ODS_FONTS_PREFIX,
 };
+const ODS_MARKER_PREFIXES = {
+	'svg': ODS_SVG_PREFIX,
+};
 function getPrefix(obj, def, n) {
 	for (let pre in obj) {
 		if (obj[pre].includes(n)) return pre;
@@ -619,6 +625,12 @@ function getOdsPrefix(n) {
 }
 function getOdsNumberPrefix(n) {
 	return getPrefix(ODS_NUMBER_PREFIXES, 'number', n);
+}
+function getOdsMarkerPrefix(n) {
+	return getPrefix(ODS_MARKER_PREFIXES, 'draw', n);
+}
+function getOdsThemePrefix(n) {
+	return 'loext';
 }
 function makeOdsStyle(v, pro) {
 	let vs = [];
@@ -652,10 +664,8 @@ function makeOdsNumberStyle(v, pro) {
 			let c = '', s = '';
 			switch (n) {
 			case 'text':
-			case 'map':
 			case 'fill-character':
 				if (!Array.isArray(val)) val = [val];
-				console.log(n, val, pre);
 				val.forEach(function(v) {
 					c += makeXmlTag(pre + n, v, function(v) {
 						let s = typeof v === 'object' ? v.value : v;
@@ -683,4 +693,19 @@ function makeOdsNumberStyle(v, pro) {
 	});
 	return vs.join('');
 }
-
+function makeOdsMarkerStyle(v, pro) {
+	let vs = [];
+	if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		vs.push(makeXmlTag('draw:' + pro, d, null, '?', getOdsMarkerPrefix));
+	});
+	return vs.join('');
+}
+function makeOdsThemeStyle(v, pro) {
+	let vs = [];
+	if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		vs.push(makeXmlTag('loext:' + pro, d, null, '?', getOdsThemePrefix));
+	});
+	return vs.join('');
+}

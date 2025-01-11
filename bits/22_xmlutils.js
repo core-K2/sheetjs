@@ -325,7 +325,13 @@ function makeXmlTag(tag, v, cb, attrs, prefix, trap) {
 				}
 			}
 			if (typeof val === 'object') {
-				c += makeXmlTag(pre + n, val, cb, attrs, prefix, trap);
+				if (Array.isArray(val)) {
+					val.forEach(function(v) {
+						c += makeXmlTag(pre + n, v, cb, attrs, prefix, trap);
+					});
+				} else {
+					c += makeXmlTag(pre + n, val, cb, attrs, prefix, trap);
+				}
 			} else {
 				s += ` ${pre}${n}="${escapexml(val)}"`;
 			}
