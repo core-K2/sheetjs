@@ -454,7 +454,7 @@ function write_sty_xml(wb/*:Workbook*/, opts)/*:string*/ {
 		'xmlns:vt': XMLNS.vt
 	})], w;
 	if(wb.SSF && (w = write_numFmts(wb.SSF)) != null) o[o.length] = w;
-	if (opts.stayStyle) {
+	if (opts?.stayStyle) {
 		o[o.length] = writeFonts(wb.Styles.Fonts, opts);
 		o[o.length] = writeFills(wb.Styles.Fills, opts);
 		o[o.length] = writeBorders(wb.Styles.Borders, opts);

@@ -1,6 +1,6 @@
 /* OpenDocument */
 function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
-	var master_styles = opts.stayStyle ? mekeOdsStyles(wb, opts) : [
+	var master_styles = opts?.stayStyle ? makeOdsStyles(wb, opts) : [
 		'<office:master-styles>',
 			'<style:master-page style:name="mp1" style:page-layout-name="mp1">',
 				'<style:header/>',
@@ -11,20 +11,39 @@ function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
 		'</office:master-styles>'
 	].join("");
 
-	let ver = wb?.styles?.version || '1.2';
 	var payload = '<office:document-styles ' + wxt_helper({
-		'xmlns:office':   "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
-		'xmlns:table':    "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
-		'xmlns:style':    "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
-		'xmlns:text':     "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
-		'xmlns:draw':     "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
-		'xmlns:fo':       "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
-		'xmlns:xlink':    "http://www.w3.org/1999/xlink",
-		'xmlns:dc':       "http://purl.org/dc/elements/1.1/",
-		'xmlns:number':   "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
-		'xmlns:svg':      "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
-		'xmlns:of':       "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
-		'office:version': `${ver}`
+		'xmlns:office': "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+		'xmlns:ooo': "http://openoffice.org/2004/office",
+		'xmlns:fo': "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
+		'xmlns:xlink': "http://www.w3.org/1999/xlink",
+		'xmlns:dc': "http://purl.org/dc/elements/1.1/",
+		'xmlns:meta': "urn:oasis:names:tc:opendocument:xmlns:meta:1.0",
+		'xmlns:style': "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
+		'xmlns:text': "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+		'xmlns:rpt': "http://openoffice.org/2005/report",
+		'xmlns:draw': "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
+		'xmlns:dr3d': "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0",
+		'xmlns:svg': "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
+		'xmlns:chart': "urn:oasis:names:tc:opendocument:xmlns:chart:1.0",
+		'xmlns:table': "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+		'xmlns:number': "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
+		'xmlns:ooow': "http://openoffice.org/2004/writer",
+		'xmlns:oooc': "http://openoffice.org/2004/calc",
+		'xmlns:css3t': "http://www.w3.org/TR/css3-text/",
+		'xmlns:of': "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
+		'xmlns:tableooo': "http://openoffice.org/2009/table",
+		'xmlns:calcext': "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0",
+		'xmlns:drawooo': "http://openoffice.org/2010/draw",
+		'xmlns:xhtml': "http://www.w3.org/1999/xhtml",
+		'xmlns:loext': "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0",
+		'xmlns:grddl': "http://www.w3.org/2003/g/data-view#",
+		'xmlns:field': "urn:openoffice:names:experimental:ooo-ms-interop:xmlns:field:1.0",
+		'xmlns:math': "http://www.w3.org/1998/Math/MathML",
+		'xmlns:form': "urn:oasis:names:tc:opendocument:xmlns:form:1.0",
+		'xmlns:script': "urn:oasis:names:tc:opendocument:xmlns:script:1.0",
+		'xmlns:dom': "http://www.w3.org/2001/xml-events",
+		'xmlns:presentation': "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
+		'office:version': "1.3"
 	}) + '>' + master_styles + '</office:document-styles>';
 
 	return XML_HEADER + payload;
@@ -457,7 +476,8 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 			// TODO: settings (equiv of settings.xml for ODS)
 		} else o.push('<office:document-content' + attr  + '>\n');
 		// o.push('  <office:scripts/>\n');
-		var nfs = write_automatic_styles_ods(o, wb);
+		var nfs = opts?.stayStyle && writeOdsStayStyles(o, wb, opts)
+		if (!nfs) nfs = write_automatic_styles_ods(o, wb);
 		o.push('  <office:body>\n');
 		o.push('    <office:spreadsheet>\n');
 		if(((wb.Workbook||{}).WBProps||{}).date1904) o.push('      <table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false">\n        <table:null-date table:date-value="1904-01-01"/>\n      </table:calculation-settings>\n');
@@ -514,97 +534,88 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 	return zip;
 }
 
-function mekeOdsStyles(wb, opts) {
+function writeOdsStayStyles(o, wb, opts) {
+	let content = wb?.content;
+	if (content) {
+		let target = {
+			'font-face-decls': writeOdsFonts,
+			'automatic-styles': writeOdsStyles,
+		};
+		let nfs = {};
+		for (let n in target) {
+			target[n](o, content[n], n);
+		}
+		return nfs;
+	}
+	return null;
+}
+function makeOdsStyles(wb, opts) {
 	let styles = wb?.styles;
 	if (!styles) return '';
-	let outs = [];
-	let v = styles['font-face-decls'];
-	if (v) outs.push(makeOdsFontFace(v));
-	v = styles['styles'];
-	if (v) outs.push(makeOdsStyles(v));
-	return outs.join('');
+	let target = {
+		'font-face-decls': writeOdsFonts,
+		'styles': writeOdsStyles,
+		'automatic-styles': writeOdsStyles,
+		'master-styles': writeOdsStyles,
+	};
+	let o = [];
+	for (let n in target) {
+		target[n](o, styles[n], n);
+	}
+	return o.join('');
 }
-function makeOdsFontFace(v) {
-	return makeXmlTag('office:font-face-decls', v, function(f) {
-		let vs = [];
-		let ar = f['font-face'];
-		if (!Array.isArray(ar)) ar = [ar];
-		ar.forEach(function(d) {
-			vs.push(makeXmlTag('style:font-face', d, null, function(d) {
-				let s = '';
-				for (let n in d) {
-					let pre;
-					switch (n) {
-					case 'font-family':
-						pre = 'svg';
-						break;
-					default:
-						pre = 'style';
-						break;
-					}
-					s += ` ${pre}:${n}="${escapexml(d[n])}"`;
-				}
-				return s;
-			}));
-		});
-		return vs.join('');
-	});
-}
-function makeOdsStyles(v) {
-	return makeXmlTag('office:styles', v, function(ss) {
-		let vs = [];
-		for (let pro in ss) {
-			switch (pro) {
-			case 'default-style':
-			case 'style':
-				vs.push(makeOdsStyle(ss[pro], pro));
-				break;
-			case 'number-style':
-			case 'date-style':
-			case 'text-style':
-			case 'time-style':
-				vs.push(makeOdsNumberStyle(ss[pro], pro));
-				break;
-			case 'marker':
-				vs.push(makeOdsMarkerStyle(ss[pro], pro));
-				break;
-			case 'theme':
-				vs.push(makeOdsThemeStyle(ss[pro], pro));
-				break;
-			default:
-				console.warn('unknown property ' + pro);
-				break;
-			}
-		}
-		return vs.join('');
-	});
-}
-const ODS_STYLE_ATTRS = ['name', 'family', 'parent-style-name', 'display-name', 'next-style-name'];
-const ODS_STYLE_SUBS = ['table-cell-properties', 'paragraph-properties', 'text-properties', 'graphic-properties'];
-const ODS_FONTS_PREFIX = ['background-color', 'color', 'country', 'language',
-	'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
-	'wrap-option',
-	'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
-	'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
-	'border-top', 'border-bottom', 'border-left', 'border-right',
+const ODS_STYLE_ATTRS = [
+	'name', 'family', 'display-name',
+	'parent-style-name', 'next-style-name',
+	'master-page-name', 'data-style-name',
 ];
-const ODS_SVG_PREFIX = ['stroke-color', 'viewBox', 'd'];
-const ODS_DRAW_PREFIX = ['fill', 'fill-color', 'stroke',
+const ODS_STYLE_SUBS = [
+	'table-cell-properties', 'table-column-properties', 'table-row-properties',
+	'table-properties',
+	'paragraph-properties', 'text-properties', 'graphic-properties', 
+];
+const ODS_FONTS_PREFIX = [
+	'background-color', 'color', 'country', 'language',
+	'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
+	'wrap-option', 'text-shadow', 'text-align', 'break-before',
+	'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+	'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+	'border', 'border-top', 'border-bottom', 'border-left', 'border-right',
+	'min-height', 'page-width', 'page-height',
+];
+const ODS_SVG_PREFIX = [
+	'stroke-color', 'viewBox', 'd',
+];
+const ODS_DRAW_PREFIX = [
+	'fill', 'fill-color', 'stroke',
 	'shadow', 'shadow-offset-x', 'shadow-offset-y',
 	'marker-start', 'marker-start-width', 'marker-start-center',
 	'auto-grow-height', 'auto-grow-width',
 ];
-const ODS_LOEXT_PREFIX = ['tab-stop-distance', 'opacity',
-	'blank-width-char', 'max-blank-integer-digits'
+const ODS_LOEXT_PREFIX = [
+	'opacity',
+	'blank-width-char', 'max-blank-integer-digits',
+	'vertical-justify',
+	'char-complex-color', 'theme-type', 'color-type',
 ];
-const ODS_STYLE_PREFIX = ['name', 'volatile', 'map', 'condition',
-	'apply-style-name'
+const ODS_STYLE_PREFIX = [
+	'name', 'volatile', 'map', 'condition',
+	'apply-style-name', 'text-properties',
+];
+const ODS_TEXT_PREFIX = [
+	'p', 's', 'title', 'sheet-name', 'page-number', 'page-count',
+	'date', 'date-value', 'time', 'time-value',
+];
+const ODS_CCS3T_PREFIX = [
+	'text-justify',
 ];
 const ODS_PREFIXES = {
 	'fo': ODS_FONTS_PREFIX,
 	'svg': ODS_SVG_PREFIX,
 	'draw': ODS_DRAW_PREFIX,
 	'loext': ODS_LOEXT_PREFIX,
+	'text': ODS_TEXT_PREFIX,
+	'css3t': ODS_CCS3T_PREFIX,
 };
 const ODS_NUMBER_PREFIXES = {
 	'style': ODS_STYLE_PREFIX,
@@ -632,11 +643,80 @@ function getOdsMarkerPrefix(n) {
 function getOdsThemePrefix(n) {
 	return 'loext';
 }
+function getOdsFontPrefix(n) {
+	return getPrefix({
+		'svg': ['font-family']
+	}, 'style', n);
+}
+function getOdsAutomaticStylePrefix(n) {
+	return getPrefix({
+		'fo': ['break-before']
+	}, 'style', n);
+}
+function makeOdsTag(v, pro, fn) {
+	let o = [];
+	fn(o, v, pro);
+	return o.join('');
+}
 function makeOdsStyle(v, pro) {
-	let vs = [];
-	if (!Array.isArray(v)) v = [v];
+	return makeOdsTag(v, pro, writeOdsStyle);
+}
+function makeOdsNumberStyle(v, pro) {
+	return makeOdsTag(v, pro, writeOdsNumberStyle);
+}
+function makeOdsMarkerStyle(v, pro) {
+	return makeOdsTag(v, pro, writeOdsMarkerStyle);
+}
+function makeOdsThemeStyle(v, pro) {
+	return makeOdsTag(v, pro, writeOdsThemeStyle);
+}
+function makeOdsPageLayout(v, pro) {
+	return makeOdsTag(v, pro, writeOdsPageLayout);
+}
+function makeOdsMasterPage(v, pro) {
+	return makeOdsTag(v, pro, writeOdsMasterPage);
+}
+function writeOdsStyles(o, v, pro) {
+	if (!v) return;
+	o.push(makeXmlTag('office:' + pro, v, function(ss) {
+		let vs = [];
+		for (let pro in ss) {
+			switch (pro) {
+			case 'default-style':
+			case 'style':
+				vs.push(makeOdsStyle(ss[pro], pro));
+				break;
+			case 'number-style':
+			case 'date-style':
+			case 'text-style':
+			case 'time-style':
+				vs.push(makeOdsNumberStyle(ss[pro], pro));
+				break;
+			case 'marker':
+				vs.push(makeOdsMarkerStyle(ss[pro], pro));
+				break;
+			case 'theme':
+				vs.push(makeOdsThemeStyle(ss[pro], pro));
+				break;
+			case 'page-layout':
+				vs.push(makeOdsPageLayout(ss[pro], pro));
+				break;
+			case 'master-page':
+				vs.push(makeOdsMasterPage(ss[pro], pro));
+				break;
+			default:
+				console.warn('unknown property ' + pro);
+				break;
+			}
+		}
+		return vs.join('');
+	}));
+}
+function writeOdsStyle(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
-		vs.push(makeXmlTag('style:' + pro, d, function(d) {
+		o.push(makeXmlTag('style:' + pro, d, function(d) {
 			let s = '';
 			for (let n in d) {
 				if (ODS_STYLE_SUBS.includes(n)) {
@@ -654,13 +734,12 @@ function makeOdsStyle(v, pro) {
 			return s;
 		}));
 	});
-	return vs.join('');
 }
-function makeOdsNumberStyle(v, pro) {
-	let vs = [];
-	if (!Array.isArray(v)) v = [v];
+function writeOdsNumberStyle(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
-		vs.push(makeXmlTag('number:' + pro, d, null, '?', getOdsNumberPrefix, function(n, val, pre) {
+		o.push(makeXmlTag('number:' + pro, d, null, '?', getOdsNumberPrefix, function(n, val, pre) {
 			let c = '', s = '';
 			switch (n) {
 			case 'text':
@@ -691,21 +770,39 @@ function makeOdsNumberStyle(v, pro) {
 			return {c:c, s:s};
 		}));
 	});
-	return vs.join('');
 }
-function makeOdsMarkerStyle(v, pro) {
-	let vs = [];
-	if (!Array.isArray(v)) v = [v];
+function writeOdsMarkerStyle(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
-		vs.push(makeXmlTag('draw:' + pro, d, null, '?', getOdsMarkerPrefix));
+		o.push(makeXmlTag('draw:' + pro, d, null, '?', getOdsMarkerPrefix));
 	});
-	return vs.join('');
 }
-function makeOdsThemeStyle(v, pro) {
-	let vs = [];
-	if (!Array.isArray(v)) v = [v];
+function writeOdsThemeStyle(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
-		vs.push(makeXmlTag('loext:' + pro, d, null, '?', getOdsThemePrefix));
+		o.push(makeXmlTag('loext:' + pro, d, null, '?', getOdsThemePrefix));
 	});
-	return vs.join('');
+}
+function writeOdsFonts(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('office:' + pro, d, null, '?', getOdsFontPrefix));
+	});
+}
+function writeOdsPageLayout(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('style:' + pro, d, null, '?', getOdsPrefix));
+	});
+}
+function writeOdsMasterPage(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('style:' + pro, d, null, '?', getOdsPrefix));
+	});
 }
