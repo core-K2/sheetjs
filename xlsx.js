@@ -3603,6 +3603,10 @@ var str_match_xml_ns = (function() {
 		let s = str.slice(si, ef);
 		if (got) {
 			let obj = Xml.xmlStrToObject(s);
+			if (obj?.body?.parsererror) {
+				let x = Xml.xmlStrToObject(str);
+				obj = x[tag];
+			}
 			if (typeof got === 'object') {
 				got[tag] = obj;
 			}
@@ -3830,6 +3834,9 @@ var Xml = {
 			let val = this.xmlToObject(node, obj);
 			if (val === undefined) {
 				continue;
+			}
+			if (name !== node.localName) {
+				val.ln = node.localName;
 			}
 			if (!obj[name]) {
 				obj[name] = val;
@@ -24364,13 +24371,9 @@ function parse_ods(zip, opts) {
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
 		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
-		if (opts.cellStyles) {
-			wb.styles = styles;
-		}
-		if (opts.debug) {
-			wb.content = content;
-			wb.settings = settings;
-		}
+		if (opts.content) wb.content = content;
+		if (opts.cellStyles) wb.styles = styles;
+		if (opts.settings) wb.settings = settings;
 	} else {
 		var styles = getzipstr(zip, 'styles.xml');
 		var Styles = styles && parse_ods_styles(utf8read(styles), opts);

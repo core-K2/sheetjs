@@ -188,8 +188,8 @@ export interface ParsingOptions extends CommonOptions {
     /* If true, get ODS settings(ck2Ex:true only) */
     settings?: boolean;
 
-    /* If true, output original objects */
-    debug?: boolean;
+    /* If true, output content objects */
+    content?: boolean;
 
     /* indexed colors */
     indexedColors?: Array<String>;

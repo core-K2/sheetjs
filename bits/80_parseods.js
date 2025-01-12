@@ -821,13 +821,9 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
 		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
 		wb = to_excel_workbook(content, styles, settings, meta);
-		if (opts.cellStyles) {
-			wb.styles = styles;
-		}
-		if (opts.debug) {
-			wb.content = content;
-			wb.settings = settings;
-		}
+		if (opts.content) wb.content = content;
+		if (opts.cellStyles) wb.styles = styles;
+		if (opts.settings) wb.settings = settings;
 	} else {
 		var styles = getzipstr(zip, 'styles.xml');
 		var Styles = styles && parse_ods_styles(utf8read(styles), opts);

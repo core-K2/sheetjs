@@ -309,6 +309,10 @@ var str_match_xml_ns = /*#__PURE__*/(function() {
 		let s = str.slice(si, ef);
 		if (got) {
 			let obj = Xml.xmlStrToObject(s);
+			if (obj?.body?.parsererror) {
+				let x = Xml.xmlStrToObject(str);
+				obj = x[tag];
+			}
 			if (typeof got === 'object') {
 				got[tag] = obj;
 			}
@@ -536,6 +540,9 @@ var Xml = {
 			let val = this.xmlToObject(node, obj);
 			if (val === undefined) {
 				continue;
+			}
+			if (name !== node.localName) {
+				val.ln = node.localName;
 			}
 			if (!obj[name]) {
 				obj[name] = val;
