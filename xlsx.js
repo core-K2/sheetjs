@@ -25209,8 +25209,8 @@ var write_content_ods = /* @__PURE__ */(function() {
 			for(C = 0; C <= range.e.c; ++C) {
 				let col = ws["!cols"][C] || {};
 				let pre = ar.length > 0 ? ar.slice(-1)[0] : {};
-				if (col.ods === pre.ods && col.dsn === pre.dsn) {
-					if (pre.count === undefined) pre.count = 2;
+				if (col?.ods === pre?.ods && col?.dsn === pre?.dsn) {
+					if (pre?.count === undefined) pre.count = 2;
 					else pre.count++;
 				} else {
 					ar.push(col);
@@ -25234,7 +25234,26 @@ var write_content_ods = /* @__PURE__ */(function() {
 			o.push('        <table:table-row' + H + '>\n');
 			for(C=0; C < range.s.c; ++C) o.push(null_cell_xml);
 			for(; C <= range.e.c; ++C) {
-				var skip = false, ct = {}, textp = "";
+				var ct = {}, textp = "";
+				let m = marr.find(m => m.s.r <= R && R <= m.e.r && m.s.c <= C && C <= m.e.c);
+				let cCount = 0;
+				if (m) {
+					cCount = m.e.c - m.s.c;
+					if (m.s.c === C) {
+						if (m.s.r === R) {
+							ct['table:number-columns-spanned'] = cCount + 1;
+							ct['table:number-rows-spanned'] = m.e.r - m.s.r + 1;
+						} else {
+							o.push(`          <table:covered-table-cell table:number-columns-repeated="${cCount + 1}"/>\n`);
+							C += cCount;
+							continue;
+						}
+					} else {
+						continue;
+					}
+				}
+				/*
+				skip = false;
 				for(mi = 0; mi != marr.length; ++mi) {
 					if(marr[mi].s.c > C) continue;
 					if(marr[mi].s.r > R) continue;
@@ -25246,6 +25265,7 @@ var write_content_ods = /* @__PURE__ */(function() {
 					break;
 				}
 				if(skip) { o.push('          <table:covered-table-cell/>\n'); continue; }
+				*/
 				var ref = encode_cell({r:R, c:C}), cell = dense ? (ws["!data"][R]||[])[C]: ws[ref];
 				if(cell && cell.f) {
 					ct['table:formula'] = escapexml(csf_to_ods_formula(cell.f));
@@ -25329,6 +25349,10 @@ var write_content_ods = /* @__PURE__ */(function() {
 					payload = writextag('office:annotation', apayload, aprops) + payload;
 				}
 				o.push('          ' + writextag('table:table-cell', payload, ct) + '\n');
+				if (cCount > 0) {
+					o.push(`          <table:covered-table-cell table:number-columns-repeated="${cCount}"/>\n`);
+					C += cCount;
+				}
 			}
 			o.push('        </table:table-row>\n');
 		}
