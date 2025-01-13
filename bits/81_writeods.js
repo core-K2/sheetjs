@@ -690,6 +690,12 @@ function getOdsAutomaticStylePrefix(n) {
 function getOdsTablePrefix(n) {
 	return 'table';
 }
+function getOdsGradientPrefix(n) {
+	return getPrefix({
+		'loext': ['gradient-stop', 'color-type', 'color-value'],
+		'svg': ['offset']
+	}, 'draw', n);
+}
 function makeOdsTag(v, pro, fn) {
 	let o = [];
 	fn(o, v, pro);
@@ -712,6 +718,9 @@ function makeOdsPageLayout(v, pro) {
 }
 function makeOdsMasterPage(v, pro) {
 	return makeOdsTag(v, pro, writeOdsMasterPage);
+}
+function makeOdsGradient(v, pro) {
+	return makeOdsTag(v, pro, writeOdsGradient);
 }
 function writeOdsStyles(o, v, pro) {
 	if (!v) return;
@@ -741,6 +750,9 @@ function writeOdsStyles(o, v, pro) {
 				break;
 			case 'master-page':
 				vs.push(makeOdsMasterPage(ss[pro], pro));
+				break;
+			case 'gradient':
+				vs.push(makeOdsGradient(ss[pro], pro));
 				break;
 			default:
 				console.warn('unknown property ' + pro);
@@ -849,5 +861,12 @@ function writeOdsCalculation(o, v, pro) {
 	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
 		o.push(makeXmlTag('table:' + pro, d, null, '?', getOdsTablePrefix));
+	});
+}
+function writeOdsGradient(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('draw:' + pro, d, null, '?', getOdsGradientPrefix));
 	});
 }
