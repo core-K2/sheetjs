@@ -1079,8 +1079,10 @@ function makeColStyle(c, ass, styles, Styles, fonts) {
 		let cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
 	}
+	n = c['default-cell-style-name'];
+	if (n) ret.dsn = n;
 	if (styles) {
-		s = ass[c['default-cell-style-name']];
+		s = ass[n];
 		if (s) {
 			let st = getDefaultStyle(styles, s['family']);
 			if (st) {

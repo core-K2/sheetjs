@@ -239,7 +239,24 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 		var marr/*:Array<Range>*/ = ws['!merges'] || [], mi = 0;
 		var dense = ws["!data"] != null;
 		if(ws["!cols"]) {
-			for(C = 0; C <= range.e.c; ++C) o.push('        <table:table-column' + (ws["!cols"][C] ? ' table:style-name="co' + ws["!cols"][C].ods + '"' : '') + '></table:table-column>\n');
+			let ar = [];
+			for(C = 0; C <= range.e.c; ++C) {
+				let col = ws["!cols"][C] || {};
+				let pre = ar.length > 0 ? ar.slice(-1)[0] : {};
+				if (col.ods === pre.ods && col.dsn === pre.dsn) {
+					if (pre.count === undefined) pre.count = 2;
+					else pre.count++;
+				} else {
+					ar.push(col);
+				}
+			}
+			ar.forEach(function(col) {
+				let s = '        <table:table-column';
+				if (col.ods !== undefined) s += ` table:style-name="co${col.ods}"`;
+				if (col.dsn) s += ` table:default-cell-style-name="${col.dsn}"`;
+				if (col.count) s += ` table:number-columns-repeated="${col.count}"`;
+				o.push(s + ' />\n');
+			});
 		}
 		var H = "", ROWS = ws["!rows"]||[];
 		for(R = 0; R < range.s.r; ++R) {
