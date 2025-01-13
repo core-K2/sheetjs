@@ -983,6 +983,7 @@ function convert_content(wb, content, styles, setting) {
 				if (iRowMax < iRow) iRowMax = iRow;
 			}
 		}
+		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		let csts = sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
@@ -1044,6 +1045,17 @@ function makeRowStyles(rows, ass, iRowMax) {
 	}
 	return rss;
 }
+function makeRowStyle(r, ass) {
+	let n = r['style-name'];
+	let ret = {ods: n.substring(2)};
+	let s = ass[n];
+	if (s) {
+		let rps = s['table-row-properties'];
+		let h = rps && getPixelSize(rps['row-height']);
+		if (h) ret.hpx = h;
+	}
+	return ret;
+}
 function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	let cs = [];
 	let i, j;
@@ -1060,8 +1072,9 @@ function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	return cs;
 }
 function makeColStyle(c, ass, styles, Styles, fonts) {
-	let ret = {};
-	let s = ass[c['style-name']];
+	let n = c['style-name'];
+	let ret = {ods: n.substring(2)};
+	let s = ass[n];
 	if (s) {
 		let cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
@@ -1089,22 +1102,15 @@ function getDefaultStyle(styles, family) {
 			return s.family === family;
 		}) : def.family === family ? def : null;
 }
-function makeRowStyle(r, ass) {
-	let ret = {};
-	let s = ass[r['style-name']];
-	if (s) {
-		let rps = s['table-row-properties'];
-		let h = rps && getPixelSize(rps['row-height']);
-		if (h) ret.hpx = h;
-	}
-	return ret;
-}
 function makeCell(cell) {
 	let c = {};
+	let sn = cell['style-name'];
+	if (sn) c.sn = sn;
 	// boolean, float, date, time, string
-	let tn = cell['value-type'];
+	let vt = cell['value-type'];
+	if (vt) c.vt = vt;
 	let p = cell.p;
-	let v = cell[tn + '-value'] || cell.value || p;
+	let v = cell[vt + '-value'] || cell.value || p;
 	let w = p ? Array.isArray(p) ? p.join('\n') : p : v;
 	if (typeof v === 'object') {
 		let a = v.a;
@@ -1118,7 +1124,7 @@ function makeCell(cell) {
 		v = JSON.stringify(v);
 	}
 	let t = 's';
-	switch (tn) {
+	switch (vt) {
 	case 'boolean':
 		t = 'b';
 		break;
@@ -1134,8 +1140,8 @@ function makeCell(cell) {
 		break;
 	}
 	c.t = t;
-	c.v = v;
-	c.w = w;
+	if (v !== undefined) c.v = v;
+	if (w !== undefined) c.w = w;
 	let f = cell['formula'];
 	if (f) {
 		if (f.startsWith('of:=')) f = f.substring(4);

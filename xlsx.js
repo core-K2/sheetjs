@@ -24533,6 +24533,7 @@ function convert_content(wb, content, styles, setting) {
 				if (iRowMax < iRow) iRowMax = iRow;
 			}
 		}
+		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		let csts = sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
@@ -24594,6 +24595,17 @@ function makeRowStyles(rows, ass, iRowMax) {
 	}
 	return rss;
 }
+function makeRowStyle(r, ass) {
+	let n = r['style-name'];
+	let ret = {ods: n.substring(2)};
+	let s = ass[n];
+	if (s) {
+		let rps = s['table-row-properties'];
+		let h = rps && getPixelSize(rps['row-height']);
+		if (h) ret.hpx = h;
+	}
+	return ret;
+}
 function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	let cs = [];
 	let i, j;
@@ -24610,8 +24622,9 @@ function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	return cs;
 }
 function makeColStyle(c, ass, styles, Styles, fonts) {
-	let ret = {};
-	let s = ass[c['style-name']];
+	let n = c['style-name'];
+	let ret = {ods: n.substring(2)};
+	let s = ass[n];
 	if (s) {
 		let cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
@@ -24639,22 +24652,15 @@ function getDefaultStyle(styles, family) {
 			return s.family === family;
 		}) : def.family === family ? def : null;
 }
-function makeRowStyle(r, ass) {
-	let ret = {};
-	let s = ass[r['style-name']];
-	if (s) {
-		let rps = s['table-row-properties'];
-		let h = rps && getPixelSize(rps['row-height']);
-		if (h) ret.hpx = h;
-	}
-	return ret;
-}
 function makeCell(cell) {
 	let c = {};
+	let sn = cell['style-name'];
+	if (sn) c.sn = sn;
 	// boolean, float, date, time, string
-	let tn = cell['value-type'];
+	let vt = cell['value-type'];
+	if (vt) c.vt = vt;
 	let p = cell.p;
-	let v = cell[tn + '-value'] || cell.value || p;
+	let v = cell[vt + '-value'] || cell.value || p;
 	let w = p ? Array.isArray(p) ? p.join('\n') : p : v;
 	if (typeof v === 'object') {
 		let a = v.a;
@@ -24668,7 +24674,7 @@ function makeCell(cell) {
 		v = JSON.stringify(v);
 	}
 	let t = 's';
-	switch (tn) {
+	switch (vt) {
 	case 'boolean':
 		t = 'b';
 		break;
@@ -24684,8 +24690,8 @@ function makeCell(cell) {
 		break;
 	}
 	c.t = t;
-	c.v = v;
-	c.w = w;
+	if (v !== undefined) c.v = v;
+	if (w !== undefined) c.w = w;
 	let f = cell['formula'];
 	if (f) {
 		if (f.startsWith('of:=')) f = f.substring(4);
@@ -25174,8 +25180,8 @@ var write_content_ods = /* @__PURE__ */(function() {
 	var write_ws = function(ws, wb, i, opts, nfs, date1904) {
 		/* Section 9 Tables */
 		var o = [];
-		var tstyle = "ta1";
-		if(((((wb||{}).Workbook||{}).Sheets||[])[i]||{}).Hidden) tstyle = "ta2";
+		var tstyle = opts?.stayStyle && ws?.sn;
+		if (!tstyle) tstyle = ((((wb||{}).Workbook||{}).Sheets||[])[i]||{}).Hidden ? 'ta2' : 'ta1';
 		o.push('      <table:table table:name="' + escapexml(wb.SheetNames[i]) + '" table:style-name="' + tstyle + '">\n');
 		var R=0,C=0, range = decode_range(ws['!ref']||"A1");
 		var marr = ws['!merges'] || [], mi = 0;
@@ -25237,8 +25243,18 @@ var write_content_ods = /* @__PURE__ */(function() {
 							ct['calcext:value-type'] = "error";
 						} else {
 							textp = (cell.w||String(cell.v||0));
-							ct['office:value-type'] = "float";
-							ct['office:value'] = (cell.v||0);
+							ct['office:value-type'] = cell.vt || "float";
+							switch (cell.vt) {
+							case 'date':
+								ct['date-value'] = (new Date(cell.v)).toISOString().split('T')[0];
+								break;
+							case 'time':
+								ct['time-value'] = (new Date(cell.v)).toISOString().split('T')[1];
+								break;
+							default:
+								ct['office:value'] = (cell.v||0);
+								break;
+							}
 						}
 						break;
 					case 's': case 'str':
@@ -25262,7 +25278,9 @@ var write_content_ods = /* @__PURE__ */(function() {
 					if(_tgt.charAt(0) != "#" && !_tgt.match(/^\w+:/)) _tgt = '../' + _tgt;
 					text_p = writextag('text:a', text_p, {'xlink:href': _tgt.replace(/&/g, "&amp;")});
 				}
-				if(nfs[cell.z]) ct["table:style-name"] = "ce" + nfs[cell.z].slice(1);
+				let tsn = opts?.stayStyle && cell?.sn;
+				if (!tsn && nfs[cell.z]) tsn = "ce" + nfs[cell.z].slice(1);
+				if (tsn) ct["table:style-name"] = tsn;
 				var payload = writextag('text:p', text_p, {});
 				if(cell.c) {
 					var acreator = "", apayload = "", aprops = {};
@@ -25422,7 +25440,10 @@ var write_content_ods = /* @__PURE__ */(function() {
 		if (!nfs) nfs = write_automatic_styles_ods(o, wb);
 		o.push('  <office:body>\n');
 		o.push('    <office:spreadsheet>\n');
-		if(((wb.Workbook||{}).WBProps||{}).date1904) o.push('      <table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false">\n        <table:null-date table:date-value="1904-01-01"/>\n      </table:calculation-settings>\n');
+		let ss = opts?.stayStyle && wb?.content?.body?.spreadsheet;
+		let n = 'calculation-settings';
+		if (ss && ss[n]) writeOdsCalculation(o, ss[n], n);
+		else if (((wb.Workbook||{}).WBProps||{}).date1904) o.push('      <table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false">\n        <table:null-date table:date-value="1904-01-01"/>\n      </table:calculation-settings>\n');
 		for(var i = 0; i != wb.SheetNames.length; ++i) o.push(write_ws(wb.Sheets[wb.SheetNames[i]], wb, i, opts, nfs, ((wb.Workbook||{}).WBProps||{}).date1904));
 		if((wb.Workbook||{}).Names) o.push(write_names_ods(wb.Workbook.Names, wb.SheetNames, -1));
 		o.push('    </office:spreadsheet>\n');
@@ -25595,6 +25616,9 @@ function getOdsAutomaticStylePrefix(n) {
 		'fo': ['break-before']
 	}, 'style', n);
 }
+function getOdsTablePrefix(n) {
+	return 'table';
+}
 function makeOdsTag(v, pro, fn) {
 	let o = [];
 	fn(o, v, pro);
@@ -25746,6 +25770,13 @@ function writeOdsMasterPage(o, v, pro) {
 	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
 		o.push(makeXmlTag('style:' + pro, d, null, '?', getOdsPrefix));
+	});
+}
+function writeOdsCalculation(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('table:' + pro, d, null, '?', getOdsTablePrefix));
 	});
 }/*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
 var subarray = function() {
