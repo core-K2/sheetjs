@@ -626,3 +626,15 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function convertToOfficeDateValue(v) {
+	let date = new Date(v);
+	return isNaN(date) ? v : date.toISOString().split('T')[0];
+}
+function convertToOfficeTimeValue(v) {
+	let date = new Date(v);
+	if (isNaN(date)) return v;
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	const seconds = String(date.getSeconds()).padStart(2, '0');
+	return `PT${hours}H${minutes}M${seconds}S`;
+}

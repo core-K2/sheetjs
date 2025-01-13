@@ -1123,30 +1123,34 @@ function makeCell(cell) {
 		}
 		v = JSON.stringify(v);
 	}
-	let t = 's';
+	let f = cell['formula'];
+	if (f) {
+		if (f.startsWith('of:=')) f = f.substring(4);
+		c.f = f;
+	}
+	let t;
 	switch (vt) {
 	case 'boolean':
 		t = 'b';
+		w = v ? 'TRUE' : 'FALSE';
 		break;
 	case 'date':
 	case 'time':
-		v = (new Date(v)).getTime();
+		t = 'd';
+		break;
 	case 'float':
 	case 'currency':
 		t = 'n';
 		break;
 	case 'string':
 		if (p === 0) w = '';
+	default:
+		t = 's';
 		break;
 	}
 	c.t = t;
 	if (v !== undefined) c.v = v;
 	if (w !== undefined) c.w = w;
-	let f = cell['formula'];
-	if (f) {
-		if (f.startsWith('of:=')) f = f.substring(4);
-		c.f = f;
-	}
 	return c;
 }
 function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {

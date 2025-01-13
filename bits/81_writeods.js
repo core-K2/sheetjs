@@ -296,17 +296,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						} else {
 							textp = (cell.w||String(cell.v||0));
 							ct['office:value-type'] = cell.vt || "float";
-							switch (cell.vt) {
-							case 'date':
-								ct['date-value'] = (new Date(cell.v)).toISOString().split('T')[0];
-								break;
-							case 'time':
-								ct['time-value'] = (new Date(cell.v)).toISOString().split('T')[1];
-								break;
-							default:
-								ct['office:value'] = (cell.v||0);
-								break;
-							}
+							ct['office:value'] = (cell.v||0);
 						}
 						break;
 					case 's': case 'str':
@@ -314,10 +304,22 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						ct['office:value-type'] = "string";
 						break;
 					case 'd':
-						textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
-						ct['office:value-type'] = "date";
-						ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
-						ct['table:style-name'] = "ce1";
+						ct['office:value-type'] = cell.vt || "date";
+						switch (cell.vt) {
+						case 'date':
+							textp = (cell.w||String(cell.v));
+							ct['date-value'] = convertToOfficeDateValue(cell.v);
+							break;
+						case 'time':
+							textp = (cell.w||String(cell.v));
+							ct['time-value'] = convertToOfficeTimeValue(cell.v);
+							break;
+						default:
+							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
+							ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
+							ct['table:style-name'] = "ce1";
+							break;
+						}
 						break;
 					//case 'e': // TODO: translate to ODS errors
 					default: o.push(null_cell_xml); continue; // TODO: empty cell with comments
@@ -705,9 +707,10 @@ function writeOdsStyles(o, v, pro) {
 				vs.push(makeOdsStyle(ss[pro], pro));
 				break;
 			case 'number-style':
-			case 'date-style':
 			case 'text-style':
+			case 'date-style':
 			case 'time-style':
+			case 'boolean-style':
 				vs.push(makeOdsNumberStyle(ss[pro], pro));
 				break;
 			case 'marker':

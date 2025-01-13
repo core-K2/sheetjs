@@ -3994,6 +3994,18 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function convertToOfficeDateValue(v) {
+	let date = new Date(v);
+	return isNaN(date) ? v : date.toISOString().split('T')[0];
+}
+function convertToOfficeTimeValue(v) {
+	let date = new Date(v);
+	if (isNaN(date)) return v;
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	const seconds = String(date.getSeconds()).padStart(2, '0');
+	return `PT${hours}H${minutes}M${seconds}S`;
+}
 function getdatastr(data)/*:?string*/ {
 	if(!data) return null;
 	if(data.content && data.type) return cc2str(data.content, true);
@@ -24783,30 +24795,34 @@ function makeCell(cell) {
 		}
 		v = JSON.stringify(v);
 	}
-	let t = 's';
+	let f = cell['formula'];
+	if (f) {
+		if (f.startsWith('of:=')) f = f.substring(4);
+		c.f = f;
+	}
+	let t;
 	switch (vt) {
 	case 'boolean':
 		t = 'b';
+		w = v ? 'TRUE' : 'FALSE';
 		break;
 	case 'date':
 	case 'time':
-		v = (new Date(v)).getTime();
+		t = 'd';
+		break;
 	case 'float':
 	case 'currency':
 		t = 'n';
 		break;
 	case 'string':
 		if (p === 0) w = '';
+	default:
+		t = 's';
 		break;
 	}
 	c.t = t;
 	if (v !== undefined) c.v = v;
 	if (w !== undefined) c.w = w;
-	let f = cell['formula'];
-	if (f) {
-		if (f.startsWith('of:=')) f = f.substring(4);
-		c.f = f;
-	}
 	return c;
 }
 function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
@@ -25354,17 +25370,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						} else {
 							textp = (cell.w||String(cell.v||0));
 							ct['office:value-type'] = cell.vt || "float";
-							switch (cell.vt) {
-							case 'date':
-								ct['date-value'] = (new Date(cell.v)).toISOString().split('T')[0];
-								break;
-							case 'time':
-								ct['time-value'] = (new Date(cell.v)).toISOString().split('T')[1];
-								break;
-							default:
-								ct['office:value'] = (cell.v||0);
-								break;
-							}
+							ct['office:value'] = (cell.v||0);
 						}
 						break;
 					case 's': case 'str':
@@ -25372,10 +25378,22 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						ct['office:value-type'] = "string";
 						break;
 					case 'd':
-						textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
-						ct['office:value-type'] = "date";
-						ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
-						ct['table:style-name'] = "ce1";
+						ct['office:value-type'] = cell.vt || "date";
+						switch (cell.vt) {
+						case 'date':
+							textp = (cell.w||String(cell.v));
+							ct['date-value'] = convertToOfficeDateValue(cell.v);
+							break;
+						case 'time':
+							textp = (cell.w||String(cell.v));
+							ct['time-value'] = convertToOfficeTimeValue(cell.v);
+							break;
+						default:
+							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
+							ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
+							ct['table:style-name'] = "ce1";
+							break;
+						}
 						break;
 					//case 'e': // TODO: translate to ODS errors
 					default: o.push(null_cell_xml); continue; // TODO: empty cell with comments
@@ -25763,9 +25781,10 @@ function writeOdsStyles(o, v, pro) {
 				vs.push(makeOdsStyle(ss[pro], pro));
 				break;
 			case 'number-style':
-			case 'date-style':
 			case 'text-style':
+			case 'date-style':
 			case 'time-style':
+			case 'boolean-style':
 				vs.push(makeOdsNumberStyle(ss[pro], pro));
 				break;
 			case 'marker':
@@ -25888,7 +25907,8 @@ function writeOdsCalculation(o, v, pro) {
 	v.forEach(function(d) {
 		o.push(makeXmlTag('table:' + pro, d, null, '?', getOdsTablePrefix));
 	});
-}/*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
+}
+/*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
 var subarray = function() {
   try {
     if (typeof Uint8Array == "undefined")
