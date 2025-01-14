@@ -25305,6 +25305,14 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 	};
 
 	var null_cell_xml = '          <table:table-cell />\n';
+	var coveredTableCell_xml = function(count) {
+		let s = '          <table:covered-table-cell';
+		if (count > 1) {
+			s += ` table:number-columns-repeated="${count}"`
+		}
+		s += ' />\n';
+		return s;
+	}
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
 		/* Section 9 Tables */
 		var o/*:Array<string>*/ = [];
@@ -25354,7 +25362,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 							ct['table:number-columns-spanned'] = cCount + 1;
 							ct['table:number-rows-spanned'] = m.e.r - m.s.r + 1;
 						} else {
-							o.push(`          <table:covered-table-cell table:number-columns-repeated="${cCount + 1}"/>\n`);
+							o.push(coveredTableCell_xml(cCount + 1));
 							C += cCount;
 							continue;
 						}
@@ -25362,20 +25370,6 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						continue;
 					}
 				}
-				/*
-				skip = false;
-				for(mi = 0; mi != marr.length; ++mi) {
-					if(marr[mi].s.c > C) continue;
-					if(marr[mi].s.r > R) continue;
-					if(marr[mi].e.c < C) continue;
-					if(marr[mi].e.r < R) continue;
-					if(marr[mi].s.c != C || marr[mi].s.r != R) skip = true;
-					ct['table:number-columns-spanned'] = (marr[mi].e.c - marr[mi].s.c + 1);
-					ct['table:number-rows-spanned'] =    (marr[mi].e.r - marr[mi].s.r + 1);
-					break;
-				}
-				if(skip) { o.push('          <table:covered-table-cell/>\n'); continue; }
-				*/
 				var ref = encode_cell({r:R, c:C}), cell = dense ? (ws["!data"][R]||[])[C]: ws[ref];
 				if(cell && cell.f) {
 					ct['table:formula'] = escapexml(csf_to_ods_formula(cell.f));
@@ -25460,7 +25454,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				}
 				o.push('          ' + writextag('table:table-cell', payload, ct) + '\n');
 				if (cCount > 0) {
-					o.push(`          <table:covered-table-cell table:number-columns-repeated="${cCount}"/>\n`);
+					o.push(coveredTableCell_xml(cCount));
 					C += cCount;
 				}
 			}
