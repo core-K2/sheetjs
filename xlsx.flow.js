@@ -25304,13 +25304,13 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 			.replace(/^ /, "<text:s/>").replace(/ $/, "<text:s/>");
 	};
 
-	var null_cell_xml = '<table:table-cell />';
+	var null_cell_xml = '<table:table-cell/>';
 	var coveredTableCell_xml = function(count) {
 		let s = '<table:covered-table-cell';
 		if (count > 1) {
 			s += ` table:number-columns-repeated="${count}"`
 		}
-		s += ' />';
+		s += '/>';
 		return s;
 	}
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
@@ -25339,7 +25339,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				if (col.ods !== undefined) s += ` table:style-name="co${col.ods}"`;
 				if (col.dsn) s += ` table:default-cell-style-name="${col.dsn}"`;
 				if (col.count) s += ` table:number-columns-repeated="${col.count}"`;
-				o.push(s + ' />');
+				o.push(s + '/>');
 			});
 		}
 		var H = "", ROWS = ws["!rows"]||[];
