@@ -209,14 +209,14 @@ function write_names_ods(Names, SheetNames, idx) {
 		if(name.Sheet == (idx == -1 ? null : idx)) scoped.push(name);
 	}
 	if(!scoped.length) return "";
-	return "      <table:named-expressions>\n" + scoped.map(function(name) {
+	return "<table:named-expressions>" + scoped.map(function(name) {
 		var odsref =  (idx == -1 ? "$" : "") + csf_to_ods_3D(name.Ref);
-		return "        " + writextag("table:named-range", null, {
+		return writextag("table:named-range", null, {
 			"table:name": name.Name,
 			"table:cell-range-address": odsref,
 			"table:base-cell-address": odsref.replace(/[\.][^\.]*$/, ".$A$1")
 		});
-	}).join("\n") + "\n      </table:named-expressions>\n";
+	}).join("") + "</table:named-expressions>";
 }
 var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function() {
 	/* 6.1.2 White Space Characters */
@@ -228,13 +228,13 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 			.replace(/^ /, "<text:s/>").replace(/ $/, "<text:s/>");
 	};
 
-	var null_cell_xml = '          <table:table-cell />\n';
+	var null_cell_xml = '<table:table-cell />';
 	var coveredTableCell_xml = function(count) {
-		let s = '          <table:covered-table-cell';
+		let s = '<table:covered-table-cell';
 		if (count > 1) {
 			s += ` table:number-columns-repeated="${count}"`
 		}
-		s += ' />\n';
+		s += ' />';
 		return s;
 	}
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
@@ -242,7 +242,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 		var o/*:Array<string>*/ = [];
 		var tstyle = opts?.stayStyle && ws?.sn;
 		if (!tstyle) tstyle = ((((wb||{}).Workbook||{}).Sheets||[])[i]||{}).Hidden ? 'ta2' : 'ta1';
-		o.push('      <table:table table:name="' + escapexml(wb.SheetNames[i]) + '" table:style-name="' + tstyle + '">\n');
+		o.push('<table:table table:name="' + escapexml(wb.SheetNames[i]) + '" table:style-name="' + tstyle + '">');
 		var R=0,C=0, range = decode_range(ws['!ref']||"A1");
 		var marr/*:Array<Range>*/ = ws['!merges'] || [], mi = 0;
 		var dense = ws["!data"] != null;
@@ -259,21 +259,21 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				}
 			}
 			ar.forEach(function(col) {
-				let s = '        <table:table-column';
+				let s = '<table:table-column';
 				if (col.ods !== undefined) s += ` table:style-name="co${col.ods}"`;
 				if (col.dsn) s += ` table:default-cell-style-name="${col.dsn}"`;
 				if (col.count) s += ` table:number-columns-repeated="${col.count}"`;
-				o.push(s + ' />\n');
+				o.push(s + ' />');
 			});
 		}
 		var H = "", ROWS = ws["!rows"]||[];
 		for(R = 0; R < range.s.r; ++R) {
 			H = ROWS[R] ? ' table:style-name="ro' + ROWS[R].ods + '"' : "";
-			o.push('        <table:table-row' + H + '></table:table-row>\n');
+			o.push('<table:table-row' + H + '></table:table-row>');
 		}
 		for(; R <= range.e.r; ++R) {
 			H = ROWS[R] ? ' table:style-name="ro' + ROWS[R].ods + '"' : "";
-			o.push('        <table:table-row' + H + '>\n');
+			o.push('<table:table-row' + H + '>');
 			for(C=0; C < range.s.c; ++C) o.push(null_cell_xml);
 			for(; C <= range.e.c; ++C) {
 				var ct = {}, textp = "";
@@ -376,21 +376,21 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 					if(!cell.c.hidden) aprops["office:display"] = true;
 					payload = writextag('office:annotation', apayload, aprops) + payload;
 				}
-				o.push('          ' + writextag('table:table-cell', payload, ct) + '\n');
+				o.push(writextag('table:table-cell', payload, ct));
 				if (cCount > 0) {
 					o.push(coveredTableCell_xml(cCount));
 					C += cCount;
 				}
 			}
-			o.push('        </table:table-row>\n');
+			o.push('</table:table-row>');
 		}
 		if((wb.Workbook||{}).Names) o.push(write_names_ods(wb.Workbook.Names, wb.SheetNames, i));
-		o.push('      </table:table>\n');
+		o.push('</table:table>');
 		return o.join("");
 	};
 
 	var write_automatic_styles_ods = function(o/*:Array<string>*/, wb) {
-		o.push(' <office:automatic-styles>\n');
+		o.push('<office:automatic-styles>');
 
 		/* column styles */
 		var cidx = 0;
@@ -403,9 +403,9 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 					process_col(colobj);
 					colobj.ods = cidx;
 					var w = ws["!cols"][C].wpx + "px";
-					o.push('  <style:style style:name="co' + cidx + '" style:family="table-column">\n');
-					o.push('   <style:table-column-properties fo:break-before="auto" style:column-width="' + w + '"/>\n');
-					o.push('  </style:style>\n');
+					o.push('<style:style style:name="co' + cidx + '" style:family="table-column">');
+					o.push('<style:table-column-properties fo:break-before="auto" style:column-width="' + w + '"/>');
+					o.push('</style:style>');
 					++cidx;
 				}
 			}
@@ -419,29 +419,29 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				for(var R = 0; R < ws["!rows"].length; ++R) if(ws["!rows"][R]) {
 					ws["!rows"][R].ods = ridx;
 					var h = ws["!rows"][R].hpx + "px";
-					o.push('  <style:style style:name="ro' + ridx + '" style:family="table-row">\n');
-					o.push('   <style:table-row-properties fo:break-before="auto" style:row-height="' + h + '"/>\n');
-					o.push('  </style:style>\n');
+					o.push('<style:style style:name="ro' + ridx + '" style:family="table-row">');
+					o.push('<style:table-row-properties fo:break-before="auto" style:row-height="' + h + '"/>');
+					o.push('</style:style>');
 					++ridx;
 				}
 			}
 		});
 
 		/* table */
-		o.push('  <style:style style:name="ta1" style:family="table" style:master-page-name="mp1">\n');
-		o.push('   <style:table-properties table:display="true" style:writing-mode="lr-tb"/>\n');
-		o.push('  </style:style>\n');
-		o.push('  <style:style style:name="ta2" style:family="table" style:master-page-name="mp1">\n');
-		o.push('   <style:table-properties table:display="false" style:writing-mode="lr-tb"/>\n');
-		o.push('  </style:style>\n');
+		o.push('<style:style style:name="ta1" style:family="table" style:master-page-name="mp1">');
+		o.push('<style:table-properties table:display="true" style:writing-mode="lr-tb"/>');
+		o.push('</style:style>');
+		o.push('<style:style style:name="ta2" style:family="table" style:master-page-name="mp1">');
+		o.push('<style:table-properties table:display="false" style:writing-mode="lr-tb"/>');
+		o.push('</style:style>');
 
-		o.push('  <number:date-style style:name="N37" number:automatic-order="true">\n');
-		o.push('   <number:month number:style="long"/>\n');
-		o.push('   <number:text>/</number:text>\n');
-		o.push('   <number:day number:style="long"/>\n');
-		o.push('   <number:text>/</number:text>\n');
-		o.push('   <number:year/>\n');
-		o.push('  </number:date-style>\n');
+		o.push('<number:date-style style:name="N37" number:automatic-order="true">');
+		o.push('<number:month number:style="long"/>');
+		o.push('<number:text>/</number:text>');
+		o.push('<number:day number:style="long"/>');
+		o.push('<number:text>/</number:text>');
+		o.push('<number:year/>');
+		o.push('</number:date-style>');
 
 		/* number formats, table cells, text */
 		var nfs = {};
@@ -456,18 +456,18 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				if(!c || !c.z || c.z.toLowerCase() == "general") continue;
 				if(!nfs[c.z]) {
 					var out = write_number_format_ods(c.z, "N" + nfi);
-					if(out) { nfs[c.z] = "N" + nfi; ++nfi; o.push(out + "\n"); }
+					if(out) { nfs[c.z] = "N" + nfi; ++nfi; o.push(out); }
 				}
 			}
 		});
-		o.push('  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N37"/>\n');
+		o.push('<style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N37"/>');
 		keys(nfs).forEach(function(nf) {
-			o.push('<style:style style:name="ce' + nfs[nf].slice(1) + '" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="' + nfs[nf] + '"/>\n');
+			o.push('<style:style style:name="ce' + nfs[nf].slice(1) + '" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="' + nfs[nf] + '"/>');
 		});
 
 		/* page-layout */
 
-		o.push(' </office:automatic-styles>\n');
+		o.push('</office:automatic-styles>');
 		return nfs;
 	};
 
@@ -520,23 +520,23 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 		});
 
 		if(opts.bookType == "fods") {
-			o.push('<office:document' + attr + fods + '>\n');
-			o.push(write_meta_ods().replace(/<office:document-meta[^<>]*?>/, "").replace(/<\/office:document-meta>/, "") + "\n");
+			o.push('<office:document' + attr + fods + '>');
+			o.push(write_meta_ods().replace(/<office:document-meta[^<>]*?>/, "").replace(/<\/office:document-meta>/, ""));
 			// TODO: settings (equiv of settings.xml for ODS)
-		} else o.push('<office:document-content' + attr  + '>\n');
-		// o.push('  <office:scripts/>\n');
+		} else o.push('<office:document-content' + attr  + '>');
+		// o.push('<office:scripts/>');
 		var nfs = opts?.stayStyle && writeOdsStayStyles(o, wb, opts)
 		if (!nfs) nfs = write_automatic_styles_ods(o, wb);
-		o.push('  <office:body>\n');
-		o.push('    <office:spreadsheet>\n');
+		o.push('<office:body>');
+		o.push('<office:spreadsheet>');
 		let ss = opts?.stayStyle && wb?.content?.body?.spreadsheet;
 		let n = 'calculation-settings';
 		if (ss && ss[n]) writeOdsCalculation(o, ss[n], n);
-		else if (((wb.Workbook||{}).WBProps||{}).date1904) o.push('      <table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false">\n        <table:null-date table:date-value="1904-01-01"/>\n      </table:calculation-settings>\n');
+		else if (((wb.Workbook||{}).WBProps||{}).date1904) o.push('<table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false"><table:null-date table:date-value="1904-01-01"/></table:calculation-settings>');
 		for(var i = 0; i != wb.SheetNames.length; ++i) o.push(write_ws(wb.Sheets[wb.SheetNames[i]], wb, i, opts, nfs, ((wb.Workbook||{}).WBProps||{}).date1904));
 		if((wb.Workbook||{}).Names) o.push(write_names_ods(wb.Workbook.Names, wb.SheetNames, -1));
-		o.push('    </office:spreadsheet>\n');
-		o.push('  </office:body>\n');
+		o.push('</office:spreadsheet>');
+		o.push('</office:body>');
 		if(opts.bookType == "fods") o.push('</office:document>');
 		else o.push('</office:document-content>');
 		return o.join("");
