@@ -946,6 +946,7 @@ function convert_content(wb, content, styles, setting) {
 				let rep = cell['number-columns-repeated'] || 1
 				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'] || 0;
+				if (rspan > 0 && iRowMax < iRow + rspan) iRowMax = iRow + rspan;
 				for (k = 0; k < rep; k++) {
 					++iCol;
 					if (c && (be || iCol <= iColMax)) {
