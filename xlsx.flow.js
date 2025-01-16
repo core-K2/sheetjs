@@ -24569,6 +24569,7 @@ function convert_content(wb, content, styles, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = toNameObjects(content['automatic-styles']);
+	let oss = toNameObjects(styles);
 	let Styles = wb.Styles;
 	let ss = body.spreadsheet;
 	let sheets = ss.table;
@@ -24614,7 +24615,7 @@ function convert_content(wb, content, styles, setting) {
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
 				let c = Object.keys(cell).length ? makeCell(cell) : null;
-				let be = c ? setCellStyle(c, Styles, cell, cols[j], ass, fonts, styles) || !!c.v : false;
+				let be = c ? setCellStyle(c, Styles, cell, cols[j], ass, oss, fonts) || !!c.v : false;
 				let rep = cell['number-columns-repeated'] || 1
 				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'] || 0;
@@ -24661,7 +24662,7 @@ function convert_content(wb, content, styles, setting) {
 		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
-		let csts = sh['!cols'] = makeColStyles(cols, ass, iColMax, styles, Styles, fonts);
+		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(function(v) {
 			sh[v.n].si = csts[v.i].si;
 		});
@@ -24740,11 +24741,11 @@ function makeRowStyle(r, ass) {
 	}
 	return ret;
 }
-function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
+function makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts) {
 	let cs = [];
 	let i, j;
 	for (i = j = 0; i < cols.length && j <= iColMax; i++) {
-		let c = makeColStyle(cols[i], ass, styles, Styles, fonts);
+		let c = makeColStyle(cols[i], ass, oss, styles, Styles, fonts);
 		let rep = cols[i]['number-columns-repeated'] || 1;
 		for (k = 0; k < rep; k++) {
 			cs.push(c);
@@ -24755,7 +24756,7 @@ function makeColStyles(cols, ass, iColMax, styles, Styles, fonts) {
 	}
 	return cs;
 }
-function makeColStyle(c, ass, styles, Styles, fonts) {
+function makeColStyle(c, ass, oss, styles, Styles, fonts) {
 	let n = c['style-name'];
 	let ret = {ods: n.substring(2)};
 	let s = ass[n];
@@ -24770,9 +24771,9 @@ function makeColStyle(c, ass, styles, Styles, fonts) {
 		if (s) {
 			let st = getDefaultStyle(styles, s['family']);
 			if (st) {
-				let tc = getStyleObject(null, 'table-cell-properties', st, styles);
-				let pp = getStyleObject(null, 'paragraph-properties', st, styles);
-				let tp = getStyleObject(null, 'text-properties', st, styles);
+				let tc = getStyleObject(null, 'table-cell-properties', st, oss);
+				let pp = getStyleObject(null, 'paragraph-properties', st, oss);
+				let tp = getStyleObject(null, 'text-properties', st, oss);
 				let style = {};
 				applyStyle(style, Styles, fonts, tc, pp, tp);
 				ret.si = getOrAddObject(Styles.CellXf, style);
@@ -24839,7 +24840,7 @@ function makeCell(cell) {
 	if (w !== undefined) c.w = w;
 	return c;
 }
-function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
+function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 	let ret = false;
 	let sts = existValues(cell && cell['style-name'], col && col['default-cell-style-name']);
 	if (!sts) return ret;
@@ -24847,13 +24848,13 @@ function setCellStyle(c, Styles, cell, col, ass, fonts, styles) {
 	for (let i = 0; i < sts.length; i++) {
 		let st = ass[sts[i]];
 		if (!st) {
-			st = styles && styles[sts[i]];
+			st = oss && oss[sts[i]];
 			if (!st) continue;
 		}
-		dst = getStyleObject(dst, 'data-style-name', st, styles, ass);
-		tc = getStyleObject(tc, 'table-cell-properties', st, styles);
-		pp = getStyleObject(pp, 'paragraph-properties', st, styles);
-		tp = getStyleObject(tp, 'text-properties', st, styles);
+		dst = getStyleObject(dst, 'data-style-name', st, oss, ass);
+		tc = getStyleObject(tc, 'table-cell-properties', st, oss);
+		pp = getStyleObject(pp, 'paragraph-properties', st, oss);
+		tp = getStyleObject(tp, 'text-properties', st, oss);
 	}
 	let style = {};
 	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
@@ -25001,9 +25002,11 @@ function makeFill(tc, tp, fills) {
 function makeAlignment(tc, pp) {
 	let ret = {};
 	if (tc) {
-		ret.vertical = getProp('vertical-align', tc) || 'bottom';
-		ret.textRotation = getProp('rotation-angle', tc) || 0;
-		let v = getProp('wrap-option', tc);
+		let v = getProp('vertical-align', tc);
+		if (v) ret.vertical = v;
+		v = getProp('rotation-angle', tc);
+		if (v !== null) ret.textRotation = v;
+		v = getProp('wrap-option', tc);
 		if (v) ret.wrapText = v === 'wrap';
 		if (tc?.direction) ret.direction = tc.direction;
 	}
