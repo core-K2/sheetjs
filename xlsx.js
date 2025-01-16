@@ -24894,6 +24894,7 @@ function makeAlignment(tc, pp) {
 		ret.textRotation = getProp('rotation-angle', tc) || 0;
 		let v = getProp('wrap-option', tc);
 		if (v) ret.wrapText = v === 'wrap';
+		if (tc?.direction) ret.direction = tc.direction;
 	}
 	ret.horizontal = getProp('text-align', pp) || 'general';
 	return ret;
