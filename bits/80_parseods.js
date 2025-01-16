@@ -912,6 +912,8 @@ function convert_content(wb, content, styles, setting) {
 		if (!cols) {
 			if (!hcols) continue;
 			cols = [];
+		} else if (!Array.isArray(cols)) {
+			cols = [cols];
 		}
 		if (hcols) {
 			if (!Array.isArray(hcols)) hcols = [hcols];
@@ -924,7 +926,7 @@ function convert_content(wb, content, styles, setting) {
 		wb.Workbook.Sheets.push({
 			name: n,
 			sheetId: '' + wb.SheetNames.length,
-			Hidden: 0,
+			Hidden: getSheetHidden(sheet, ass),
 		});
 		let merges = sh['!merges'] = [];
 		let iRow = 0;
@@ -991,6 +993,15 @@ function convert_content(wb, content, styles, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+}
+function getSheetHidden(sheet, ass) {
+	let sn = sheet['style-name'];
+	if (sn) {
+		let s = ass[sn];
+		let tp = s && s['table-properties'];
+		if (tp && !tp.display) return 1;
+	}
+	return 0;
 }
 function toNameObjects(v) {
 	let o = {};

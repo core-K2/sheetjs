@@ -24474,6 +24474,8 @@ function convert_content(wb, content, styles, setting) {
 		if (!cols) {
 			if (!hcols) continue;
 			cols = [];
+		} else if (!Array.isArray(cols)) {
+			cols = [cols];
 		}
 		if (hcols) {
 			if (!Array.isArray(hcols)) hcols = [hcols];
@@ -24486,7 +24488,7 @@ function convert_content(wb, content, styles, setting) {
 		wb.Workbook.Sheets.push({
 			name: n,
 			sheetId: '' + wb.SheetNames.length,
-			Hidden: 0,
+			Hidden: getSheetHidden(sheet, ass),
 		});
 		let merges = sh['!merges'] = [];
 		let iRow = 0;
@@ -24553,6 +24555,15 @@ function convert_content(wb, content, styles, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+}
+function getSheetHidden(sheet, ass) {
+	let sn = sheet['style-name'];
+	if (sn) {
+		let s = ass[sn];
+		let tp = s && s['table-properties'];
+		if (tp && !tp.display) return 1;
+	}
+	return 0;
 }
 function toNameObjects(v) {
 	let o = {};
@@ -25551,7 +25562,24 @@ function write_ods(wb, opts) {
 
 	return zip;
 }
-
+function setSheetHidden(sheet, ass, Sheet) {
+	let sn = sheet['style-name'];
+	if (sn) {
+		let s = ass.find(s => s?.family === 'table' && s?.name === sn);
+		if (!s) return;
+		let tp = s && s['table-properties'];
+		if (!tp) return;
+		tp.display = Sheet.Hidden ? false : true;
+	}
+}
+function setBookHidden(wb) {
+	let Sheets = wb?.Workbook?.Sheets;
+	let sheets = wb?.content?.body?.spreadsheet?.table;
+	let ass = wb?.content['automatic-styles']?.style;
+	if (!Sheets || !sheets || !ass) return;
+	if (!Array.isArray(sheets)) sheets = [sheets];
+	sheets.forEach(sheet => setSheetHidden(sheet, ass, Sheets.find(s => s.name === sheet.name)));
+}
 function writeOdsStayStyles(o, wb, opts) {
 	let content = wb?.content;
 	if (content) {
@@ -25560,6 +25588,7 @@ function writeOdsStayStyles(o, wb, opts) {
 			'automatic-styles': writeOdsStyles,
 		};
 		let nfs = {};
+		setBookHidden(wb);
 		for (let n in target) {
 			target[n](o, content[n], n);
 		}
@@ -25592,6 +25621,9 @@ const ODS_STYLE_SUBS = [
 	'table-properties',
 	'paragraph-properties', 'text-properties', 'graphic-properties', 
 ];
+const ODS_STYLE_SUBS_FUNC = {
+	'table-properties': makeTableProperty,
+};
 const ODS_FONTS_PREFIX = [
 	'background-color', 'color', 'country', 'language',
 	'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
@@ -25706,6 +25738,9 @@ function makeOdsMasterPage(v, pro) {
 function makeOdsGradient(v, pro) {
 	return makeOdsTag(v, pro, writeOdsGradient);
 }
+function makeTableProperty(v, pro) {
+	return makeOdsTag(v, pro, writeOdsTableProperty);
+}
 function writeOdsStyles(o, v, pro) {
 	if (!v) return;
 	o.push(makeXmlTag('office:' + pro, v, function(ss) {
@@ -25721,6 +25756,8 @@ function writeOdsStyles(o, v, pro) {
 			case 'date-style':
 			case 'time-style':
 			case 'boolean-style':
+			case 'percentage-style':
+			case 'currency-style':
 				vs.push(makeOdsNumberStyle(ss[pro], pro));
 				break;
 			case 'marker':
@@ -25754,7 +25791,12 @@ function writeOdsStyle(o, v, pro) {
 			let s = '';
 			for (let n in d) {
 				if (ODS_STYLE_SUBS.includes(n)) {
-					s += makeXmlTag('style:' + n, d[n], null, '?', getOdsPrefix);
+					let fn = ODS_STYLE_SUBS_FUNC[n];
+					if (typeof fn === 'function') {
+						s += fn(d[n], n);
+					} else {
+						s += makeXmlTag('style:' + n, d[n], null, '?', getOdsPrefix);
+					}
 				}
 			}
 			return s;
@@ -25852,6 +25894,17 @@ function writeOdsGradient(o, v, pro) {
 	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
 		o.push(makeXmlTag('draw:' + pro, d, null, '?', getOdsGradientPrefix));
+	});
+}
+function writeOdsTableProperty(o, v, pro) {
+	if (!v) return;
+	else if (!Array.isArray(v)) v = [v];
+	v.forEach(function(d) {
+		o.push(makeXmlTag('style:' + pro, d, null, '?', function(n) {
+			return getPrefix({
+				'table': ['display'],
+			}, 'style', n);			
+		}));
 	});
 }
 /*! sheetjs (C) 2013-present SheetJS -- http://sheetjs.com */
