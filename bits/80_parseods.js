@@ -816,10 +816,12 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
-		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml') : null;
+		let xmlOpts = {asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/]};
+		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
+		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
+		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta);
 		if (opts.content) wb.content = content;
 		if (opts.cellStyles) wb.styles = styles;
@@ -1007,15 +1009,25 @@ function getSheetHidden(sheet, ass) {
 }
 function toNameObjects(v) {
 	let o = {};
-	for (let i in v) {
-		let ar = v[i];
-		if (!Array.isArray(ar)) ar = [ar];
-		ar.forEach(function(t) {
+	if (Array.isArray(v)) {
+		v.forEach(function(obj) {
+			let t = singleObject(obj);
 			let n = t?.name;
 			if (n) {
 				o[n] = t;
 			}
 		});
+	} else {
+		for (let i in v) {
+			let ar = v[i];
+			if (!Array.isArray(ar)) ar = [ar];
+			ar.forEach(function(t) {
+				let n = t?.name;
+				if (n) {
+					o[n] = t;
+				}
+			});
+		}
 	}
 	return o;
 }

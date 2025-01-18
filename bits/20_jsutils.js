@@ -417,6 +417,7 @@ var Xml = {
 		prefixText: '',		// prefix for text data
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
 		convNames: null,	// convert name map
+		asSeqArray: null,	// as sequence array object names
 	},
 	_opts: [],
 	pushOpts: function() {
@@ -443,6 +444,10 @@ var Xml = {
 				}
 			}
 		}
+		let seq = this.opts.asSeqArray;
+		if (seq && !Array.isArray(seq)) {
+			this.opts.asSeqArray = [seq];
+		}
 	},
 	// get property name
 	getName: function(n) {
@@ -456,6 +461,14 @@ var Xml = {
 			if (conv) return conv;
 		}
 		return n;
+	},
+	isSeqArray: function(n) {
+		let seq = this.opts.asSeqArray;
+		if (!seq) return false;
+		return seq.findIndex(function(s) {
+			let re = s instanceof RegExp ? s : new RegExp(s);
+			return re.test(n);
+		}) >= 0;
 	},
 	// convert value
 	toValue: function(v, bTrim) {
@@ -499,8 +512,8 @@ var Xml = {
 		return this.xmlToObject(this.getXmlDocument(xmlStr).documentElement);
 	},
 	// XML node to JavaScript Object
-	xmlToObject: function(xmlNode, parent) {
-		let obj = {};
+	xmlToObject: function(xmlNode, parent, bSeqParent) {
+		let obj = bSeqParent ? [] : {};
 		let attrs = this.parseAttributes(xmlNode.attributes);
 		// child node process
 		let len = xmlNode.childNodes.length;
@@ -537,14 +550,18 @@ var Xml = {
 				}
 				continue;
 			}
-			let val = this.xmlToObject(node, obj);
+			let val = this.xmlToObject(node, obj, this.isSeqArray(node.nodeName));
 			if (val === undefined) {
 				continue;
 			}
 			if (name !== node.localName) {
 				val.ln = node.localName;
 			}
-			if (!obj[name]) {
+			if (bSeqParent) {
+				let o = {};
+				o[name] = val;
+				obj.push(o);
+			} else if (!obj[name]) {
 				obj[name] = val;
 			} else {
 				if (!Array.isArray(obj[name])) {
@@ -637,4 +654,8 @@ function convertToOfficeTimeValue(v) {
 	const minutes = String(date.getMinutes()).padStart(2, '0');
 	const seconds = String(date.getSeconds()).padStart(2, '0');
 	return `PT${hours}H${minutes}M${seconds}S`;
+}
+function singleObject(v) {
+	let keys = typeof v === 'object' ? Object.keys(v) : null;
+	return keys && keys.length === 1 ? v[keys[0]] : v;
 }

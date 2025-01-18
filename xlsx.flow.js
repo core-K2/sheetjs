@@ -3785,6 +3785,7 @@ var Xml = {
 		prefixText: '',		// prefix for text data
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
 		convNames: null,	// convert name map
+		asSeqArray: null,	// as sequence array object names
 	},
 	_opts: [],
 	pushOpts: function() {
@@ -3811,6 +3812,10 @@ var Xml = {
 				}
 			}
 		}
+		let seq = this.opts.asSeqArray;
+		if (seq && !Array.isArray(seq)) {
+			this.opts.asSeqArray = [seq];
+		}
 	},
 	// get property name
 	getName: function(n) {
@@ -3824,6 +3829,14 @@ var Xml = {
 			if (conv) return conv;
 		}
 		return n;
+	},
+	isSeqArray: function(n) {
+		let seq = this.opts.asSeqArray;
+		if (!seq) return false;
+		return seq.findIndex(function(s) {
+			let re = s instanceof RegExp ? s : new RegExp(s);
+			return re.test(n);
+		}) >= 0;
 	},
 	// convert value
 	toValue: function(v, bTrim) {
@@ -3867,8 +3880,8 @@ var Xml = {
 		return this.xmlToObject(this.getXmlDocument(xmlStr).documentElement);
 	},
 	// XML node to JavaScript Object
-	xmlToObject: function(xmlNode, parent) {
-		let obj = {};
+	xmlToObject: function(xmlNode, parent, bSeqParent) {
+		let obj = bSeqParent ? [] : {};
 		let attrs = this.parseAttributes(xmlNode.attributes);
 		// child node process
 		let len = xmlNode.childNodes.length;
@@ -3905,14 +3918,18 @@ var Xml = {
 				}
 				continue;
 			}
-			let val = this.xmlToObject(node, obj);
+			let val = this.xmlToObject(node, obj, this.isSeqArray(node.nodeName));
 			if (val === undefined) {
 				continue;
 			}
 			if (name !== node.localName) {
 				val.ln = node.localName;
 			}
-			if (!obj[name]) {
+			if (bSeqParent) {
+				let o = {};
+				o[name] = val;
+				obj.push(o);
+			} else if (!obj[name]) {
 				obj[name] = val;
 			} else {
 				if (!Array.isArray(obj[name])) {
@@ -4005,6 +4022,10 @@ function convertToOfficeTimeValue(v) {
 	const minutes = String(date.getMinutes()).padStart(2, '0');
 	const seconds = String(date.getSeconds()).padStart(2, '0');
 	return `PT${hours}H${minutes}M${seconds}S`;
+}
+function singleObject(v) {
+	let keys = typeof v === 'object' ? Object.keys(v) : null;
+	return keys && keys.length === 1 ? v[keys[0]] : v;
 }
 function getdatastr(data)/*:?string*/ {
 	if(!data) return null;
@@ -24488,10 +24509,12 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
-		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml') : null;
+		let xmlOpts = {asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/]};
+		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
-		let content = parse_zip_xml(zip, 'content.xml', {convNames: {'covered-table-cell': 'table-cell'}});
+		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
+		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta);
 		if (opts.content) wb.content = content;
 		if (opts.cellStyles) wb.styles = styles;
@@ -24679,15 +24702,25 @@ function getSheetHidden(sheet, ass) {
 }
 function toNameObjects(v) {
 	let o = {};
-	for (let i in v) {
-		let ar = v[i];
-		if (!Array.isArray(ar)) ar = [ar];
-		ar.forEach(function(t) {
+	if (Array.isArray(v)) {
+		v.forEach(function(obj) {
+			let t = singleObject(obj);
 			let n = t?.name;
 			if (n) {
 				o[n] = t;
 			}
 		});
+	} else {
+		for (let i in v) {
+			let ar = v[i];
+			if (!Array.isArray(ar)) ar = [ar];
+			ar.forEach(function(t) {
+				let n = t?.name;
+				if (n) {
+					o[n] = t;
+				}
+			});
+		}
 	}
 	return o;
 }
@@ -25697,19 +25730,17 @@ function setBookHidden(wb) {
 }
 function writeOdsStayStyles(o, wb, opts) {
 	let content = wb?.content;
-	if (content) {
-		let target = {
-			'font-face-decls': writeOdsFonts,
-			'automatic-styles': writeOdsStyles,
-		};
-		let nfs = {};
-		setBookHidden(wb);
-		for (let n in target) {
-			target[n](o, content[n], n);
-		}
-		return nfs;
+	if (!content) return null;
+	let target = {
+		'font-face-decls': writeOdsFonts,
+		'automatic-styles': writeOdsStyles,
+	};
+	let nfs = {};
+	setBookHidden(wb);
+	for (let n in target) {
+		target[n](o, content[n], n);
 	}
-	return null;
+	return nfs;
 }
 function makeOdsStyles(wb, opts) {
 	let styles = wb?.styles;
@@ -25856,46 +25887,57 @@ function makeOdsGradient(v, pro) {
 function makeTableProperty(v, pro) {
 	return makeOdsTag(v, pro, writeOdsTableProperty);
 }
+function writeOdsStylesItem(item) {
+	let vs = [];
+	for (let n in item) {
+		switch (n) {
+		case 'default-style':
+		case 'style':
+			vs.push(makeOdsStyle(item[n], n));
+			break;
+		case 'number-style':
+		case 'text-style':
+		case 'date-style':
+		case 'time-style':
+		case 'boolean-style':
+		case 'percentage-style':
+		case 'currency-style':
+			vs.push(makeOdsNumberStyle(item[n], n));
+			break;
+		case 'marker':
+			vs.push(makeOdsMarkerStyle(item[n], n));
+			break;
+		case 'theme':
+			vs.push(makeOdsThemeStyle(item[n], n));
+			break;
+		case 'page-layout':
+			vs.push(makeOdsPageLayout(item[n], n));
+			break;
+		case 'master-page':
+			vs.push(makeOdsMasterPage(item[n], n));
+			break;
+		case 'gradient':
+			vs.push(makeOdsGradient(item[n], n));
+			break;
+		default:
+			console.warn('unknown property ' + n);
+			break;
+		}
+	}
+	return vs.join('');
+}
 function writeOdsStyles(o, v, pro) {
 	if (!v) return;
 	o.push(makeXmlTag('office:' + pro, v, function(ss) {
-		let vs = [];
-		for (let pro in ss) {
-			switch (pro) {
-			case 'default-style':
-			case 'style':
-				vs.push(makeOdsStyle(ss[pro], pro));
-				break;
-			case 'number-style':
-			case 'text-style':
-			case 'date-style':
-			case 'time-style':
-			case 'boolean-style':
-			case 'percentage-style':
-			case 'currency-style':
-				vs.push(makeOdsNumberStyle(ss[pro], pro));
-				break;
-			case 'marker':
-				vs.push(makeOdsMarkerStyle(ss[pro], pro));
-				break;
-			case 'theme':
-				vs.push(makeOdsThemeStyle(ss[pro], pro));
-				break;
-			case 'page-layout':
-				vs.push(makeOdsPageLayout(ss[pro], pro));
-				break;
-			case 'master-page':
-				vs.push(makeOdsMasterPage(ss[pro], pro));
-				break;
-			case 'gradient':
-				vs.push(makeOdsGradient(ss[pro], pro));
-				break;
-			default:
-				console.warn('unknown property ' + pro);
-				break;
-			}
+		if (Array.isArray(ss)) {
+			let ar = [];
+			ss.forEach(function(item) {
+				ar.push(writeOdsStylesItem(item));
+			});
+			return ar.join('');
+		} else {
+			return writeOdsStylesItem(ss);
 		}
-		return vs.join('');
 	}));
 }
 function writeOdsStyle(o, v, pro) {

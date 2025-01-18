@@ -605,19 +605,17 @@ function setBookHidden(wb) {
 }
 function writeOdsStayStyles(o, wb, opts) {
 	let content = wb?.content;
-	if (content) {
-		let target = {
-			'font-face-decls': writeOdsFonts,
-			'automatic-styles': writeOdsStyles,
-		};
-		let nfs = {};
-		setBookHidden(wb);
-		for (let n in target) {
-			target[n](o, content[n], n);
-		}
-		return nfs;
+	if (!content) return null;
+	let target = {
+		'font-face-decls': writeOdsFonts,
+		'automatic-styles': writeOdsStyles,
+	};
+	let nfs = {};
+	setBookHidden(wb);
+	for (let n in target) {
+		target[n](o, content[n], n);
 	}
-	return null;
+	return nfs;
 }
 function makeOdsStyles(wb, opts) {
 	let styles = wb?.styles;
@@ -764,46 +762,57 @@ function makeOdsGradient(v, pro) {
 function makeTableProperty(v, pro) {
 	return makeOdsTag(v, pro, writeOdsTableProperty);
 }
+function writeOdsStylesItem(item) {
+	let vs = [];
+	for (let n in item) {
+		switch (n) {
+		case 'default-style':
+		case 'style':
+			vs.push(makeOdsStyle(item[n], n));
+			break;
+		case 'number-style':
+		case 'text-style':
+		case 'date-style':
+		case 'time-style':
+		case 'boolean-style':
+		case 'percentage-style':
+		case 'currency-style':
+			vs.push(makeOdsNumberStyle(item[n], n));
+			break;
+		case 'marker':
+			vs.push(makeOdsMarkerStyle(item[n], n));
+			break;
+		case 'theme':
+			vs.push(makeOdsThemeStyle(item[n], n));
+			break;
+		case 'page-layout':
+			vs.push(makeOdsPageLayout(item[n], n));
+			break;
+		case 'master-page':
+			vs.push(makeOdsMasterPage(item[n], n));
+			break;
+		case 'gradient':
+			vs.push(makeOdsGradient(item[n], n));
+			break;
+		default:
+			console.warn('unknown property ' + n);
+			break;
+		}
+	}
+	return vs.join('');
+}
 function writeOdsStyles(o, v, pro) {
 	if (!v) return;
 	o.push(makeXmlTag('office:' + pro, v, function(ss) {
-		let vs = [];
-		for (let pro in ss) {
-			switch (pro) {
-			case 'default-style':
-			case 'style':
-				vs.push(makeOdsStyle(ss[pro], pro));
-				break;
-			case 'number-style':
-			case 'text-style':
-			case 'date-style':
-			case 'time-style':
-			case 'boolean-style':
-			case 'percentage-style':
-			case 'currency-style':
-				vs.push(makeOdsNumberStyle(ss[pro], pro));
-				break;
-			case 'marker':
-				vs.push(makeOdsMarkerStyle(ss[pro], pro));
-				break;
-			case 'theme':
-				vs.push(makeOdsThemeStyle(ss[pro], pro));
-				break;
-			case 'page-layout':
-				vs.push(makeOdsPageLayout(ss[pro], pro));
-				break;
-			case 'master-page':
-				vs.push(makeOdsMasterPage(ss[pro], pro));
-				break;
-			case 'gradient':
-				vs.push(makeOdsGradient(ss[pro], pro));
-				break;
-			default:
-				console.warn('unknown property ' + pro);
-				break;
-			}
+		if (Array.isArray(ss)) {
+			let ar = [];
+			ss.forEach(function(item) {
+				ar.push(writeOdsStylesItem(item));
+			});
+			return ar.join('');
+		} else {
+			return writeOdsStylesItem(ss);
 		}
-		return vs.join('');
 	}));
 }
 function writeOdsStyle(o, v, pro) {
