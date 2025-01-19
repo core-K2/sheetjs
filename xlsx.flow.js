@@ -25717,7 +25717,7 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 function setSheetHidden(sheet, ass, Sheet) {
 	let sn = sheet['style-name'];
 	if (sn) {
-		let s = ass.find(s => s?.family === 'table' && s?.name === sn);
+		let s = ass[sn];
 		if (!s) return;
 		let tp = s && s['table-properties'];
 		if (!tp) return;
@@ -25727,8 +25727,9 @@ function setSheetHidden(sheet, ass, Sheet) {
 function setBookHidden(wb) {
 	let Sheets = wb?.Workbook?.Sheets;
 	let sheets = wb?.content?.body?.spreadsheet?.table;
-	let ass = wb?.content['automatic-styles']?.style;
+	let ass = wb?.content['automatic-styles'];
 	if (!Sheets || !sheets || !ass) return;
+	ass = toNameObjects(ass);
 	if (!Array.isArray(sheets)) sheets = [sheets];
 	sheets.forEach(sheet => setSheetHidden(sheet, ass, Sheets.find(s => s.name === sheet.name)));
 }
