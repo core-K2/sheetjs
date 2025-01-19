@@ -25240,6 +25240,12 @@ function write_names_ods(Names, SheetNames, idx) {
 var write_content_ods = /* @__PURE__ */(function() {
 	/* 6.1.2 White Space Characters */
 	var write_text_p = function(text, span) {
+		if (typeof text !== 'string') {
+			text = String(text);
+		} else if (text.startsWith('[') && text.endsWith(']')) {
+			let ar = JSON.parse(text);
+			text = ar.join('\n');
+		}
 		return escapexml(text)
 			.replace(/  +/g, function($$){return '<text:s text:c="'+$$.length+'"/>';})
 			.replace(/\t/g, "<text:tab/>")
