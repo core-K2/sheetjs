@@ -762,13 +762,15 @@ function makeOdsGradient(v, pro) {
 function makeTableProperty(v, pro) {
 	return makeOdsTag(v, pro, writeOdsTableProperty);
 }
-function writeOdsStylesItem(item) {
+function writeOdsStylesItem(item, isArray) {
 	let vs = [];
 	for (let n in item) {
+		let v = item[n];
+		if (isArray) v = [v];
 		switch (n) {
 		case 'default-style':
 		case 'style':
-			vs.push(makeOdsStyle(item[n], n));
+			vs.push(makeOdsStyle(v, n));
 			break;
 		case 'number-style':
 		case 'text-style':
@@ -777,22 +779,22 @@ function writeOdsStylesItem(item) {
 		case 'boolean-style':
 		case 'percentage-style':
 		case 'currency-style':
-			vs.push(makeOdsNumberStyle(item[n], n));
+			vs.push(makeOdsNumberStyle(v, n));
 			break;
 		case 'marker':
-			vs.push(makeOdsMarkerStyle(item[n], n));
+			vs.push(makeOdsMarkerStyle(v, n));
 			break;
 		case 'theme':
-			vs.push(makeOdsThemeStyle(item[n], n));
+			vs.push(makeOdsThemeStyle(v, n));
 			break;
 		case 'page-layout':
-			vs.push(makeOdsPageLayout(item[n], n));
+			vs.push(makeOdsPageLayout(v, n));
 			break;
 		case 'master-page':
-			vs.push(makeOdsMasterPage(item[n], n));
+			vs.push(makeOdsMasterPage(v, n));
 			break;
 		case 'gradient':
-			vs.push(makeOdsGradient(item[n], n));
+			vs.push(makeOdsGradient(v, n));
 			break;
 		default:
 			console.warn('unknown property ' + n);
@@ -807,7 +809,7 @@ function writeOdsStyles(o, v, pro) {
 		if (Array.isArray(ss)) {
 			let ar = [];
 			ss.forEach(function(item) {
-				ar.push(writeOdsStylesItem(item));
+				ar.push(writeOdsStylesItem(item, true));
 			});
 			return ar.join('');
 		} else {

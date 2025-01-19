@@ -313,9 +313,13 @@ function makeXmlTag(tag, v, cb, attrs, prefix, trap) {
 		}
 	} else if (attrs === '?') {
 		for (let n in v) {
+			let val = v[n];
+			if (!isNaN(n) && typeof val === 'object') {
+				n = Object.keys(val)[0];
+				val = val[n];
+			}
 			let pre = typeof prefix === 'function' ? prefix(n) : '';
 			if (pre) pre += ':';
-			let val = v[n];
 			if (typeof trap === 'function') {
 				let ret = trap(n, val, pre);
 				if (ret) {
