@@ -680,6 +680,9 @@ const ODS_STYLE_PREFIX = [
 	'name', 'volatile', 'map', 'condition',
 	'apply-style-name', 'text-properties',
 ];
+const ODS_NUMBER_PREFIX = [
+	'country', 'language',
+];
 const ODS_TEXT_PREFIX = [
 	'p', 's', 'title', 'sheet-name', 'page-number', 'page-count',
 	'date', 'date-value', 'time', 'time-value',
@@ -697,6 +700,7 @@ const ODS_PREFIXES = {
 };
 const ODS_NUMBER_PREFIXES = {
 	'style': ODS_STYLE_PREFIX,
+	'number': ODS_NUMBER_PREFIX,
 	'loext': ODS_LOEXT_PREFIX,
 	'fo': ODS_FONTS_PREFIX,
 };
@@ -861,6 +865,7 @@ function writeOdsNumberStyle(o, v, pro) {
 			switch (n) {
 			case 'text':
 			case 'fill-character':
+			case 'currency-symbol':
 				if (!Array.isArray(val)) val = [val];
 				val.forEach(function(v) {
 					c += makeXmlTag(pre + n, v, function(v) {
