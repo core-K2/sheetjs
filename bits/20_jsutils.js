@@ -643,16 +643,29 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function toDate(v) {
+	if (v === undefined) return new Date();
+	try {
+		let dt = new Date(v);
+		if (dt.toString() !== 'Invalid Date') return dt;
+	} catch (e) {
+	}
+	return new Date(null);
+}
+function toOdsDateTime(v) {
+	let dt = toDate(v);
+	let off = dt.getTimezoneOffset();
+	if (off) dt.setMinutes(dt.getMinutes() - off);
+	return dt.toISOString().replace('Z', '000000');
+}
 function convertToOfficeDateValue(v) {
-	let date = new Date(v);
-	return isNaN(date) ? v : date.toISOString().split('T')[0];
+	return toDate(v).toISOString().split('T')[0];
 }
 function convertToOfficeTimeValue(v) {
-	let date = new Date(v);
-	if (isNaN(date)) return v;
-	const hours = String(date.getHours()).padStart(2, '0');
-	const minutes = String(date.getMinutes()).padStart(2, '0');
-	const seconds = String(date.getSeconds()).padStart(2, '0');
+	let dt = toDate(v);
+	const hours = String(dt.getHours()).padStart(2, '0');
+	const minutes = String(dt.getMinutes()).padStart(2, '0');
+	const seconds = String(dt.getSeconds()).padStart(2, '0');
 	return `PT${hours}H${minutes}M${seconds}S`;
 }
 function singleObject(v) {

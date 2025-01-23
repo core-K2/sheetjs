@@ -57,5 +57,29 @@ function write_rdf(rdf) {
   return o.join("");
 }
 function write_meta_ods(wb, opts) {
-  return '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2"><office:meta><meta:generator>SheetJS ' + XLSX.version + "</meta:generator></office:meta></office:document-meta>";
+  let props = wb?.Props;
+  if (!props)
+    return '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2"><office:meta><meta:generator>SheetJS ' + XLSX.version + "</meta:generator></office:meta></office:document-meta>";
+  let o = [
+    '<office:document-meta',
+    ' xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"',
+    ' xmlns:ooo="http://openoffice.org/2004/office"',
+    ' xmlns:xlink="http://www.w3.org/1999/xlink"',
+    ' xmlns:dc="http://purl.org/dc/elements/1.1/"',
+    ' xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"',
+    ' xmlns:grddl="http://www.w3.org/2003/g/data-view#" office:version="1.3">',
+    '<office:meta>',
+  ];
+  o.push(`<dc:date>${toOdsDateTime()}</dc:date>`);
+  o.push(`<meta:generator>SheetJS ${XLSX.version} (Extended Edition by core-K2)</meta:generator>`);
+  o.push(`<meta:print-date>${toOdsDateTime(props?.['print-date'])}</meta:print-date>`);
+  o.push(`<meta:editing-duration>${props?.['editing-duration']}</meta:editing-duration>`);
+  let i = props?.['editing-cycles'] || 0;
+  o.push(`<meta:editing-cycles>${++i}</meta:editing-cycles>`);
+  o.push(makeXmlTag('meta:document-statistic', props?.['document-statistic'], null, '?', 'meta'));
+  o = o.concat([
+    '</office:meta>',
+    '</office:document-meta>',
+  ]);
+  return o.join('');
 }

@@ -527,7 +527,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 
 		if(opts.bookType == "fods") {
 			o.push('<office:document' + attr + fods + '>');
-			o.push(write_meta_ods().replace(/<office:document-meta[^<>]*?>/, "").replace(/<\/office:document-meta>/, ""));
+			o.push(write_meta_ods(wb, opts).replace(/<office:document-meta[^<>]*?>/, "").replace(/<\/office:document-meta>/, ""));
 			// TODO: settings (equiv of settings.xml for ODS)
 		} else o.push('<office:document-content' + attr  + '>');
 		// o.push('<office:scripts/>');
@@ -576,7 +576,7 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 
 	/* TODO: this is hard-coded to satiate excel */
 	f = "meta.xml";
-	zip_add_file(zip, f, XML_HEADER + write_meta_ods(/*::wb, opts*/));
+	zip_add_file(zip, f, XML_HEADER + write_meta_ods(wb, opts));
 	manifest.push([f, "text/xml"]);
 	rdf.push([f, "MetadataFile"]);
 
@@ -676,6 +676,13 @@ const ODS_LOEXT_PREFIX = [
 	'vertical-justify',
 	'char-complex-color', 'theme-type', 'color-type',
 ];
+const ODS_TEXT_PREFIX = [
+	'p', 's', 'title', 'sheet-name', 'page-number', 'page-count',
+	'date', 'date-value', 'time', 'time-value',
+];
+const ODS_CCS3T_PREFIX = [
+	'text-justify',
+];
 const ODS_STYLE_PREFIX = [
 	'name', 'volatile', 'map', 'condition',
 	'apply-style-name', 'text-properties',
@@ -683,12 +690,8 @@ const ODS_STYLE_PREFIX = [
 const ODS_NUMBER_PREFIX = [
 	'country', 'language',
 ];
-const ODS_TEXT_PREFIX = [
-	'p', 's', 'title', 'sheet-name', 'page-number', 'page-count',
-	'date', 'date-value', 'time', 'time-value',
-];
-const ODS_CCS3T_PREFIX = [
-	'text-justify',
+const ODS_TABLE_PREFIX = [
+	'display', 'tab-color',
 ];
 const ODS_PREFIXES = {
 	'fo': ODS_FONTS_PREFIX,
@@ -707,6 +710,11 @@ const ODS_NUMBER_PREFIXES = {
 const ODS_MARKER_PREFIXES = {
 	'svg': ODS_SVG_PREFIX,
 };
+const ODS_AS_CONTENTS = [
+	'text',
+	'fill-character',
+	'currency-symbol',
+];
 function getPrefix(obj, def, n) {
 	for (let pre in obj) {
 		if (obj[pre].includes(n)) return pre;
@@ -861,34 +869,27 @@ function writeOdsNumberStyle(o, v, pro) {
 	else if (!Array.isArray(v)) v = [v];
 	v.forEach(function(d) {
 		o.push(makeXmlTag('number:' + pro, d, null, '?', getOdsNumberPrefix, function(n, val, pre) {
+			if (!ODS_AS_CONTENTS.includes(n)) return null;
 			let c = '', s = '';
-			switch (n) {
-			case 'text':
-			case 'fill-character':
-			case 'currency-symbol':
-				if (!Array.isArray(val)) val = [val];
-				val.forEach(function(v) {
-					c += makeXmlTag(pre + n, v, function(v) {
-						let s = typeof v === 'object' ? v.value : v;
-						return s === 0 ? ' ' : s || '';
-					}, function(v) {
-						let s = '';
-						if (typeof v === 'object') {
-							for (let vn in v) {
-								if (vn !== 'value') {
-									let pre = getOdsNumberPrefix(vn);
-									if (pre) pre += ':';
-									s += ` ${pre}${vn}="${escapexml(v[vn])}"`;
-								}
+			if (!Array.isArray(val)) val = [val];
+			val.forEach(function(v) {
+				c += makeXmlTag(pre + n, v, function(v) {
+					let s = typeof v === 'object' ? v.value : v;
+					return s === 0 ? ' ' : s || '';
+				}, function(v) {
+					let s = '';
+					if (typeof v === 'object') {
+						for (let vn in v) {
+							if (vn !== 'value') {
+								let pre = getOdsNumberPrefix(vn);
+								if (pre) pre += ':';
+								s += ` ${pre}${vn}="${escapexml(v[vn])}"`;
 							}
 						}
-						return s;
-					});
+					}
+					return s;
 				});
-				break;
-			default:
-				return null;
-			}
+			});
 			return {c:c, s:s};
 		}));
 	});
@@ -948,7 +949,7 @@ function writeOdsTableProperty(o, v, pro) {
 	v.forEach(function(d) {
 		o.push(makeXmlTag('style:' + pro, d, null, '?', function(n) {
 			return getPrefix({
-				'table': ['display'],
+				'table': ODS_TABLE_PREFIX,
 			}, 'style', n);			
 		}));
 	});

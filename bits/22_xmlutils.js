@@ -318,7 +318,7 @@ function makeXmlTag(tag, v, cb, attrs, prefix, trap) {
 				n = Object.keys(val)[0];
 				val = val[n];
 			}
-			let pre = typeof prefix === 'function' ? prefix(n) : '';
+			let pre = typeof prefix === 'function' ? prefix(n) : prefix || '';
 			if (pre) pre += ':';
 			if (typeof trap === 'function') {
 				let ret = trap(n, val, pre);
