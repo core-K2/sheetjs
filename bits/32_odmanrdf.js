@@ -69,18 +69,46 @@ function write_meta_ods(wb, opts) {
     ' xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"',
     ' xmlns:grddl="http://www.w3.org/2003/g/data-view#"',
     ' office:version="1.3">',
-    '<office:meta>',
+ //   '<office:meta>',
   ];
+  props.generator = `SheetJS ${XLSX.version} (Extended Edition by core-K2)`;
+  props.date = toOdsDateTime();
+  props['editing-cycles'] = toNumber(props?.['editing-cycles']) + 1;
+  let prefix = n => {
+    if (['language', 'date'].includes(n)) return 'dc';
+    return 'meta';
+  };
+  o.push(makeXmlTag('office:meta', props, null, '?', prefix, (n, val, pre) => {
+    let c = '', s = '';
+    if (!Array.isArray(val)) val = [val];
+    val.forEach(v => {
+      let bObj = typeof v === 'object';
+      c += makeXmlTag(pre + n, v, (v) => {
+        return bObj ? v?.value || '' : v === 0 ? ' ' : v || '';
+      }, bObj ? '?' : null, prefix, (n => {
+        return n === 'value' ? {s:'', c:''} : null;
+      }));
+    });
+    return {
+      s: s,
+      c: c
+    };
+  }));
+/*
+  let v = props?.['creation-date'];
+  if (v) o.push(`<meta:creation-date>${v}</meta:creation-date>`);  
   o.push(`<dc:date>${toOdsDateTime()}</dc:date>`);
   o.push(`<meta:generator>SheetJS ${XLSX.version} (Extended Edition by core-K2)</meta:generator>`);
   o.push(`<meta:print-date>${toOdsDateTime(props?.['print-date'])}</meta:print-date>`);
   o.push(`<meta:editing-duration>${props?.['editing-duration']}</meta:editing-duration>`);
-  let i = props?.['editing-cycles'] || 0;
-  o.push(`<meta:editing-cycles>${++i}</meta:editing-cycles>`);
+  v = props?.['editing-cycles'] || 0;
+  o.push(`<meta:editing-cycles>${++v}</meta:editing-cycles>`);
   o.push(makeXmlTag('meta:document-statistic', props?.['document-statistic'], null, '?', 'meta'));
   o = o.concat([
     '</office:meta>',
     '</office:document-meta>',
   ]);
+*/
+  o.push('</office:document-meta>');
   return o.join('');
 }

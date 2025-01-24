@@ -643,19 +643,30 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
-function toDate(v, bTz) {
-	let dt = v ? new Date(v) : new Date();
+function toNumber(v) {
+	return isNaN(v) ? 0 : Number(v);
+}
+/**
+ * convert to valid Date object
+ * @param {any} v input value ('now': get current date)
+ * @param {number} flg bitmask flag (1:always get value, 2:think time zone)
+ * @returns Date object or null
+ */
+function toDate(v, flg) {
+	if (!v && !!(flg & 1)) return null;
+	let dt = v instanceof Date ? v : v === 'now' ? new Date() : new Date(v);
 	if (isNaN(dt.getTime())) {
 		dt = new Date(null);
 	}
-	if (bTz) {
+	if (flg & 2) {
 		let off = dt.getTimezoneOffset();
 		if (off) dt.setMinutes(dt.getMinutes() - off);
 	}
 	return dt;
 }
 function toOdsDateTime(v) {
-	let dt = toDate(v, true);
+	let dt = toDate(arguments.length < 1 ? 'now' : v, 3);
+	if (!dt) return dt;
 	return dt.toISOString().replace('Z', '000000');
 }
 function convertToOfficeDateValue(v) {

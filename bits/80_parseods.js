@@ -819,7 +819,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let xmlOpts = {asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/]};
 		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
-		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:7});
+		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:0, textPName:''});
 		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta);
