@@ -232,7 +232,16 @@ var wtregex = /(^\s|\s$|\n)/;
 function writetag(f/*:string*/,g/*:string*/)/*:string*/ { return '<' + f + (g.match(wtregex)?' xml:space="preserve"' : "") + '>' + g + '</' + f + '>'; }
 
 function wxt_helper(h)/*:string*/ { return keys(h).map(function(k) { return " " + k + '="' + h[k] + '"';}).join(""); }
-function writextag(f/*:string*/,g/*:?string*/,h) { return '<' + f + ((h != null) ? wxt_helper(h) : "") + ((g != null) ? (g.match(wtregex)?' xml:space="preserve"' : "") + '>' + g + '</' + f : "/") + '>';}
+function writextag(f/*:string*/,g/*:?string*/,h) {
+	let s = '<' + f + ((h != null) ? wxt_helper(h) : "");
+	if (g) {
+		if (g.match(wtregex)) s += ' xml:space="preserve"';
+		s += '>' + g + '</' + f;
+	} else {
+		s += '/';
+	}
+	return s + '>';
+}
 
 function write_w3cdtf(d/*:Date*/, t/*:?boolean*/)/*:string*/ { try { return d.toISOString().replace(/\.\d*/,""); } catch(e) { if(t) throw e; } return ""; }
 

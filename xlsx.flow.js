@@ -4393,7 +4393,16 @@ var wtregex = /(^\s|\s$|\n)/;
 function writetag(f/*:string*/,g/*:string*/)/*:string*/ { return '<' + f + (g.match(wtregex)?' xml:space="preserve"' : "") + '>' + g + '</' + f + '>'; }
 
 function wxt_helper(h)/*:string*/ { return keys(h).map(function(k) { return " " + k + '="' + h[k] + '"';}).join(""); }
-function writextag(f/*:string*/,g/*:?string*/,h) { return '<' + f + ((h != null) ? wxt_helper(h) : "") + ((g != null) ? (g.match(wtregex)?' xml:space="preserve"' : "") + '>' + g + '</' + f : "/") + '>';}
+function writextag(f/*:string*/,g/*:?string*/,h) {
+	let s = '<' + f + ((h != null) ? wxt_helper(h) : "");
+	if (g) {
+		if (g.match(wtregex)) s += ' xml:space="preserve"';
+		s += '>' + g + '</' + f;
+	} else {
+		s += '/';
+	}
+	return s + '>';
+}
 
 function write_w3cdtf(d/*:Date*/, t/*:?boolean*/)/*:string*/ { try { return d.toISOString().replace(/\.\d*/,""); } catch(e) { if(t) throw e; } return ""; }
 
@@ -25430,6 +25439,8 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 		s += '/>';
 		return s;
 	}
+	const VALUE_TYPE_NAME = 'office:value-type';
+	const CALC_VALUE_TYPE_NAME = 'calcext:value-type';
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
 		/* Section 9 Tables */
 		var o/*:Array<string>*/ = [];
@@ -25498,11 +25509,17 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						}
 					}
 				}
-				if(!cell) { o.push(null_cell_xml); continue; }
+				if (!cell) {
+					o.push(null_cell_xml);
+					continue;
+				}
+				let tsn = opts?.stayStyle && cell?.sn;
+				if (!tsn && nfs[cell.z]) tsn = "ce" + nfs[cell.z].slice(1);
+				if (tsn) ct["table:style-name"] = tsn;
 				switch(cell.t) {
 					case 'b':
 						textp = (cell.v ? 'TRUE' : 'FALSE');
-						ct['office:value-type'] = "boolean";
+						ct[VALUE_TYPE_NAME] = "boolean";
 						ct['office:boolean-value'] = (cell.v ? 'true' : 'false');
 						break;
 					case 'n':
@@ -25515,40 +25532,41 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 								ct['table:formula'] = "of:=" + (cell.v < 0 ? "-" : "") + "1/0";
 							}
 							ct['office:string-value'] = "";
-							ct['office:value-type'] = "string";
-							ct['calcext:value-type'] = "error";
+							ct[VALUE_TYPE_NAME] = "string";
+							ct[CALC_VALUE_TYPE_NAME] = "error";
 						} else {
 							textp = (cell.w||String(cell.v||0));
-							ct['office:value-type'] = cell.vt || "float";
+							ct[VALUE_TYPE_NAME] = cell.vt || "float";
 							ct['office:value'] = (cell.v||0);
 						}
 						break;
 					case 's': case 'str':
-						textp = cell.v == null ? "" : cell.v;
-						ct['office:value-type'] = "string";
+						textp = cell?.v || "";
+						if (textp) ct[VALUE_TYPE_NAME] = "string";
 						break;
 					case 'd':
-						ct['office:value-type'] = cell.vt || "date";
+						ct[VALUE_TYPE_NAME] = cell.vt || "date";
 						switch (cell.vt) {
 						case 'date':
 							textp = (cell.w||String(cell.v));
-							ct['date-value'] = convertToOfficeDateValue(cell.v);
+							ct['office:date-value'] = convertToOfficeDateValue(cell.v);
 							break;
 						case 'time':
 							textp = (cell.w||String(cell.v));
-							ct['time-value'] = convertToOfficeTimeValue(cell.v);
+							ct['office:time-value'] = convertToOfficeTimeValue(cell.v);
 							break;
 						default:
 							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
 							ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
-							ct['table:style-name'] = "ce1";
+							//ct['table:style-name'] = "ce1";
 							break;
 						}
 						break;
 					//case 'e': // TODO: translate to ODS errors
 					default: o.push(null_cell_xml); continue; // TODO: empty cell with comments
 				}
-				var text_p = write_text_p(textp);
+				if (!ct?.[CALC_VALUE_TYPE_NAME] && ct?.[VALUE_TYPE_NAME]) ct[CALC_VALUE_TYPE_NAME] = ct[VALUE_TYPE_NAME];
+				var text_p = textp && write_text_p(textp);
 				if(cell.l && cell.l.Target) {
 					var _tgt = cell.l.Target;
 					_tgt = _tgt.charAt(0) == "#" ? "#" + csf_to_ods_3D(_tgt.slice(1)) : _tgt;
@@ -25556,9 +25574,6 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 					if(_tgt.charAt(0) != "#" && !_tgt.match(/^\w+:/)) _tgt = '../' + _tgt;
 					text_p = writextag('text:a', text_p, {'xlink:href': _tgt.replace(/&/g, "&amp;")});
 				}
-				let tsn = opts?.stayStyle && cell?.sn;
-				if (!tsn && nfs[cell.z]) tsn = "ce" + nfs[cell.z].slice(1);
-				if (tsn) ct["table:style-name"] = tsn;
 				var payload = text_p ? writextag('text:p', text_p, {}) : '';
 				if(cell.c) {
 					var acreator = "", apayload = "", aprops = {};
