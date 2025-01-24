@@ -372,12 +372,13 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				let tsn = opts?.stayStyle && cell?.sn;
 				if (!tsn && nfs[cell.z]) tsn = "ce" + nfs[cell.z].slice(1);
 				if (tsn) ct["table:style-name"] = tsn;
-				var payload = writextag('text:p', text_p, {});
+				var payload = text_p ? writextag('text:p', text_p, {}) : '';
 				if(cell.c) {
 					var acreator = "", apayload = "", aprops = {};
 					for(var ci = 0; ci < cell.c.length; ++ci) {
 						if(!acreator && cell.c[ci].a) acreator = cell.c[ci].a;
-						apayload += "<text:p>" + write_text_p(cell.c[ci].t) + "</text:p>";
+						text_p = write_text_p(cell.c[ci].t);
+						if (text_p) apayload += `<text:p>${text_p}</text:p>`;
 					}
 					if(!cell.c.hidden) aprops["office:display"] = true;
 					payload = writextag('office:annotation', apayload, aprops) + payload;
@@ -592,19 +593,19 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 	return zip;
 }
 function setSheetHidden(sheet, ass, Sheet) {
-	let sn = sheet['style-name'];
+	let sn = sheet?.['style-name'];
 	if (sn) {
 		let s = ass[sn];
 		if (!s) return;
-		let tp = s && s['table-properties'];
+		let tp = s?.['table-properties'];
 		if (!tp) return;
-		tp.display = Sheet.Hidden ? false : true;
+		tp.display = Sheet?.Hidden ? false : true;
 	}
 }
 function setBookHidden(wb) {
 	let Sheets = wb?.Workbook?.Sheets;
 	let sheets = wb?.content?.body?.spreadsheet?.table;
-	let ass = wb?.content['automatic-styles'];
+	let ass = wb?.content?.['automatic-styles'];
 	if (!Sheets || !sheets || !ass) return;
 	ass = toNameObjects(ass);
 	if (!Array.isArray(sheets)) sheets = [sheets];

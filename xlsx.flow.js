@@ -4011,19 +4011,19 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
-function toDate(v) {
-	if (v === undefined) return new Date();
-	try {
-		let dt = new Date(v);
-		if (dt.toString() !== 'Invalid Date') return dt;
-	} catch (e) {
+function toDate(v, bTz) {
+	let dt = v ? new Date(v) : new Date();
+	if (isNaN(dt.getTime())) {
+		dt = new Date(null);
 	}
-	return new Date(null);
+	if (bTz) {
+		let off = dt.getTimezoneOffset();
+		if (off) dt.setMinutes(dt.getMinutes() - off);
+	}
+	return dt;
 }
 function toOdsDateTime(v) {
-	let dt = toDate(v);
-	let off = dt.getTimezoneOffset();
-	if (off) dt.setMinutes(dt.getMinutes() - off);
+	let dt = toDate(v, true);
 	return dt.toISOString().replace('Z', '000000');
 }
 function convertToOfficeDateValue(v) {
@@ -6279,7 +6279,8 @@ function write_meta_ods(wb, opts) {
     ' xmlns:xlink="http://www.w3.org/1999/xlink"',
     ' xmlns:dc="http://purl.org/dc/elements/1.1/"',
     ' xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"',
-    ' xmlns:grddl="http://www.w3.org/2003/g/data-view#" office:version="1.3">',
+    ' xmlns:grddl="http://www.w3.org/2003/g/data-view#"',
+    ' office:version="1.3">',
     '<office:meta>',
   ];
   o.push(`<dc:date>${toOdsDateTime()}</dc:date>`);
@@ -25538,12 +25539,13 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				let tsn = opts?.stayStyle && cell?.sn;
 				if (!tsn && nfs[cell.z]) tsn = "ce" + nfs[cell.z].slice(1);
 				if (tsn) ct["table:style-name"] = tsn;
-				var payload = writextag('text:p', text_p, {});
+				var payload = text_p ? writextag('text:p', text_p, {}) : '';
 				if(cell.c) {
 					var acreator = "", apayload = "", aprops = {};
 					for(var ci = 0; ci < cell.c.length; ++ci) {
 						if(!acreator && cell.c[ci].a) acreator = cell.c[ci].a;
-						apayload += "<text:p>" + write_text_p(cell.c[ci].t) + "</text:p>";
+						text_p = write_text_p(cell.c[ci].t);
+						if (text_p) apayload += `<text:p>${text_p}</text:p>`;
 					}
 					if(!cell.c.hidden) aprops["office:display"] = true;
 					payload = writextag('office:annotation', apayload, aprops) + payload;
@@ -25758,19 +25760,19 @@ function write_ods(wb/*:any*/, opts/*:any*/) {
 	return zip;
 }
 function setSheetHidden(sheet, ass, Sheet) {
-	let sn = sheet['style-name'];
+	let sn = sheet?.['style-name'];
 	if (sn) {
 		let s = ass[sn];
 		if (!s) return;
-		let tp = s && s['table-properties'];
+		let tp = s?.['table-properties'];
 		if (!tp) return;
-		tp.display = Sheet.Hidden ? false : true;
+		tp.display = Sheet?.Hidden ? false : true;
 	}
 }
 function setBookHidden(wb) {
 	let Sheets = wb?.Workbook?.Sheets;
 	let sheets = wb?.content?.body?.spreadsheet?.table;
-	let ass = wb?.content['automatic-styles'];
+	let ass = wb?.content?.['automatic-styles'];
 	if (!Sheets || !sheets || !ass) return;
 	ass = toNameObjects(ass);
 	if (!Array.isArray(sheets)) sheets = [sheets];

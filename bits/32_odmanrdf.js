@@ -67,7 +67,8 @@ function write_meta_ods(wb, opts) {
     ' xmlns:xlink="http://www.w3.org/1999/xlink"',
     ' xmlns:dc="http://purl.org/dc/elements/1.1/"',
     ' xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"',
-    ' xmlns:grddl="http://www.w3.org/2003/g/data-view#" office:version="1.3">',
+    ' xmlns:grddl="http://www.w3.org/2003/g/data-view#"',
+    ' office:version="1.3">',
     '<office:meta>',
   ];
   o.push(`<dc:date>${toOdsDateTime()}</dc:date>`);

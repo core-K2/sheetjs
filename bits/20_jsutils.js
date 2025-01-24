@@ -643,19 +643,19 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
-function toDate(v) {
-	if (v === undefined) return new Date();
-	try {
-		let dt = new Date(v);
-		if (dt.toString() !== 'Invalid Date') return dt;
-	} catch (e) {
+function toDate(v, bTz) {
+	let dt = v ? new Date(v) : new Date();
+	if (isNaN(dt.getTime())) {
+		dt = new Date(null);
 	}
-	return new Date(null);
+	if (bTz) {
+		let off = dt.getTimezoneOffset();
+		if (off) dt.setMinutes(dt.getMinutes() - off);
+	}
+	return dt;
 }
 function toOdsDateTime(v) {
-	let dt = toDate(v);
-	let off = dt.getTimezoneOffset();
-	if (off) dt.setMinutes(dt.getMinutes() - off);
+	let dt = toDate(v, true);
 	return dt.toISOString().replace('Z', '000000');
 }
 function convertToOfficeDateValue(v) {
