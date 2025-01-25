@@ -643,6 +643,19 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function toBoolean(v) {
+	if (typeof v === 'boolean') return v;
+	if (isNaN(v)) {
+		switch (v.toLowerCase()) {
+		case 'f':
+		case 'false':
+			return false;
+		default:
+			return true;
+		}
+	}
+	return Number(v) !== 0;
+}
 function toNumber(v) {
 	return isNaN(v) ? 0 : Number(v);
 }

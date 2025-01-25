@@ -277,7 +277,9 @@ function write_ws_xml_cell(cell/*:Cell*/, ref, ws, opts, idx, wb, date1904)/*:st
 	var vv = "";
 	var oldt = cell.t, oldv = cell.v;
 	if(cell.t !== "z") switch(cell.t) {
-		case 'b': vv = cell.v ? "1" : "0"; break;
+		case 'b':
+			 vv = toBoolean(cell.v) ? "1" : "0";
+			 break;
 		case 'n':
 			if(isNaN(cell.v)) {
 				let dt = parseDateJp(cell.v);
@@ -289,8 +291,11 @@ function write_ws_xml_cell(cell/*:Cell*/, ref, ws, opts, idx, wb, date1904)/*:st
 				}
 			}
 			else if(!isFinite(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x07]; } // #DIV/0!
-			else vv = ''+cell.v; break;
-		case 'e': vv = BErr[cell.v]; break;
+			else vv = ''+cell.v;
+			break;
+		case 'e':
+			vv = BErr[cell.v];
+			break;
 		case 'd':
 			if(opts && opts.cellDates) {
 				var _vv = parseDate(cell.v, date1904);
@@ -303,7 +308,9 @@ function write_ws_xml_cell(cell/*:Cell*/, ref, ws, opts, idx, wb, date1904)/*:st
 			}
 			if(typeof cell.z === 'undefined') cell.z = table_fmt[14];
 			break;
-		default: vv = cell.v; break;
+		default:
+			vv = cell.v;
+			break;
 	}
 	var v = (cell.t == "z" || cell.v == null)? "" : writetag('v', escapexml(vv)), o = ({r:ref}/*:any*/);
 	/* TODO: cell style */

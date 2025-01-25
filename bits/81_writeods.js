@@ -322,9 +322,9 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 				if (tsn) ct["table:style-name"] = tsn;
 				switch(cell.t) {
 					case 'b':
-						textp = (cell.v ? 'TRUE' : 'FALSE');
+						textp = (toBoolean(cell.v) ? 'TRUE' : 'FALSE');
 						ct[VALUE_TYPE_NAME] = "boolean";
-						ct['office:boolean-value'] = (cell.v ? 'true' : 'false');
+						ct['office:boolean-value'] = textp.toLowerCase();
 						break;
 					case 'n':
 						if(!isFinite(cell.v)) {

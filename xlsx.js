@@ -3937,6 +3937,19 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function toBoolean(v) {
+	if (typeof v === 'boolean') return v;
+	if (isNaN(v)) {
+		switch (v.toLowerCase()) {
+		case 'f':
+		case 'false':
+			return false;
+		default:
+			return true;
+		}
+	}
+	return Number(v) !== 0;
+}
 function toNumber(v) {
 	return isNaN(v) ? 0 : Number(v);
 }
@@ -16879,7 +16892,9 @@ function write_ws_xml_cell(cell, ref, ws, opts, idx, wb, date1904) {
 	var vv = "";
 	var oldt = cell.t, oldv = cell.v;
 	if(cell.t !== "z") switch(cell.t) {
-		case 'b': vv = cell.v ? "1" : "0"; break;
+		case 'b':
+			 vv = toBoolean(cell.v) ? "1" : "0";
+			 break;
 		case 'n':
 			if(isNaN(cell.v)) {
 				let dt = parseDateJp(cell.v);
@@ -16891,8 +16906,11 @@ function write_ws_xml_cell(cell, ref, ws, opts, idx, wb, date1904) {
 				}
 			}
 			else if(!isFinite(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x07]; } // #DIV/0!
-			else vv = ''+cell.v; break;
-		case 'e': vv = BErr[cell.v]; break;
+			else vv = ''+cell.v;
+			break;
+		case 'e':
+			vv = BErr[cell.v];
+			break;
 		case 'd':
 			if(opts && opts.cellDates) {
 				var _vv = parseDate(cell.v, date1904);
@@ -16905,7 +16923,9 @@ function write_ws_xml_cell(cell, ref, ws, opts, idx, wb, date1904) {
 			}
 			if(typeof cell.z === 'undefined') cell.z = table_fmt[14];
 			break;
-		default: vv = cell.v; break;
+		default:
+			vv = cell.v;
+			break;
 	}
 	var v = (cell.t == "z" || cell.v == null)? "" : writetag('v', escapexml(vv)), o = ({r:ref});
 	/* TODO: cell style */
@@ -25475,9 +25495,9 @@ var write_content_ods = /* @__PURE__ */(function() {
 				if (tsn) ct["table:style-name"] = tsn;
 				switch(cell.t) {
 					case 'b':
-						textp = (cell.v ? 'TRUE' : 'FALSE');
+						textp = (toBoolean(cell.v) ? 'TRUE' : 'FALSE');
 						ct[VALUE_TYPE_NAME] = "boolean";
-						ct['office:boolean-value'] = (cell.v ? 'true' : 'false');
+						ct['office:boolean-value'] = textp.toLowerCase();
 						break;
 					case 'n':
 						if(!isFinite(cell.v)) {
