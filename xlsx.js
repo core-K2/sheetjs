@@ -3969,11 +3969,11 @@ function parseDateJp(str) {
 	if (isNaN(d.getTime())) {
 		let len = JAPANESE_DATE_KEYS.length;
 		d = new Date(null);
-		let be = false;
+		let be = 0;
 		for (let i = 0; i < len; i++) {
 			let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
 			if (m) {
-				be = true;
+				be |= 1 << i;
 				let n = Number(m[1]);
 				switch (i) {
 				case 0: d.setFullYear(n); break;
@@ -3986,6 +3986,9 @@ function parseDateJp(str) {
 			}
 		}
 		if (!be) return null;
+		if (!(be & 1) && be & 6) {
+			d.setFullYear((new Date()).getFullYear());
+		}
 	}
 	return d;
 }
