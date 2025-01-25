@@ -669,6 +669,29 @@ function toOdsDateTime(v) {
 	if (!dt) return dt;
 	return dt.toISOString().replace('Z', '000000');
 }
+const JAPANESE_DATE_KEYS = '年月日時分秒';
+function parseDateJp(str) {
+	let d = parseDate(str);
+	if (isNaN(d.getTime())) {
+		let len = JAPANESE_DATE_KEYS.length;
+		d = new Date();
+		for (let i = 0; i < len; i++) {
+			let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
+			if (m) {
+				let n = Number(m[1]);
+				switch (i) {
+				case 0: d.setFullYear(n); break;
+				case 1: d.setMonth(n-1); break;
+				case 2: d.setDate(n); break;
+				case 3: d.setHours(n); break;
+				case 4: d.setMinutes(n); break;
+				case 5: d.setSeconds(n); break;
+				}
+			}
+		}
+	}
+	return d;
+}
 function convertToOfficeDateValue(v) {
 	return toDate(v).toISOString().split('T')[0];
 }
