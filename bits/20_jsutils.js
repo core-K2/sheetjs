@@ -674,10 +674,12 @@ function parseDateJp(str) {
 	let d = parseDate(str);
 	if (isNaN(d.getTime())) {
 		let len = JAPANESE_DATE_KEYS.length;
-		d = new Date();
+		d = new Date(null);
+		let be = false;
 		for (let i = 0; i < len; i++) {
 			let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
 			if (m) {
+				be = true;
 				let n = Number(m[1]);
 				switch (i) {
 				case 0: d.setFullYear(n); break;
@@ -689,6 +691,7 @@ function parseDateJp(str) {
 				}
 			}
 		}
+		if (!be) return null;
 	}
 	return d;
 }

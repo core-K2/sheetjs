@@ -3968,10 +3968,12 @@ function parseDateJp(str) {
 	let d = parseDate(str);
 	if (isNaN(d.getTime())) {
 		let len = JAPANESE_DATE_KEYS.length;
-		d = new Date();
+		d = new Date(null);
+		let be = false;
 		for (let i = 0; i < len; i++) {
 			let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
 			if (m) {
+				be = true;
 				let n = Number(m[1]);
 				switch (i) {
 				case 0: d.setFullYear(n); break;
@@ -3983,6 +3985,7 @@ function parseDateJp(str) {
 				}
 			}
 		}
+		if (!be) return null;
 	}
 	return d;
 }
@@ -16845,7 +16848,15 @@ function write_ws_xml_cell(cell, ref, ws, opts, idx, wb, date1904) {
 	if(cell.t !== "z") switch(cell.t) {
 		case 'b': vv = cell.v ? "1" : "0"; break;
 		case 'n':
-			if(isNaN(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x24]; } // #NUM!
+			if(isNaN(cell.v)) {
+				let dt = parseDateJp(cell.v);
+				if (dt == null) {
+					cell.t = "e";
+					vv = BErr[cell.v = 0x24];  // #NUM!
+				} else {
+					vv = '' + (cell.v = datenum(dt, date1904));
+				}
+			}
 			else if(!isFinite(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x07]; } // #DIV/0!
 			else vv = ''+cell.v; break;
 		case 'e': vv = BErr[cell.v]; break;

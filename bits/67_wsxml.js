@@ -279,7 +279,15 @@ function write_ws_xml_cell(cell/*:Cell*/, ref, ws, opts, idx, wb, date1904)/*:st
 	if(cell.t !== "z") switch(cell.t) {
 		case 'b': vv = cell.v ? "1" : "0"; break;
 		case 'n':
-			if(isNaN(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x24]; } // #NUM!
+			if(isNaN(cell.v)) {
+				let dt = parseDateJp(cell.v);
+				if (dt == null) {
+					cell.t = "e";
+					vv = BErr[cell.v = 0x24];  // #NUM!
+				} else {
+					vv = '' + (cell.v = datenum(dt, date1904));
+				}
+			}
 			else if(!isFinite(cell.v)) { cell.t = "e"; vv = BErr[cell.v = 0x07]; } // #DIV/0!
 			else vv = ''+cell.v; break;
 		case 'e': vv = BErr[cell.v]; break;
