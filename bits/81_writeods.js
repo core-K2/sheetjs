@@ -353,11 +353,11 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						switch (cell.vt) {
 						case 'date':
 							textp = (cell.w||String(cell.v));
-							ct['office:date-value'] = convertToOfficeDateValue(parseDateJp(cell.v));
+							ct['office:date-value'] = convertToOfficeDateValue(parseDateJp(textp));
 							break;
 						case 'time':
 							textp = (cell.w||String(cell.v));
-							ct['office:time-value'] = convertToOfficeTimeValue(parseDateJp(cell.v));
+							ct['office:time-value'] = convertToOfficeTimeValue(parseDateJp(textp));
 							break;
 						default:
 							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));

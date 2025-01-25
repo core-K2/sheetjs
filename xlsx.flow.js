@@ -4039,30 +4039,60 @@ function toOdsDateTime(v) {
 }
 const JAPANESE_DATE_KEYS = '年月日時分秒';
 function parseDateJp(str) {
-	let d = parseDate(str);
-	if (isNaN(d.getTime())) {
-		let len = JAPANESE_DATE_KEYS.length;
-		d = new Date(null);
-		let be = 0;
-		for (let i = 0; i < len; i++) {
-			let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
-			if (m) {
-				be |= 1 << i;
-				let n = Number(m[1]);
-				switch (i) {
-				case 0: d.setFullYear(n); break;
-				case 1: d.setMonth(n-1); break;
-				case 2: d.setDate(n); break;
-				case 3: d.setHours(n); break;
-				case 4: d.setMinutes(n); break;
-				case 5: d.setSeconds(n); break;
-				}
+	let d = new Date(null);
+	let len = JAPANESE_DATE_KEYS.length;
+	let be = 0;
+	for (let i = 0; i < len; i++) {
+		let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
+		if (m) {
+			be |= 1 << i;
+			let n = Number(m[1]);
+			switch (i) {
+			case 0: d.setFullYear(n); break;
+			case 1: d.setMonth(n-1); break;
+			case 2: d.setDate(n); break;
+			case 3: d.setHours(n); break;
+			case 4: d.setMinutes(n); break;
+			case 5: d.setSeconds(n); break;
 			}
 		}
-		if (!be) return null;
-		if (!(be & 1) && be & 6) {
-			d.setFullYear((new Date()).getFullYear());
+	}
+	if (!be) {
+		let m = str.match(/(\d+)\/(\d+)(\/(\d+))?/);
+		if (m) {
+			let mon, day;
+			be |= 6;
+			if (m[4]) {
+				be |= 1;
+				let y = Number(m[1]);
+				mon = Number(m[2]);
+				day = Number(m[4]);
+				if (y < 100) y += 2000;
+				d.setFullYear(y);
+			} else {
+				mon = Number(m[1]);
+				day = Number(m[2]);
+			}
+			d.setMonth(mon-1);
+			d.setDate(day);
 		}
+		m = str.match(/(\d+):(\d+)(:(\d+))?/) || str.match(/PT(\d+)H(\d+)M((\d+)S)?/);
+		if (m) {
+			be |= 24;
+			d.setHours(Number(m[1]));
+			d.setMinutes(Number(m[2]));
+			if (m[4]) {
+				be |= 32;
+				d.setSeconds(Number(m[4]));
+			}
+		}
+		if (!be) {
+			d = parseDate(str);
+			if (isNaN(d.getTime())) return null;
+		}
+	}
+	if (!(be & 1) && be & 6) {
+		d.setFullYear((new Date()).getFullYear());
 	}
 	return d;
 }
@@ -25586,11 +25616,11 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						switch (cell.vt) {
 						case 'date':
 							textp = (cell.w||String(cell.v));
-							ct['office:date-value'] = convertToOfficeDateValue(parseDateJp(cell.v));
+							ct['office:date-value'] = convertToOfficeDateValue(parseDateJp(textp));
 							break;
 						case 'time':
 							textp = (cell.w||String(cell.v));
-							ct['office:time-value'] = convertToOfficeTimeValue(parseDateJp(cell.v));
+							ct['office:time-value'] = convertToOfficeTimeValue(parseDateJp(textp));
 							break;
 						default:
 							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
