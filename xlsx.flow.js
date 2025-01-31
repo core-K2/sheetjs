@@ -16564,7 +16564,8 @@ function ods_to_csf_formula(f/*:string*/)/*:string*/ {
 function csf_to_ods_formula(f/*:string*/)/*:string*/ {
 	var o = "of:=" + f.replace(crefregex, "$1[.$2$3$4$5]").replace(/\]:\[/g,":");
 	/* TODO: something other than this */
-	return o.replace(/;/g, "|").replace(/,/g,";");
+//	return o.replace(/;/g, "|").replace(/,/g,";");
+	return o.replace(/,/g,";");
 }
 
 function ods_to_csf_3D(r/*:string*/)/*:[string, string]*/ {
@@ -25019,6 +25020,7 @@ function makeCell(cell) {
 	case 'float':
 	case 'currency':
 		t = 'n';
+		v = toNumber(v);
 		break;
 	case 'string':
 		if (p === 0) w = '';

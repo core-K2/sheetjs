@@ -1168,6 +1168,7 @@ function makeCell(cell) {
 	case 'float':
 	case 'currency':
 		t = 'n';
+		v = toNumber(v);
 		break;
 	case 'string':
 		if (p === 0) w = '';
