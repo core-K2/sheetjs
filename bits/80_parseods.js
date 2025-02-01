@@ -1432,8 +1432,9 @@ function setDataFormat(c, cell, dst, ass) {
 				}
 			}
 		});
+		c.ds = ds;
 	}
-	let w =applyDataStyle(ds, c.v);
+	let w = applyDataStyle(ds, c.v);
 	if (w !== undefined) c.w = w;
 }
 function setDfTextProp(ds, v) {
