@@ -12,6 +12,7 @@ XLSX.writeXLSX = writeSyncXLSX;
 XLSX.writeFileXLSX = writeFileSyncXLSX;
 XLSX.set_fs = set_fs;
 XLSX.set_cptable = set_cptable;
+XLSX.applyDataStyle = applyDataStyle;
 XLSX.SSF = SSF;
 if(typeof __stream !== "undefined") XLSX.stream = __stream;
 if(typeof CFB !== "undefined") XLSX.CFB = CFB;

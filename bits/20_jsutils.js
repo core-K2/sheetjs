@@ -656,8 +656,12 @@ function toBoolean(v) {
 	}
 	return Number(v) !== 0;
 }
-function toNumber(v) {
-	return isNaN(v) ? 0 : Number(v);
+function toNumber(v, def) {
+	if (typeof v === 'number') {
+		return Number(v);
+	}
+	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
+	return isNaN(ret) ? def === undefined ? 0 : def : ret;
 }
 /**
  * convert to valid Date object

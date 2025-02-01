@@ -4024,8 +4024,12 @@ function toBoolean(v) {
 	}
 	return Number(v) !== 0;
 }
-function toNumber(v) {
-	return isNaN(v) ? 0 : Number(v);
+function toNumber(v, def) {
+	if (typeof v === 'number') {
+		return Number(v);
+	}
+	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
+	return isNaN(ret) ? def === undefined ? 0 : def : ret;
 }
 /**
  * convert to valid Date object
@@ -25053,7 +25057,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
 	c.si = getOrAddObject(Styles.CellXf, style);
 	if (dst) {
-		setDataFormat(c, cell, dst);
+		setDataFormat(c, cell, dst, ass);
 	}
 	return ret;
 }
@@ -25245,12 +25249,96 @@ function parseBorder(v) {
 		}
 	};
 }
-function setDataFormat(c, cell, dst) {
-	if (c.t === 'n') {
-		if (typeof c.w === 'number') {
-			let n = dst.number;
-			if (n) {
-				c.w = c.w.toFixed(n['decimal-places']);
+function applyDataStyle(ds, v) {
+	let n = Number(v);
+	if (!isNaN(n)) {
+		let s = '';
+		if (n < 0) s += ds?.text || '';
+		s += ds?.symbol || '';
+		return s + n.toLocaleString(ds?.loc || navigator.language, {
+			minimumIntegerDigits: ds?.dig || 1,
+			minimumFractionDigits: ds?.mdot || 0,
+			maximumFractionDigits: ds?.dot || 0,
+			useGrouping: ds?.grp || false,
+		});
+	}
+	return v;
+}
+function setDataFormat(c, cell, dst, ass) {
+	let ds = {};
+	if (Array.isArray(dst)) {
+		dst.forEach(d => {
+			for (let n in d) {
+				switch (n) {
+				case 'text-properties':
+					setDfTextProp(ds, d[n]);
+					break;
+				case 'text':
+					ds.text = d[n];
+					break;
+				case 'currency-symbol':
+					setDfSymbol(ds, d[n]);
+					break;
+				case 'number':
+					setDfNumber(ds, d[n]);
+					break;
+				case 'map':
+					setDfMap(ds, d[n], ass);
+					break;
+				}
+			}
+		});
+	}
+	let w =applyDataStyle(ds, c.v);
+	if (w !== undefined) c.w = w;
+}
+function setDfTextProp(ds, v) {
+	let c = v?.color;
+	if (c) ds.rgb = c;
+}
+function setDfSymbol(ds, v) {
+	let s = v?.value;
+	if (s) ds.symbol = s;
+	s = `${v?.language}-${v?.country}`;
+	if (s) ds.loc = s;
+}
+function setDfNumber(ds, v) {
+	for (let n in v) {
+		switch (n) {
+		case 'grouping':
+			ds.grp = v[n];
+			break;
+		case 'decimal-places':
+			ds.dot = v[n];
+			break;
+		case 'min-decimal-places':
+			ds.mdot = v[n];
+			break;
+		case 'min-integer-digits':
+			ds.dig = v[n];
+			break;
+		}
+	}
+}
+function setDfMap(ds, v, ass) {
+	let c = v?.condition;
+	let a = v?.['apply-style-name'];
+	if (!c || !a) return;
+	c = c.replace('value()', '?');
+	let tp = a['text-properties'];
+	let col = tp?.color;
+	if (col) {
+		ds[c] = col;
+	} else {
+		col = ds?.rgb;
+		if (col) {
+			switch (c) {
+			case '?>=0':
+				ds['?<0'] = col;
+				break;
+			case '?>0':
+				ds['?<=0'] = col;
+				break;
 			}
 		}
 	}
@@ -30270,6 +30358,7 @@ XLSX.writeXLSX = writeSyncXLSX;
 XLSX.writeFileXLSX = writeFileSyncXLSX;
 XLSX.set_fs = set_fs;
 XLSX.set_cptable = set_cptable;
+XLSX.applyDataStyle = applyDataStyle;
 XLSX.SSF = SSF;
 if(typeof __stream !== "undefined") XLSX.stream = __stream;
 if(typeof CFB !== "undefined") XLSX.CFB = CFB;
