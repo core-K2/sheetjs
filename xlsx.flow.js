@@ -25260,7 +25260,7 @@ function applyDataStyle(ds, v, t) {
 			if (n < 0) s += ds?.text || '';
 			s += ds?.symbol || '';
 			return s + n.toLocaleString(ds?.loc || navigator.language, {
-				minimumIntegerDigits: ds?.dig || 1,
+				minimumIntegerDigits: ds?.dig || 0,
 				minimumFractionDigits: ds?.mdot || 0,
 				maximumFractionDigits: ds?.dot || 0,
 				useGrouping: ds?.grp || false,
@@ -25297,7 +25297,7 @@ function setDataFormat(c, cell, dst, ass, oss) {
 		c.ds = ds;
 	}
 	let w = applyDataStyle(ds, c.v, c.t);
-	if (w !== undefined) c.w = w;
+	if (w !== c.v) c.w = w;
 }
 function setDfTextProp(ds, v) {
 	let c = v?.color;

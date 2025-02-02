@@ -1441,7 +1441,7 @@ function setDataFormat(c, cell, dst, ass, oss) {
 		c.ds = ds;
 	}
 	let w = applyDataStyle(ds, c.v, c.t);
-	if (w !== undefined) c.w = w;
+	if (w !== c.v) c.w = w;
 }
 function setDfTextProp(ds, v) {
 	let c = v?.color;
