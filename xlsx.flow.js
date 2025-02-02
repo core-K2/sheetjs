@@ -25107,7 +25107,9 @@ function applyObject(obj, v) {
 }
 function getStyleObject(obj, name, st, styles, ass) {
 	let o = st && st[name];
-	if (ass && typeof o === 'string') o = ass[o];
+	if (typeof o === 'string') {
+		o = ass?.[o] || styles?.[o];
+	}
 	if (o) obj = applyObject(obj, o);
 	if (styles) {
 		for (o = st;;) {
@@ -25249,18 +25251,22 @@ function parseBorder(v) {
 		}
 	};
 }
-function applyDataStyle(ds, v) {
-	let n = Number(v);
-	if (!isNaN(n)) {
-		let s = '';
-		if (n < 0) s += ds?.text || '';
-		s += ds?.symbol || '';
-		return s + n.toLocaleString(ds?.loc || navigator.language, {
-			minimumIntegerDigits: ds?.dig || 1,
-			minimumFractionDigits: ds?.mdot || 0,
-			maximumFractionDigits: ds?.dot || 0,
-			useGrouping: ds?.grp || false,
-		});
+function applyDataStyle(ds, v, t) {
+	switch (t) {
+	case 'n':
+		let n = Number(v);
+		if (!isNaN(n)) {
+			let s = '';
+			if (n < 0) s += ds?.text || '';
+			s += ds?.symbol || '';
+			return s + n.toLocaleString(ds?.loc || navigator.language, {
+				minimumIntegerDigits: ds?.dig || 1,
+				minimumFractionDigits: ds?.mdot || 0,
+				maximumFractionDigits: ds?.dot || 0,
+				useGrouping: ds?.grp || false,
+			});
+		}
+		break;
 	}
 	return v;
 }
@@ -25290,7 +25296,7 @@ function setDataFormat(c, cell, dst, ass) {
 		});
 		c.ds = ds;
 	}
-	let w = applyDataStyle(ds, c.v);
+	let w = applyDataStyle(ds, c.v, c.t);
 	if (w !== undefined) c.w = w;
 }
 function setDfTextProp(ds, v) {
@@ -25323,11 +25329,19 @@ function setDfNumber(ds, v) {
 }
 function setDfMap(ds, v, ass) {
 	let c = v?.condition;
-	let a = v?.['apply-style-name'];
-	if (!c || !a) return;
+	if (!c) return;
 	c = c.replace('value()', '?');
-	let tp = a['text-properties'];
-	let col = tp?.color;
+	let a = getStyleObject(null, 'apply-style-name', v, null, ass);
+	let col;
+	if (a) {
+		for (let n in a) {
+			switch (n) {
+			case 'text-properties':
+				col = a[n]?.color;
+				break;
+			}
+		}
+	}
 	if (col) {
 		ds[c] = col;
 	} else {
