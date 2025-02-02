@@ -1201,7 +1201,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
 	c.si = getOrAddObject(Styles.CellXf, style);
 	if (dst) {
-		setDataFormat(c, cell, dst, ass);
+		setDataFormat(c, cell, dst, ass, oss);
 	}
 	return ret;
 }
@@ -1404,7 +1404,7 @@ function applyDataStyle(ds, v, t) {
 			if (n < 0) s += ds?.text || '';
 			s += ds?.symbol || '';
 			return s + n.toLocaleString(ds?.loc || navigator.language, {
-				minimumIntegerDigits: ds?.dig || 1,
+				minimumIntegerDigits: ds?.dig || 0,
 				minimumFractionDigits: ds?.mdot || 0,
 				maximumFractionDigits: ds?.dot || 0,
 				useGrouping: ds?.grp || false,
@@ -1414,7 +1414,7 @@ function applyDataStyle(ds, v, t) {
 	}
 	return v;
 }
-function setDataFormat(c, cell, dst, ass) {
+function setDataFormat(c, cell, dst, ass, oss) {
 	let ds = {};
 	if (Array.isArray(dst)) {
 		dst.forEach(d => {
@@ -1433,7 +1433,7 @@ function setDataFormat(c, cell, dst, ass) {
 					setDfNumber(ds, d[n]);
 					break;
 				case 'map':
-					setDfMap(ds, d[n], ass);
+					setDfMap(ds, d[n], ass, oss);
 					break;
 				}
 			}
@@ -1471,11 +1471,11 @@ function setDfNumber(ds, v) {
 		}
 	}
 }
-function setDfMap(ds, v, ass) {
+function setDfMap(ds, v, ass, oss) {
 	let c = v?.condition;
 	if (!c) return;
 	c = c.replace('value()', '?');
-	let a = getStyleObject(null, 'apply-style-name', v, null, ass);
+	let a = getStyleObject(null, 'apply-style-name', v, oss, ass);
 	let col;
 	if (a) {
 		for (let n in a) {
