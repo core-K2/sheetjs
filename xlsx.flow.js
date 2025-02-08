@@ -25011,7 +25011,7 @@ function makeCell(cell) {
 		if (f.startsWith('of:=')) f = f.substring(4);
 		c.f = f;
 	}
-	let t;
+	let t = '';
 	switch (vt) {
 	case 'boolean':
 		t = 'b';
@@ -25028,7 +25028,6 @@ function makeCell(cell) {
 		break;
 	case 'string':
 		if (p === 0) w = '';
-	default:
 		t = 's';
 		break;
 	}
@@ -25048,6 +25047,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 			st = oss && oss[sts[i]];
 			if (!st) continue;
 		}
+		if (c.t !== 's')
 		dst = getStyleObject(dst, 'data-style-name', st, oss, ass);
 		tc = getStyleObject(tc, 'table-cell-properties', st, oss);
 		pp = getStyleObject(pp, 'paragraph-properties', st, oss);
@@ -25120,8 +25120,10 @@ function getStyleObject(obj, name, st, styles, ass) {
 			o = styles[p];
 			if (o) {
 				o = o[name];
-				if (ass && typeof o === 'string') o = ass[o];
-				obj = applyObject(obj, o);
+				if (typeof o === 'string') {
+					o = ass?.[o] || styles?.[o];
+				}
+				if (o) obj = applyObject(obj, o);
 			}
 		}
 	}
@@ -25253,6 +25255,7 @@ function parseBorder(v) {
 }
 function applyDataStyle(ds, v, t) {
 	switch (t) {
+	case '':
 	case 'n':
 		let n = Number(v);
 		if (!isNaN(n)) {
@@ -25273,6 +25276,7 @@ function applyDataStyle(ds, v, t) {
 function setDataFormat(c, cell, dst, ass, oss) {
 	let ds = {};
 	if (Array.isArray(dst)) {
+		let bn = false;
 		dst.forEach(d => {
 			for (let n in d) {
 				switch (n) {
@@ -25287,6 +25291,7 @@ function setDataFormat(c, cell, dst, ass, oss) {
 					break;
 				case 'number':
 					setDfNumber(ds, d[n]);
+					bn = true;
 					break;
 				case 'map':
 					setDfMap(ds, d[n], ass, oss);
