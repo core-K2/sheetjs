@@ -1404,14 +1404,24 @@ function applyDataStyle(ds, v, t) {
 		let n = Number(v);
 		if (!isNaN(n)) {
 			let s = '';
-			if (n < 0) s += ds?.text || '';
+			let text = ds?.text;
+			let sign = '';
+			if (n < 0 && text && text.pre) {
+				s += text.pre.join('');
+				sign = '-';
+			}
 			s += ds?.symbol || '';
-			return s + n.toLocaleString(ds?.loc || navigator.language, {
+			let sn = n.toLocaleString(ds?.loc || navigator.language, {
 				minimumIntegerDigits: ds?.dig || 0,
 				minimumFractionDigits: ds?.mdot || 0,
 				maximumFractionDigits: ds?.dot || 0,
 				useGrouping: ds?.grp || false,
 			});
+			if (sign && sn.startsWith(sign)) sn = sn.substring(1);
+			if (n < 0 && text && text.suf) {
+				sn += text.suf.join('');
+			}
+			return s + sn;
 		}
 		break;
 	}
@@ -1428,7 +1438,13 @@ function setDataFormat(c, cell, dst, ass, oss) {
 					setDfTextProp(ds, d[n]);
 					break;
 				case 'text':
-					ds.text = d[n];
+					let text = ds?.text;
+					if (!text) {
+						text = ds.text = {};
+					}
+					let prop = bn ? 'suf' : 'pre';
+					if (!text?.[prop]) text[prop] = [];
+					text[prop].push(d[n]);
 					break;
 				case 'currency-symbol':
 					setDfSymbol(ds, d[n]);
@@ -1455,8 +1471,13 @@ function setDfTextProp(ds, v) {
 function setDfSymbol(ds, v) {
 	let s = v?.value;
 	if (s) ds.symbol = s;
-	s = `${v?.language}-${v?.country}`;
-	if (s) ds.loc = s;
+	s = v?.language;
+	if (s) {
+		if (v?.country) {
+			s += '-' + v.country;
+		}
+		ds.loc = s;
+	}
 }
 function setDfNumber(ds, v) {
 	for (let n in v) {
@@ -1479,6 +1500,10 @@ function setDfNumber(ds, v) {
 function setDfMap(ds, v, ass, oss) {
 	let c = v?.condition;
 	if (!c) return;
+	let map = ds?.map;
+	if (!map) {
+		map = ds.map = {};
+	}
 	c = c.replace('value()', '?');
 	let a = getStyleObject(null, 'apply-style-name', v, oss, ass);
 	let col;
@@ -1492,16 +1517,16 @@ function setDfMap(ds, v, ass, oss) {
 		}
 	}
 	if (col) {
-		ds[c] = col;
+		map[c] = col;
 	} else {
 		col = ds?.rgb;
 		if (col) {
 			switch (c) {
 			case '?>=0':
-				ds['?<0'] = col;
+				map['?<0'] = col;
 				break;
 			case '?>0':
-				ds['?<=0'] = col;
+				map['?<=0'] = col;
 				break;
 			}
 		}

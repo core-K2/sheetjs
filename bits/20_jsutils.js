@@ -658,7 +658,7 @@ function toBoolean(v) {
 }
 function toNumber(v, def) {
 	if (typeof v === 'number') {
-		return Number(v);
+		return v;
 	}
 	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
 	return isNaN(ret) ? def === undefined ? 0 : def : ret;
