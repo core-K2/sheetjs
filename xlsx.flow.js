@@ -25262,9 +25262,9 @@ function applyDataStyle(ds, v, t) {
 			let s = '';
 			let text = ds?.text;
 			let sign = '';
-			if (n < 0 && text && text.pre) {
+			if (text?.pre) {
 				s += text.pre.join('');
-				sign = '-';
+				if (n < 0) sign = '-';
 			}
 			s += ds?.symbol || '';
 			let sn = n.toLocaleString(ds?.loc || navigator.language, {
@@ -25274,7 +25274,7 @@ function applyDataStyle(ds, v, t) {
 				useGrouping: ds?.grp || false,
 			});
 			if (sign && sn.startsWith(sign)) sn = sn.substring(1);
-			if (n < 0 && text && text.suf) {
+			if (text?.suf) {
 				sn += text.suf.join('');
 			}
 			return s + sn;
@@ -25284,8 +25284,17 @@ function applyDataStyle(ds, v, t) {
 	return v;
 }
 function setDataFormat(c, cell, dst, ass, oss) {
-	let ds = {};
+	let ds = getDataStyle(dst, ass, oss);
+	if (ds) {
+		c.ds = ds;
+		let w = applyDataStyle(ds, c.v, c.t);
+		if (w !== c.v) c.w = w;
+	}
+}
+function getDataStyle(dst, ass, oss) {
+	let ds = null;
 	if (Array.isArray(dst)) {
+		ds = {};
 		let bn = false;
 		dst.forEach(d => {
 			for (let n in d) {
@@ -25315,10 +25324,8 @@ function setDataFormat(c, cell, dst, ass, oss) {
 				}
 			}
 		});
-		c.ds = ds;
 	}
-	let w = applyDataStyle(ds, c.v, c.t);
-	if (w !== c.v) c.w = w;
+	return ds;
 }
 function setDfTextProp(ds, v) {
 	let c = v?.color;
@@ -25356,36 +25363,15 @@ function setDfNumber(ds, v) {
 function setDfMap(ds, v, ass, oss) {
 	let c = v?.condition;
 	if (!c) return;
-	let map = ds?.map;
-	if (!map) {
-		map = ds.map = {};
-	}
-	c = c.replace('value()', '?');
 	let a = getStyleObject(null, 'apply-style-name', v, oss, ass);
-	let col;
-	if (a) {
-		for (let n in a) {
-			switch (n) {
-			case 'text-properties':
-				col = a[n]?.color;
-				break;
-			}
+	let ds2 = getDataStyle(a, ass, oss);
+	if (ds2) {
+		let map = ds?.map;
+		if (!map) {
+			map = ds.map = {};
 		}
-	}
-	if (col) {
-		map[c] = col;
-	} else {
-		col = ds?.rgb;
-		if (col) {
-			switch (c) {
-			case '?>=0':
-				map['?<0'] = col;
-				break;
-			case '?>0':
-				map['?<=0'] = col;
-				break;
-			}
-		}
+		c = c.replace('value()', '?');
+		map[c] = ds2;
 	}
 }
 function getProp(name) {
