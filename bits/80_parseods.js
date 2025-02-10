@@ -1122,12 +1122,19 @@ function makeColStyle(c, ass, oss, styles, Styles, fonts) {
 	}
 	return ret;
 }
+const DEFAULT_STYLE_NAME = 'default-style';
 function getDefaultStyle(styles, family) {
-	let def = styles && styles['default-style'];
-	return !def ? null :
-		Array.isArray(def) ? def.find(function(s) {
-			return s.family === family;
-		}) : def.family === family ? def : null;
+	if (Array.isArray(styles)) {
+		return styles.find(s => {
+			return s?.[DEFAULT_STYLE_NAME]?.family === family;
+		})?.[DEFAULT_STYLE_NAME];
+	} else if (typeof styles === 'object') {
+		let def = styles?.[DEFAULT_STYLE_NAME];
+		return !def ? null :
+			Array.isArray(def) ? def.find(s => {
+				return s.family === family;
+			}) : def.family === family ? def : null;
+	}
 }
 function makeCell(cell) {
 	let c = {};
@@ -1201,7 +1208,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 	ret = applyStyle(style, Styles, fonts, tc, pp, tp);
 	c.si = getOrAddObject(Styles.CellXf, style);
 	if (dst) {
-		setDataFormat(c, cell, dst, ass, oss);
+		setDataFormat(c, dst, ass, oss);
 	}
 	return ret;
 }
@@ -1424,23 +1431,106 @@ function applyDataStyle(ds, v, t) {
 			return s + sn;
 		}
 		break;
+	case 'd':
+		let df = ds?.df;
+		if (df) {
+			return formatDate(v, df, ds?.opts);
+		}
+		break;
 	}
 	return v;
 }
-function setDataFormat(c, cell, dst, ass, oss) {
-	let ds = getDataStyle(dst, ass, oss);
+function setDataFormat(c, dst, ass, oss) {
+	let ds = getDataStyle(c, dst, ass, oss);
 	if (ds) {
 		c.ds = ds;
 		let w = applyDataStyle(ds, c.v, c.t);
 		if (w !== c.v) c.w = w;
 	}
 }
-function getDataStyle(dst, ass, oss) {
+function getDataStyle(c, dst, ass, oss) {
 	let ds = null;
 	if (Array.isArray(dst)) {
 		ds = {};
 		let bn = false;
+		let bDate = c.t === 'd';
+		let s = '';
 		dst.forEach(d => {
+			if (bDate) {
+				for (let n in d) {
+					let v = d[n];
+					let cal = v?.calendar;
+					if (cal === 'gregorian') {
+						cal = '';
+					}
+					switch (n) {
+					case 'text':
+						s += v;
+						break;
+					case 'era':
+						let g = 'GE';
+						switch (v?.style) {
+						case 'long':
+							g = 'GG' + g;
+							break;
+						case 'short':
+							g = 'G' + g;
+							break;
+						case 'narrow':
+						default:
+							break;
+						}
+						s += g;
+						break;
+					case 'year':
+						if (cal) {
+							s += 'YY';
+						} else {
+							s += 'yy';
+							if (v?.style === 'long') s += 'yy';
+						}
+						break;
+					case 'month':
+						if (v?.textual) {
+							s += 'MON';
+							if (v?.style === 'long') s += 'TH';
+						} else {
+							s += 'M';
+							if (v?.style === 'long') s += 'M';
+						}
+						break;
+					case 'day':
+						s += 'd';
+						if (v?.style === 'long') s += 'd';
+						break;
+					case 'day-of-week':
+						if (cal) {
+							s += 'W';
+							if (v?.style === 'long') s += 'W';
+						} else {
+							s += 'WEEK';
+							if (v?.style === 'long') s += 'DAY';
+						}
+						break;
+					case 'hours':
+						s += 'H';
+						if (v?.style === 'long') s += 'H';
+						break;
+					case 'minutes':
+						s += 'm';
+						if (v?.style === 'long') s += 'm';
+						break;
+					case 'seconds':
+						s += 's';
+						if (v?.style === 'long') s += 's';
+						break;
+					case 'am-pm':
+						s += 'ap';
+						break;
+					}
+				}
+				return;
+			}
 			for (let n in d) {
 				switch (n) {
 				case 'text-properties':
@@ -1463,11 +1553,14 @@ function getDataStyle(dst, ass, oss) {
 					bn = true;
 					break;
 				case 'map':
-					setDfMap(ds, d[n], ass, oss);
+					setDfMap(c, ds, d[n], ass, oss);
 					break;
 				}
 			}
 		});
+		if (bDate) {
+			ds.df = s;
+		}
 	}
 	return ds;
 }
@@ -1504,18 +1597,18 @@ function setDfNumber(ds, v) {
 		}
 	}
 }
-function setDfMap(ds, v, ass, oss) {
-	let c = v?.condition;
-	if (!c) return;
+function setDfMap(c, ds, v, ass, oss) {
+	let cond = v?.condition;
+	if (!cond) return;
 	let a = getStyleObject(null, 'apply-style-name', v, oss, ass);
-	let ds2 = getDataStyle(a, ass, oss);
+	let ds2 = getDataStyle(c, a, ass, oss);
 	if (ds2) {
 		let map = ds?.map;
 		if (!map) {
 			map = ds.map = {};
 		}
-		c = c.replace('value()', '?');
-		map[c] = ds2;
+		cond = cond.replace('value()', '?');
+		map[cond] = ds2;
 	}
 }
 function getProp(name) {

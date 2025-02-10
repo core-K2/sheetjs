@@ -759,3 +759,88 @@ function singleObject(v) {
 	let keys = typeof v === 'object' ? Object.keys(v) : null;
 	return keys && keys.length === 1 ? v[keys[0]] : v;
 }
+
+function getDateFormat(opts) {
+	let loc = navigator.language;
+	switch (loc.substring(0, 2)) {
+	case 'ja':
+		loc = 'ja-JP-u-ca-japanese';
+		break;
+	}
+	return new Intl.DateTimeFormat(loc, opts);
+}
+function getGengoYear(dt, form, flg = 0) {
+	let opts = {
+		era: ['', '', 'narrow', 'short', 'long'][form.length % 5],
+		year: 'numeric'
+	};
+	let dtf = getDateFormat(opts);
+	let s = dtf.format(dt);
+	let m = s.match(/(.+)(\d+)/);
+	return m?.[flg + 1];
+}
+function formatDate (v, df, opts) {
+	let dt = toDate(v);
+	if (!dt) return '';
+	let y = dt.getFullYear();
+	let m = dt.getMonth() + 1;
+	let d = dt.getDate();
+	let w = dt.getDay();
+	let hh = dt.getHours();
+	let mm = dt.getMinutes();
+	let ss = dt.getSeconds();
+	let weekDays = '日月火水木金土';
+	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MONTH|MON|MM|M|dd|d|WEEKDAY|WEEK|WW|W|HH|H|hh|h|mm|m|ss|s|AP|ap)/g;
+	return df.replace(re, function (key) {
+		switch (key) {
+		case 'GGGE':
+		case 'GGE':
+		case 'GE':
+			return getGengoYear(dt, key);
+		case 'YY':
+			return getGengoYear(dt, key, 1);
+		case 'yy':
+			return ('0' + y).slice(-2);
+		case 'YYYY':
+		case 'yyyy':
+		case 'Y':
+		case 'y':
+			return y;
+		case 'MM':
+			return ('0' + m).slice(-2);
+		case 'M':
+			return m;
+		case 'DD':
+		case 'dd':
+			return ('0' + d).slice(-2);
+		case 'D':
+		case 'd':
+			return d;
+		case 'WW':
+			return weekDays.substr(w, 1) + '曜日';
+		case 'W':
+			return weekDays.substr(w, 1);
+		case 'HH':
+			return ('0' + hh).slice(-2);
+		case 'H':
+			return hh;
+		case 'hh':
+			return ('0' + (hh % 12)).slice(-2);
+		case 'h':
+			return (hh % 12);
+		case 'mm':
+			return ('0' + mm).slice(-2);
+		case 'm':
+			return mm;
+		case 'ss':
+			return ('0' + ss).slice(-2);
+		case 's':
+			return ss;
+		case 'AP':
+			return hh < 12 ? '午前' : '午後';
+		case 'ap':
+			return hh < 12 ? 'am' : 'pm';
+		}
+		return key;
+	});
+}
