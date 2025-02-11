@@ -25257,6 +25257,7 @@ function parseBorder(v) {
 function applyDataStyle(ds, v, t) {
 	switch (t) {
 	case '':
+		if (!v) break;
 	case 'n':
 		if (v === undefined) return '';
 		let n = Number(v);
