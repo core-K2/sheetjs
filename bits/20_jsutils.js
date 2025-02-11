@@ -415,7 +415,7 @@ var Xml = {
 		textVName: 'value',	// property name of text value 
 		prefixAttr: '',		// prefix for attribute
 		prefixText: '',		// prefix for text data
-		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date)
+		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date, 8:trim)
 		convNames: null,	// convert name map
 		asSeqArray: null,	// as sequence array object names
 	},
@@ -473,12 +473,12 @@ var Xml = {
 	// convert value
 	toValue: function(v, bTrim) {
 		if (v) {
-			if (bTrim) {
-				v = v.trim();
-			}
 			let asV;
 			if ((asV = this.opts.asValue)) {
-				if (asV & 1 && !isNaN(v)) {
+				if (bTrim && asV & 8) {
+					v = v.trim();
+				}
+				if (asV & 1 && !isNaN(v) && v.trim().length > 0) {
 					return Number(v);
 				}
 				if (asV & 2) {
@@ -760,24 +760,33 @@ function singleObject(v) {
 	return keys && keys.length === 1 ? v[keys[0]] : v;
 }
 
-function getDateFormat(opts) {
-	let loc = navigator.language;
-	switch (loc.substring(0, 2)) {
-	case 'ja':
-		loc = 'ja-JP-u-ca-japanese';
-		break;
-	}
-	return new Intl.DateTimeFormat(loc, opts);
+const INTL_LOCATION = {
+	'ja': 'ja-JP-u-ca-japanese',
+};
+const DATE_FORMAT_LENGTH = ['narrow', 'short', 'long'];
+function getDateFormat(opts, options) {
+	let loc = opts?.loc || navigator.language;
+	let il = INTL_LOCATION[(loc.substring(0, 2))];
+	return new Intl.DateTimeFormat(il || loc, options);
 }
-function getGengoYear(dt, form, flg = 0) {
-	let opts = {
-		era: ['', '', 'narrow', 'short', 'long'][form.length % 5],
+function getGengoYear(dt, opts, form, flg = 0) {
+	let dtf = getDateFormat(opts, {
+		era: DATE_FORMAT_LENGTH[(form.length - 2) % 3],
 		year: 'numeric'
-	};
-	let dtf = getDateFormat(opts);
+	});
 	let s = dtf.format(dt);
 	let m = s.match(/(.+)(\d+)/);
 	return m?.[flg + 1];
+}
+function getMonthText(dt, opts, form) {
+	return getDateFormat(opts, {
+		month: DATE_FORMAT_LENGTH[(form.length - 2) % 3]
+	}).format(dt);
+}
+function getWeekday(dt, opts, form) {
+	return getDateFormat(opts, {
+		weekday: DATE_FORMAT_LENGTH[(form.length - 1) % 3]
+	}).format(dt);
 }
 function formatDate (v, df, opts) {
 	let dt = toDate(v);
@@ -785,20 +794,18 @@ function formatDate (v, df, opts) {
 	let y = dt.getFullYear();
 	let m = dt.getMonth() + 1;
 	let d = dt.getDate();
-	let w = dt.getDay();
 	let hh = dt.getHours();
 	let mm = dt.getMinutes();
 	let ss = dt.getSeconds();
-	let weekDays = '日月火水木金土';
-	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MONTH|MON|MM|M|dd|d|WEEKDAY|WEEK|WW|W|HH|H|hh|h|mm|m|ss|s|AP|ap)/g;
+	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MMMM|MMM|MM|M|dd|d|WWW|WW|W|HH|H|hh|h|mm|m|ss|s|AP|ap)/g;
 	return df.replace(re, function (key) {
 		switch (key) {
 		case 'GGGE':
 		case 'GGE':
 		case 'GE':
-			return getGengoYear(dt, key);
+			return getGengoYear(dt, opts, key);
 		case 'YY':
-			return getGengoYear(dt, key, 1);
+			return getGengoYear(dt, opts, key, 1);
 		case 'yy':
 			return ('0' + y).slice(-2);
 		case 'YYYY':
@@ -806,6 +813,9 @@ function formatDate (v, df, opts) {
 		case 'Y':
 		case 'y':
 			return y;
+		case 'MMMM':
+		case 'MMM':
+			return getMonthText(dt, opts, key);
 		case 'MM':
 			return ('0' + m).slice(-2);
 		case 'M':
@@ -816,10 +826,10 @@ function formatDate (v, df, opts) {
 		case 'D':
 		case 'd':
 			return d;
+		case 'WWW':
 		case 'WW':
-			return weekDays.substr(w, 1) + '曜日';
 		case 'W':
-			return weekDays.substr(w, 1);
+			return getWeekday(dt, opts, key);
 		case 'HH':
 			return ('0' + hh).slice(-2);
 		case 'H':

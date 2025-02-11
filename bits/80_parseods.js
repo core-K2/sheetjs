@@ -1240,7 +1240,16 @@ function existValues() {
 	return ret.length > 0 && ret;
 }
 function cloneObject(obj) {
-	return !obj ? null : JSON.parse(JSON.stringify(obj));
+	if (!obj) return null;
+	let o = JSON.parse(JSON.stringify(obj));
+	if (Array.isArray(obj)) {
+		for (let n in obj) {
+			if (isNaN(n)) {
+				o[n] = obj[n];
+			}
+		}
+	}
+	return o;
 }
 function applyObject(obj, v) {
 	if (v && typeof v === 'object') {
@@ -1408,6 +1417,7 @@ function applyDataStyle(ds, v, t) {
 	switch (t) {
 	case '':
 	case 'n':
+		if (v === undefined) return '';
 		let n = Number(v);
 		if (!isNaN(n)) {
 			let s = '';
@@ -1454,15 +1464,21 @@ function getDataStyle(c, dst, ass, oss) {
 		ds = {};
 		let bn = false;
 		let bDate = c.t === 'd';
+		if (bDate) {
+			let loc = dst?.language;
+			if (loc) {
+				let c = dst?.country;
+				if (c) loc += '-' + dst.country;
+				ds.opts = {loc: loc};
+			}
+		}
 		let s = '';
 		dst.forEach(d => {
 			if (bDate) {
 				for (let n in d) {
 					let v = d[n];
 					let cal = v?.calendar;
-					if (cal === 'gregorian') {
-						cal = '';
-					}
+					if (cal === 'gregorian') cal = '';
 					switch (n) {
 					case 'text':
 						s += v;
@@ -1492,24 +1508,25 @@ function getDataStyle(c, dst, ass, oss) {
 						break;
 					case 'month':
 						if (v?.textual) {
-							s += 'MON';
-							if (v?.style === 'long') s += 'TH';
+							s += 'MMM';
 						} else {
 							s += 'M';
-							if (v?.style === 'long') s += 'M';
 						}
+						if (v?.style === 'long') s += 'M';
 						break;
 					case 'day':
 						s += 'd';
 						if (v?.style === 'long') s += 'd';
 						break;
 					case 'day-of-week':
-						if (cal) {
+						s += 'W';
+						switch (v?.style) {
+						case 'long':
+							s += 'WW';
+							break;
+						case 'short':
 							s += 'W';
-							if (v?.style === 'long') s += 'W';
-						} else {
-							s += 'WEEK';
-							if (v?.style === 'long') s += 'DAY';
+							break;
 						}
 						break;
 					case 'hours':
