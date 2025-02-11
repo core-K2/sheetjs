@@ -4082,17 +4082,22 @@ function getWeekday(dt, opts, form) {
 		weekday: DATE_FORMAT_LENGTH[(form.length - 1) % 3]
 	}).format(dt);
 }
-function formatDate (v, df, opts) {
+function getAmPm(dt, opts) {
+	let ar = getDateFormat(opts, {
+		hour: 'numeric',
+		hour12: true
+	}).formatToParts(dt);
+	let p = ar.find(n => n.type === 'dayPeriod');
+	return p ? p.value : '';
+}
+function to2Digit(n) {
+	return ('0' + n).slice(-2);
+}
+function formatDate(v, df, opts) {
 	let dt = toDate(v);
 	if (!dt) return '';
-	let y = dt.getFullYear();
-	let m = dt.getMonth() + 1;
-	let d = dt.getDate();
-	let hh = dt.getHours();
-	let mm = dt.getMinutes();
-	let ss = dt.getSeconds();
-	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MMMM|MMM|MM|M|dd|d|WWW|WW|W|HH|H|hh|h|mm|m|ss|s|AP|ap)/g;
-	return df.replace(re, function (key) {
+	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MMMM|MMM|MM|M|dd|d|WWW|WW|W|HH|H|hh|h|mm|m|ss|s|ap)/g;
+	return df.replace(re, function(key) {
 		switch (key) {
 		case 'GGGE':
 		case 'GGE':
@@ -4101,49 +4106,47 @@ function formatDate (v, df, opts) {
 		case 'YY':
 			return getGengoYear(dt, opts, key, 1);
 		case 'yy':
-			return ('0' + y).slice(-2);
+			return to2Digit(dt.getFullYear());
 		case 'YYYY':
 		case 'yyyy':
 		case 'Y':
 		case 'y':
-			return y;
+			return dt.getFullYear();
 		case 'MMMM':
 		case 'MMM':
 			return getMonthText(dt, opts, key);
 		case 'MM':
-			return ('0' + m).slice(-2);
+			return to2Digit(dt.getMonth() + 1);
 		case 'M':
-			return m;
+			return dt.getMonth() + 1;
 		case 'DD':
 		case 'dd':
-			return ('0' + d).slice(-2);
+			return to2Digit(dt.getDate());
 		case 'D':
 		case 'd':
-			return d;
+			return dt.getDate();
 		case 'WWW':
 		case 'WW':
 		case 'W':
 			return getWeekday(dt, opts, key);
 		case 'HH':
-			return ('0' + hh).slice(-2);
+			return to2Digit(dt.getHours());
 		case 'H':
-			return hh;
+			return dt.getHours();
 		case 'hh':
-			return ('0' + (hh % 12)).slice(-2);
+			return to2Digit(dt.getHours() % 12);
 		case 'h':
-			return (hh % 12);
+			return (dt.getHours() % 12);
 		case 'mm':
-			return ('0' + mm).slice(-2);
+			return to2Digit(dt.getMinutes());
 		case 'm':
-			return mm;
+			return dt.getMinutes();
 		case 'ss':
-			return ('0' + ss).slice(-2);
+			return to2Digit(dt.getSeconds());
 		case 's':
-			return ss;
-		case 'AP':
-			return hh < 12 ? '午前' : '午後';
+			return dt.getSeconds();
 		case 'ap':
-			return hh < 12 ? 'am' : 'pm';
+			return getAmPm(dt, opts);
 		}
 		return key;
 	});
@@ -25038,7 +25041,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 			st = oss && oss[sts[i]];
 			if (!st) continue;
 		}
-		if (c.t !== 's')
+		if (!dst && c.t !== 's')
 		dst = getStyleObject(dst, 'data-style-name', st, oss, ass);
 		tc = getStyleObject(tc, 'table-cell-properties', st, oss);
 		pp = getStyleObject(pp, 'paragraph-properties', st, oss);
@@ -25080,13 +25083,11 @@ function existValues() {
 	return ret.length > 0 && ret;
 }
 function cloneObject(obj) {
-	if (!obj) return null;
-	let o = JSON.parse(JSON.stringify(obj));
-	if (Array.isArray(obj)) {
-		for (let n in obj) {
-			if (isNaN(n)) {
-				o[n] = obj[n];
-			}
+	if (obj === null || typeof obj !== 'object') return obj;
+	const o = Array.isArray(obj) ? [] : {};
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			o[key] = cloneObject(obj[key]);
 		}
 	}
 	return o;

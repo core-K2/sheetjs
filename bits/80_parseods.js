@@ -1198,7 +1198,7 @@ function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
 			st = oss && oss[sts[i]];
 			if (!st) continue;
 		}
-		if (c.t !== 's')
+		if (!dst && c.t !== 's')
 		dst = getStyleObject(dst, 'data-style-name', st, oss, ass);
 		tc = getStyleObject(tc, 'table-cell-properties', st, oss);
 		pp = getStyleObject(pp, 'paragraph-properties', st, oss);
@@ -1240,13 +1240,11 @@ function existValues() {
 	return ret.length > 0 && ret;
 }
 function cloneObject(obj) {
-	if (!obj) return null;
-	let o = JSON.parse(JSON.stringify(obj));
-	if (Array.isArray(obj)) {
-		for (let n in obj) {
-			if (isNaN(n)) {
-				o[n] = obj[n];
-			}
+	if (obj === null || typeof obj !== 'object') return obj;
+	const o = Array.isArray(obj) ? [] : {};
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			o[key] = cloneObject(obj[key]);
 		}
 	}
 	return o;
