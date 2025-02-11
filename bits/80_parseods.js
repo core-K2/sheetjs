@@ -1453,7 +1453,6 @@ function setDataFormat(c, dst, ass, oss) {
 	if (ds) {
 		c.ds = ds;
 		let w = applyDataStyle(ds, c.v, c.t);
-		if (ds?.df) c.f = ds.df;
 		if (w !== c.v) c.w = w;
 	}
 }
