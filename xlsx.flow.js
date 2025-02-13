@@ -4195,8 +4195,8 @@ function getGengoYear(dt, opts, form, flg = 0) {
 		year: 'numeric'
 	});
 	let s = dtf.format(dt);
-	let m = s.match(/(.+)(\d+)/);
-	return m?.[flg + 1];
+	let m = s.match(/(.+)((\d+|元))/);
+	return m?.[flg + 1] || '';
 }
 function getMonthText(dt, opts, form) {
 	return getDateFormat(opts, {
