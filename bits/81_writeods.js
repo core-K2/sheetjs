@@ -350,19 +350,19 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						break;
 					case 'd':
 						ct[VALUE_TYPE_NAME] = cell.vt || "date";
+						let dt = parseDateJp(cell.v);
 						switch (cell.vt) {
 						case 'date':
 							textp = (cell.w||String(cell.v));
-							ct['office:date-value'] = convertToOfficeDateValue(parseDateJp(textp));
+							ct['office:date-value'] = dt.toISOString();//convertToOfficeDateValue(dt);
 							break;
 						case 'time':
 							textp = (cell.w||String(cell.v));
-							ct['office:time-value'] = convertToOfficeTimeValue(parseDateJp(textp));
+							ct['office:time-value'] = convertToOfficeTimeValue(dt);
 							break;
 						default:
-							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
-							ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
-							//ct['table:style-name'] = "ce1";
+							textp = (cell.w||(dt.toISOString()));
+							ct['office:date-value'] = dt.toISOString();
 							break;
 						}
 						break;

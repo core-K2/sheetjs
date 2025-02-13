@@ -687,12 +687,15 @@ function toOdsDateTime(v) {
 	return dt.toISOString().replace('Z', '000000');
 }
 const JAPANESE_DATE_KEYS = '年月日時分秒';
-function parseDateJp(str) {
-	let d = new Date(null);
+function parseDateJp(dt) {
+	if (dt instanceof Date) return dt;
+	let d = new Date(dt);
+	if (!isNaN(d.getTime())) return d;
+	d = new Date(null);
 	let len = JAPANESE_DATE_KEYS.length;
 	let be = 0;
 	for (let i = 0; i < len; i++) {
-		let m = str.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
+		let m = dt.match(`(\\d+)${JAPANESE_DATE_KEYS.charAt(i)}`);
 		if (m) {
 			be |= 1 << i;
 			let n = Number(m[1]);
@@ -707,7 +710,7 @@ function parseDateJp(str) {
 		}
 	}
 	if (!be) {
-		let m = str.match(/(\d+)\/(\d+)(\/(\d+))?/);
+		let m = dt.match(/(\d+)\/(\d+)(\/(\d+))?/);
 		if (m) {
 			let mon, day;
 			be |= 6;
@@ -725,7 +728,7 @@ function parseDateJp(str) {
 			d.setMonth(mon-1);
 			d.setDate(day);
 		}
-		m = str.match(/(\d+):(\d+)(:(\d+))?/) || str.match(/PT(\d+)H(\d+)M((\d+)S)?/);
+		m = dt.match(/(\d+):(\d+)(:(\d+))?/) || dt.match(/PT(\d+)H(\d+)M((\d+)S)?/);
 		if (m) {
 			be |= 24;
 			d.setHours(Number(m[1]));
@@ -736,7 +739,7 @@ function parseDateJp(str) {
 			}
 		}
 		if (!be) {
-			d = parseDate(str);
+			d = parseDate(dt);
 			if (isNaN(d.getTime())) return null;
 		}
 	}
@@ -746,8 +749,20 @@ function parseDateJp(str) {
 	return d;
 }
 function toTimeString(v) {
-	let d = parseDateJp(v);
-	return d instanceof Date ? d.toTimeString().substring(0, 5) : '';
+	let dt = parseDateJp(v);
+	return dt instanceof Date ? dt.toTimeString().substring(0, 5) : '';
+}
+function toDateTimeString(v) {
+	let dt = parseDateJp(v);
+	if (dt instanceof Date) {
+		let y = dt.getFullYear();
+		let M = String(dt.getMonth() + 1).padStart(2, '0');
+		let d = String(dt.getDate()).padStart(2, '0');
+		let h = String(dt.getHours()).padStart(2, '0');
+		let m = String(dt.getMinutes()).padStart(2, '0');
+		return `${y}-${M}-${d}T${h}:${m}`;
+	}
+	return '';
 }
 function convertToOfficeDateValue(v) {
 	return toDate(v).toISOString().split('T')[0];
