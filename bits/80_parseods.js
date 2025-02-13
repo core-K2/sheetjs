@@ -1168,8 +1168,9 @@ function makeCell(cell) {
 		t = 'b';
 		w = v ? 'TRUE' : 'FALSE';
 		break;
-	case 'date':
 	case 'time':
+		v = toTimeString(v);
+	case 'date':
 		t = 'd';
 		break;
 	case 'float':
@@ -1238,30 +1239,6 @@ function existValues() {
 		}
 	}
 	return ret.length > 0 && ret;
-}
-function cloneObject(obj) {
-	if (obj === null || typeof obj !== 'object') return obj;
-	const o = Array.isArray(obj) ? [] : {};
-	for (const key in obj) {
-		if (obj.hasOwnProperty(key)) {
-			o[key] = cloneObject(obj[key]);
-		}
-	}
-	return o;
-}
-function applyObject(obj, v) {
-	if (v && typeof v === 'object') {
-		if (!obj || !Object.keys(obj).length) {
-			obj = cloneObject(v);
-		} else {
-			for (let n in v) {
-				if (!obj.hasOwnProperty(n)) {
-					obj[n] = v[n];
-				}
-			}
-		}
-	}
-	return obj;
 }
 function getStyleObject(obj, name, st, styles, ass) {
 	let o = st && st[name];
