@@ -1449,6 +1449,7 @@ function getDataStyle(c, dst, ass, oss) {
 			}
 		}
 		let s = '';
+		let bAP = false;
 		dst.forEach(d => {
 			if (bDate) {
 				for (let n in d) {
@@ -1519,6 +1520,7 @@ function getDataStyle(c, dst, ass, oss) {
 						break;
 					case 'am-pm':
 						s += 'ap';
+						bAP = true;
 						break;
 					}
 				}
@@ -1552,7 +1554,7 @@ function getDataStyle(c, dst, ass, oss) {
 			}
 		});
 		if (bDate) {
-			ds.df = s;
+			ds.df = bAP ? s.replace(/H/g, 'h') : s;
 		}
 	}
 	return ds;

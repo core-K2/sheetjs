@@ -4133,14 +4133,23 @@ function toDateTimeString(v) {
 	return '';
 }
 function convertToOfficeDateValue(v) {
-	return toDate(v).toISOString().split('T')[0];
+	let dt = parseDateJp(v);
+	if (dt instanceof Date) {
+		let f = 'yyyy-MM-dd';
+		if (v.indexOf('T') > 0) f += 'THH:mm:ss';
+		return formatDate(dt, f);
+	}
+	return '';
 }
 function convertToOfficeTimeValue(v) {
-	let dt = toDate(v);
-	const hours = String(dt.getHours()).padStart(2, '0');
-	const minutes = String(dt.getMinutes()).padStart(2, '0');
-	const seconds = String(dt.getSeconds()).padStart(2, '0');
-	return `PT${hours}H${minutes}M${seconds}S`;
+	let dt = parseDateJp(v);
+	if (dt instanceof Date) {
+		const h = String(dt.getHours()).padStart(2, '0');
+		const m = String(dt.getMinutes()).padStart(2, '0');
+		const s = String(dt.getSeconds()).padStart(2, '0');
+		return `PT${h}H${m}M${s}S`;
+	}
+	return '';
 }
 function singleObject(v) {
 	let keys = typeof v === 'object' ? Object.keys(v) : null;
@@ -25445,6 +25454,7 @@ function getDataStyle(c, dst, ass, oss) {
 			}
 		}
 		let s = '';
+		let bAP = false;
 		dst.forEach(d => {
 			if (bDate) {
 				for (let n in d) {
@@ -25515,6 +25525,7 @@ function getDataStyle(c, dst, ass, oss) {
 						break;
 					case 'am-pm':
 						s += 'ap';
+						bAP = true;
 						break;
 					}
 				}
@@ -25548,7 +25559,7 @@ function getDataStyle(c, dst, ass, oss) {
 			}
 		});
 		if (bDate) {
-			ds.df = s;
+			ds.df = bAP ? s.replace(/H/g, 'h') : s;
 		}
 	}
 	return ds;
@@ -25980,20 +25991,17 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 						break;
 					case 'd':
 						ct[VALUE_TYPE_NAME] = cell.vt || "date";
-						let dt = parseDateJp(cell.v);
+						let v = cell.v || '';
+						textp = cell.w || String(v);
 						switch (cell.vt) {
 						case 'date':
-							textp = (cell.w||String(cell.v));
-							ct['office:date-value'] = dt.toISOString();//convertToOfficeDateValue(dt);
+							ct['office:date-value'] = convertToOfficeDateValue(v);
 							break;
 						case 'time':
-							textp = (cell.w||String(cell.v));
-							ct['office:time-value'] = convertToOfficeTimeValue(dt);
+							ct['office:time-value'] = convertToOfficeTimeValue(v);
 							break;
 						default:
-							textp = (cell.w||(parseDate(cell.v, date1904).toISOString()));
-							ct['office:date-value'] = (parseDate(cell.v, date1904).toISOString());
-							//ct['table:style-name'] = "ce1";
+							ct['office:date-value'] = parseDate(v, date1904).toISOString();
 							break;
 						}
 						break;

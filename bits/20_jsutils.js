@@ -765,14 +765,23 @@ function toDateTimeString(v) {
 	return '';
 }
 function convertToOfficeDateValue(v) {
-	return toDate(v).toISOString().split('T')[0];
+	let dt = parseDateJp(v);
+	if (dt instanceof Date) {
+		let f = 'yyyy-MM-dd';
+		if (v.indexOf('T') > 0) f += 'THH:mm:ss';
+		return formatDate(dt, f);
+	}
+	return '';
 }
 function convertToOfficeTimeValue(v) {
-	let dt = toDate(v);
-	const hours = String(dt.getHours()).padStart(2, '0');
-	const minutes = String(dt.getMinutes()).padStart(2, '0');
-	const seconds = String(dt.getSeconds()).padStart(2, '0');
-	return `PT${hours}H${minutes}M${seconds}S`;
+	let dt = parseDateJp(v);
+	if (dt instanceof Date) {
+		const h = String(dt.getHours()).padStart(2, '0');
+		const m = String(dt.getMinutes()).padStart(2, '0');
+		const s = String(dt.getSeconds()).padStart(2, '0');
+		return `PT${h}H${m}M${s}S`;
+	}
+	return '';
 }
 function singleObject(v) {
 	let keys = typeof v === 'object' ? Object.keys(v) : null;
