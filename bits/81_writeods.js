@@ -344,6 +344,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 							ct['office:value'] = (cell.v||0);
 						}
 						break;
+					case '':
 					case 's': case 'str':
 						textp = cell?.v || "";
 						if (textp) ct[VALUE_TYPE_NAME] = "string";

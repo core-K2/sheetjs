@@ -25875,6 +25875,7 @@ var write_content_ods = /* @__PURE__ */(function() {
 							ct['office:value'] = (cell.v||0);
 						}
 						break;
+					case '':
 					case 's': case 'str':
 						textp = cell?.v || "";
 						if (textp) ct[VALUE_TYPE_NAME] = "string";
@@ -30507,8 +30508,9 @@ XLSX.applyDataStyle = applyDataStyle;
 XLSX.parseDateJp = parseDateJp;
 XLSX.toTimeString = toTimeString;
 XLSX.toDateTimeString = toDateTimeString;
-XLSX.SSF = SSF;
+XLSX.formatDate = formatDate;
 XLSX.Xml = Xml;
+XLSX.SSF = SSF;
 if(typeof __stream !== "undefined") XLSX.stream = __stream;
 if(typeof CFB !== "undefined") XLSX.CFB = CFB;
 if(typeof require !== "undefined") {

@@ -16,8 +16,9 @@ XLSX.applyDataStyle = applyDataStyle;
 XLSX.parseDateJp = parseDateJp;
 XLSX.toTimeString = toTimeString;
 XLSX.toDateTimeString = toDateTimeString;
-XLSX.SSF = SSF;
+XLSX.formatDate = formatDate;
 XLSX.Xml = Xml;
+XLSX.SSF = SSF;
 if(typeof __stream !== "undefined") XLSX.stream = __stream;
 if(typeof CFB !== "undefined") XLSX.CFB = CFB;
 if(typeof require !== "undefined") {
