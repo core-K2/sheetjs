@@ -25535,7 +25535,16 @@ function getOrAddObject(ar, obj) {
 	ar.push(obj);
 	return ar.length - 1;
 }
-/* OpenDocument */
+
+// export core-K2 expansion
+var CK2 = {
+	Xml: Xml,
+	applyDataStyle: applyDataStyle,
+	parseDateJp: parseDateJp,
+	toTimeString: toTimeString,
+	toDateTimeString: toDateTimeString,
+	formatDate: formatDate,
+};/* OpenDocument */
 function write_styles_ods(wb, opts) {
 	var master_styles = opts?.stayStyle ? makeOdsStyles(wb, opts) : [
 		'<office:master-styles>',
@@ -30510,12 +30519,7 @@ XLSX.writeXLSX = writeSyncXLSX;
 XLSX.writeFileXLSX = writeFileSyncXLSX;
 XLSX.set_fs = set_fs;
 XLSX.set_cptable = set_cptable;
-XLSX.applyDataStyle = applyDataStyle;
-XLSX.parseDateJp = parseDateJp;
-XLSX.toTimeString = toTimeString;
-XLSX.toDateTimeString = toDateTimeString;
-XLSX.formatDate = formatDate;
-XLSX.Xml = Xml;
+XLSX.CK2 = CK2;
 XLSX.SSF = SSF;
 if(typeof __stream !== "undefined") XLSX.stream = __stream;
 if(typeof CFB !== "undefined") XLSX.CFB = CFB;

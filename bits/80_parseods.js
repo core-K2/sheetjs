@@ -1640,3 +1640,13 @@ function getOrAddObject(ar, obj) {
 	ar.push(obj);
 	return ar.length - 1;
 }
+
+// export core-K2 expansion
+var CK2 = {
+	Xml: Xml,
+	applyDataStyle: applyDataStyle,
+	parseDateJp: parseDateJp,
+	toTimeString: toTimeString,
+	toDateTimeString: toDateTimeString,
+	formatDate: formatDate,
+};
