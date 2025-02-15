@@ -24782,7 +24782,13 @@ function to_excel_workbook(content, styles, settings, meta) {
 		SSF: {},
 	};
 	if (content) {
-		if (styles) styles = styles.styles;
+		if (styles) {
+			let ass = styles['automatic-styles'];
+			styles = styles.styles;
+			if (Array.isArray(ass)) {
+				styles = Array.isArray(styles) ? styles.concat(ass) : ass;
+			}
+		}
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
 		convert_content(wb, content, styles, settings);
@@ -25286,7 +25292,7 @@ function parseBorder(v) {
 function applyDataStyle(ds, v, t) {
 	switch (t) {
 	case '':
-		if (!v) break;
+		if (!v || isNaN(v)) break;
 	case 'n':
 		if (v === undefined) return '';
 		let n = Number(v);
@@ -25300,7 +25306,7 @@ function applyDataStyle(ds, v, t) {
 			}
 			s += ds?.symbol || '';
 			let sn = n.toLocaleString(ds?.loc || navigator.language, {
-				minimumIntegerDigits: ds?.dig || 0,
+				minimumIntegerDigits: ds?.dig || 1,
 				minimumFractionDigits: ds?.mdot || 0,
 				maximumFractionDigits: ds?.dot || 0,
 				useGrouping: ds?.grp || false,
