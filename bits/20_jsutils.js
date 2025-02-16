@@ -752,7 +752,7 @@ function toTimeString(v) {
 	let dt = parseDateJp(v);
 	return dt instanceof Date ? dt.toTimeString().substring(0, 5) : '';
 }
-function toDateTimeString(v) {
+function toDateTimeStringLong(v) {
 	let dt = parseDateJp(v);
 	if (dt instanceof Date) {
 		let y = dt.getFullYear();
@@ -760,9 +760,13 @@ function toDateTimeString(v) {
 		let d = String(dt.getDate()).padStart(2, '0');
 		let h = String(dt.getHours()).padStart(2, '0');
 		let m = String(dt.getMinutes()).padStart(2, '0');
-		return `${y}-${M}-${d}T${h}:${m}`;
+		let s = String(dt.getSeconds()).padStart(2, '0');
+		return `${y}-${M}-${d}T${h}:${m}:${s}`;
 	}
 	return '';
+}
+function toDateTimeString(v) {
+	return toDateTimeStringLong(v).slice(0, -3);
 }
 function convertToOfficeDateValue(v) {
 	let dt = parseDateJp(v);
@@ -851,61 +855,353 @@ function getAmPm(dt, opts) {
 function to2Digit(n) {
 	return ('0' + n).slice(-2);
 }
+function datePart(key, dt, opts) {
+	switch (key) {
+	case 'ggge':
+	case 'gge':
+	case 'ge':
+		return getGengoYear(dt, opts, key, -1);
+	case 'GGGE':
+	case 'GGE':
+	case 'GE':
+		return getGengoYear(dt, opts, key);
+	case 'YY':
+		return getGengoYear(dt, opts, key, 1);
+	case 'yy':
+		return to2Digit(dt.getFullYear());
+	case 'YYYY':
+	case 'yyyy':
+	case 'Y':
+	case 'y':
+		return dt.getFullYear();
+	case 'Mmmm':
+	case 'Mmm':
+	case 'mmmm':
+	case 'mmm':
+		opts = {loc:'en-us'};
+	case 'MMMM':
+	case 'MMM':
+		return getMonthText(dt, opts, key);
+	case 'Mm':
+	case 'MM':
+		return to2Digit(dt.getMonth() + 1);
+	case 'M':
+		return dt.getMonth() + 1;
+	case 'DD':
+	case 'dd':
+		return to2Digit(dt.getDate());
+	case 'D':
+	case 'd':
+		return dt.getDate();
+	case 'dddd':
+	case 'ddd':
+		return getWeekday(dt, {loc:'en-us'}, key.substring(1));
+	case 'AAAA':
+	case 'AAA':
+	case 'AA':
+		key = key.substring(1);
+	case 'WWW':
+	case 'WW':
+	case 'W':
+		return getWeekday(dt, opts, key);
+	case 'HH':
+		return to2Digit(dt.getHours());
+	case 'H':
+		return dt.getHours();
+	case 'hh':
+		return to2Digit(dt.getHours() % 12);
+	case 'h':
+		return (dt.getHours() % 12);
+	case 'mm':
+		return to2Digit(dt.getMinutes());
+	case 'm':
+		return dt.getMinutes();
+	case 'ss':
+		return to2Digit(dt.getSeconds());
+	case 's':
+		return dt.getSeconds();
+	case 'am/pm':
+		opts = {loc:'en-us'};
+	case 'AM/PM':
+	case 'ap':
+		return getAmPm(dt, opts);
+	}
+	return key;
+}
 function formatDate(v, df, opts) {
 	let dt = parseDateJp(v);
 	if (!dt) return '';
 	let re = /(GGGE|GGE|GE|YY|yyyy|yy|y|MMMM|MMM|MM|M|dd|d|WWW|WW|W|HH|H|hh|h|mm|m|ss|s|ap)/g;
 	return df.replace(re, function(key) {
-		switch (key) {
-		case 'GGGE':
-		case 'GGE':
-		case 'GE':
-			return getGengoYear(dt, opts, key);
-		case 'YY':
-			return getGengoYear(dt, opts, key, 1);
-		case 'yy':
-			return to2Digit(dt.getFullYear());
-		case 'YYYY':
-		case 'yyyy':
-		case 'Y':
-		case 'y':
-			return dt.getFullYear();
-		case 'MMMM':
-		case 'MMM':
-			return getMonthText(dt, opts, key);
-		case 'MM':
-			return to2Digit(dt.getMonth() + 1);
-		case 'M':
-			return dt.getMonth() + 1;
-		case 'DD':
-		case 'dd':
-			return to2Digit(dt.getDate());
-		case 'D':
-		case 'd':
-			return dt.getDate();
-		case 'WWW':
-		case 'WW':
-		case 'W':
-			return getWeekday(dt, opts, key);
-		case 'HH':
-			return to2Digit(dt.getHours());
-		case 'H':
-			return dt.getHours();
-		case 'hh':
-			return to2Digit(dt.getHours() % 12);
-		case 'h':
-			return (dt.getHours() % 12);
-		case 'mm':
-			return to2Digit(dt.getMinutes());
-		case 'm':
-			return dt.getMinutes();
-		case 'ss':
-			return to2Digit(dt.getSeconds());
-		case 's':
-			return dt.getSeconds();
-		case 'ap':
-			return getAmPm(dt, opts);
-		}
-		return key;
+		return datePart(key, dt, opts);
 	});
 }
+function applyDataStyle(ds, v, t) {
+	switch (t) {
+	case '':
+		if (!v || isNaN(v)) break;
+	case 'n':
+		if (v === undefined) return '';
+		let n = Number(v);
+		if (!isNaN(n)) {
+			let s = '';
+			let text = ds?.text;
+			let sign = '';
+			if (text?.pre) {
+				s += text.pre.join('');
+				if (n < 0) sign = '-';
+			}
+			s += ds?.symbol || '';
+			let sn = n.toLocaleString(ds?.loc || navigator.language, {
+				minimumIntegerDigits: ds?.dig || 1,
+				minimumFractionDigits: ds?.mdot || 0,
+				maximumFractionDigits: ds?.dot || 0,
+				useGrouping: ds?.grp || false,
+			});
+			if (sign && sn.startsWith(sign)) sn = sn.substring(1);
+			if (text?.suf) {
+				sn += text.suf.join('');
+			}
+			return s + sn;
+		}
+		break;
+	case 'd':
+		let df = ds?.df;
+		if (df) {
+			return formatDate(v, df, ds?.opts);
+		}
+		break;
+	}
+	return v;
+}
+function analyzeDateFormat(f) {
+	let blk = 0;
+	let quote = 0;
+	let time = 0;
+	let data = {
+		g: '',
+		y: '',
+		M: '',
+		d: '',
+		h: '',
+		m: '',
+		s: '',
+		w: '',
+		ap: '',
+	};
+	let block = '';
+	let text = '';
+	let ln = '';
+	let c;
+	if (f)
+	for (let i = 0; i < f.length; i++) {
+		if ((c = f.charAt(i)) === '[') {
+			blk++;
+		} else if (c === ']') {
+			blk--;
+		} else if (c === '"') {
+			if (quote) quote--;
+			else quote++;
+		} else if (c === '\\' && blk === 0) {
+			if (ln) {
+				text += '}';
+				ln = '';
+			}
+			text += f.charAt(++i);
+		} else if (blk === 0) {
+			if (quote) {
+				if (ln) {
+					text += '}';
+					ln = '';
+				}
+				text += c;
+				continue;
+			}
+			let n = '';
+			switch (c) {
+			case 'G':
+			case 'g':
+			case 'E':
+			case 'e':
+				n = 'g';
+				break;
+			case 'Y':
+			case 'y':
+				n = 'y';
+				break;
+			case 'M':
+				n = 'M';
+				break;
+			case 'm':
+				if (time) n = 'm';
+				else {
+					n = 'M';
+					if (ln !== n) {
+						c = n;
+					}
+				}
+				break;
+			case 'D':
+			case 'd':
+				n = 'd';
+				break;
+			case 'H':
+			case 'h':
+				n = 'h';
+				time++;
+				break;
+			case 'S':
+			case 's':
+				n = 's';
+				break;
+			case 'A':
+			case 'a':
+				let ampm = f.substring(i, i + 5).toUpperCase();
+				if (ampm === 'AM/PM') {
+					n = 'ap';
+					c = block ? ampm.toLowerCase() : ampm;
+					i += ampm.length;
+					break;
+				}
+			case 'W':
+			case 'w':
+				n = 'w';
+				break;
+			}
+			if (ln && ln !== n) text += '}';
+			if (n) {
+				data[n] += c;
+				if (ln !== n) {
+					text += '${';
+				}
+			}
+			text += c;
+			ln = n;
+		} else {
+			block += c;
+		}
+	}
+	if (ln) text += '}';
+	let flag = 0;
+	if (data.y || data.g) flag |= 1;
+	if (data.M) flag |= 2;
+	if (data.d) flag |= 4;
+	if (data.w) flag |= 8;
+	if (data.h) flag |= 0x10;
+	if (data.m) flag |= 0x20;
+	if (data.s) flag |= 0x40;
+	if (data.ap) flag |= 0x80;
+	return {
+		flag: flag,
+		data: data,
+		text: text,
+		block: block,
+		type: !flag ? '' :
+			!(flag & 0xf0) ? 'date' :
+			!(flag & 0x0f) ? 'time' :
+			'datetime-local',
+	};
+}
+function analyzeFormat(f, val) {
+	let df = (f.trim().toLowerCase() !== 'general') ? analyzeDateFormat(f) : {};
+	if (!df.flag && !isNaN(Number(val))) {
+		df.flag = 0x100;
+	}
+	return df;
+}
+function getAsDate(v) {
+	if (v instanceof Date) {
+		return v;
+	} else if (typeof v === 'number') {
+		return numdate(v);
+	}
+	return parseDateJp(v);
+}
+function getInputFormat(z, val) {
+	if (z) {
+		let f = z.split(';')[0];
+		let t, v, d;
+		let df = analyzeFormat(f, val);
+		let flg = df.flag;
+		if (flg & 0xff) {
+			let s = toDateTimeStringLong(getAsDate(val));
+			t = df.type;
+			if (!(flg & 0xf0)) {
+				v = s.substring(0, 10);
+			} else if (!(flg & 0x0f)) {
+				v = s.substring(11, 19);
+			} else {
+				v = s;
+			}
+		} else if (flg & 0x100) {
+			let m = f.match(/\.([0Z]+)/);
+			if (m) d = m[1].length;
+		}
+		return {
+			type: t,
+			value: v,
+			dot: d,
+		};
+	}
+	return null;
+}
+function validTypeNumber(type, v, dt) {
+	try {
+		switch (type) {
+		case 'number':
+			return Number(v);
+		case 'date':
+		case 'time':
+		case 'datetime-local':
+			if (!dt) dt = parseDateJp(v);
+			if (dt) {
+				let n = datenum(getAsDate(dt));
+				let i = Math.floor(n);
+				if (type === 'date') {
+					return i;
+				} else if (type === 'time') {
+					return n - i;
+				}
+				return n;
+			}
+		}
+	} catch (e) {
+	}
+	return v;
+}
+function validNumber(el) {
+	return validTypeNumber(el.type, el.value, el.valueAsDate);
+}
+function formatDateVariable(f, dt, opts) {
+	if (!dt) return '';
+	return f.replace(/\$\{([^\}]+)\}/g, function(m, key) {
+		return datePart(key, dt, opts);
+	});
+}
+function applyFormatValue(c, v, opts) {
+	let f = c.z;
+	let w = v;
+	if (c.t === 'n') {
+		let df = analyzeDateFormat(f);
+		if (df.flag) {
+			let dt = getAsDate(v);
+			c.v = validTypeNumber(df.type, v, dt);
+			return formatDateVariable(df.text, dt, opts);
+		}
+	}
+	return f ? SSF.format(f, w) : w;
+}
+
+// export core-K2 expansion
+var CK2 = {
+	Xml: Xml,
+	parseDateJp: parseDateJp,
+	toTimeString: toTimeString,
+	toDateTimeString: toDateTimeString,
+	formatDate: formatDate,
+	formatDateVariable: formatDateVariable,
+	applyDataStyle: applyDataStyle,
+	getInputFormat: getInputFormat,
+	validNumber: validNumber,
+	applyFormatValue: applyFormatValue,
+};

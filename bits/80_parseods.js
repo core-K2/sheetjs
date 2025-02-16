@@ -1394,44 +1394,6 @@ function parseBorder(v) {
 		}
 	};
 }
-function applyDataStyle(ds, v, t) {
-	switch (t) {
-	case '':
-		if (!v || isNaN(v)) break;
-	case 'n':
-		if (v === undefined) return '';
-		let n = Number(v);
-		if (!isNaN(n)) {
-			let s = '';
-			let text = ds?.text;
-			let sign = '';
-			if (text?.pre) {
-				s += text.pre.join('');
-				if (n < 0) sign = '-';
-			}
-			s += ds?.symbol || '';
-			let sn = n.toLocaleString(ds?.loc || navigator.language, {
-				minimumIntegerDigits: ds?.dig || 1,
-				minimumFractionDigits: ds?.mdot || 0,
-				maximumFractionDigits: ds?.dot || 0,
-				useGrouping: ds?.grp || false,
-			});
-			if (sign && sn.startsWith(sign)) sn = sn.substring(1);
-			if (text?.suf) {
-				sn += text.suf.join('');
-			}
-			return s + sn;
-		}
-		break;
-	case 'd':
-		let df = ds?.df;
-		if (df) {
-			return formatDate(v, df, ds?.opts);
-		}
-		break;
-	}
-	return v;
-}
 function setDataFormat(c, dst, ass, oss) {
 	let ds = getDataStyle(c, dst, ass, oss);
 	if (ds) {
@@ -1640,13 +1602,3 @@ function getOrAddObject(ar, obj) {
 	ar.push(obj);
 	return ar.length - 1;
 }
-
-// export core-K2 expansion
-var CK2 = {
-	Xml: Xml,
-	applyDataStyle: applyDataStyle,
-	parseDateJp: parseDateJp,
-	toTimeString: toTimeString,
-	toDateTimeString: toDateTimeString,
-	formatDate: formatDate,
-};
