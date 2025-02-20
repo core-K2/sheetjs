@@ -666,18 +666,22 @@ function toNumber(v, def) {
 /**
  * convert to valid Date object
  * @param {any} v input value ('now': get current date)
- * @param {number} flg bitmask flag (1:always get value, 2:think time zone)
+ * @param {number} flg bitmask flag (1:always get value, 2:think time zone 4:localtime)
  * @returns Date object or null
  */
 function toDate(v, flg) {
 	if (!v && !!(flg & 1)) return null;
-	let dt = v instanceof Date ? v : v === 'now' ? new Date() : new Date(v);
+	let dt = v === 'now' ? new Date() :
+		new Date(v instanceof Date ? v.getTime() : v);
 	if (isNaN(dt.getTime())) {
 		dt = new Date(null);
 	}
 	if (flg & 2) {
 		let off = dt.getTimezoneOffset();
-		if (off) dt.setMinutes(dt.getMinutes() - off);
+		if (off) {
+			if (flg & 4) off = -off;
+			dt.setMinutes(dt.getMinutes() - off);
+		}
 	}
 	return dt;
 }
@@ -1048,6 +1052,7 @@ function analyzeDateFormat(f) {
 			case 'H':
 			case 'h':
 				n = 'h';
+				c = 'H';
 				time++;
 				break;
 			case 'S':
@@ -1109,11 +1114,11 @@ function analyzeFormat(f, val) {
 	}
 	return df;
 }
-function getAsDate(v) {
+function getAsDate(v, flg = 0) {
 	if (v instanceof Date) {
 		return v;
 	} else if (typeof v === 'number') {
-		return numdate(v);
+		return toDate(numdate(v), flg);
 	}
 	return parseDateJp(v);
 }
@@ -1124,14 +1129,15 @@ function getInputFormat(z, val) {
 		let df = analyzeFormat(f, val);
 		let flg = df.flag;
 		if (flg & 0xff) {
-			let s = toDateTimeStringLong(getAsDate(val));
+			let dt = getAsDate(val, 6);
+			let s = toDateTimeStringLong(dt);
 			t = df.type;
 			if (!(flg & 0xf0)) {
 				v = s.substring(0, 10);
 			} else if (!(flg & 0x0f)) {
 				v = s.substring(11, 19);
 			} else {
-				v = s;
+				v = s.substring(0, 19);
 			}
 		} else if (flg & 0x100) {
 			let m = f.match(/\.([0Z]+)/);
@@ -1145,7 +1151,7 @@ function getInputFormat(z, val) {
 	}
 	return null;
 }
-function validTypeNumber(type, v, dt) {
+function validTypeNumber(type, v) {
 	try {
 		switch (type) {
 		case 'number':
@@ -1153,24 +1159,23 @@ function validTypeNumber(type, v, dt) {
 		case 'date':
 		case 'time':
 		case 'datetime-local':
-			if (!dt) dt = parseDateJp(v);
-			if (dt) {
-				let n = datenum(getAsDate(dt));
-				let i = Math.floor(n);
-				if (type === 'date') {
-					return i;
-				} else if (type === 'time') {
-					return n - i;
-				}
-				return n;
+			if (typeof v === 'number') return v;
+			let dt = parseDateJp(v);
+			let n = datenum(toDate(dt, 2));
+			let s = ('' + n).split('.');
+			if (type === 'date') {
+				return Number(s[0]);
+			} else if (type === 'time') {
+				return s.length > 1 ? Number('0.' + s[1]) : 0;
 			}
+			return n;
 		}
 	} catch (e) {
 	}
 	return v;
 }
 function validNumber(el) {
-	return validTypeNumber(el.type, el.value, el.valueAsDate);
+	return validTypeNumber(el.type, el.value);
 }
 function formatDateVariable(f, dt, opts) {
 	if (!dt) return '';
@@ -1184,8 +1189,15 @@ function applyFormatValue(c, v, opts) {
 	if (c.t === 'n') {
 		let df = analyzeDateFormat(f);
 		if (df.flag) {
-			let dt = getAsDate(v);
-			c.v = validTypeNumber(df.type, v, dt);
+			let n, dt;
+			if (typeof v === 'number') {
+				dt = v >= 1000000 ? new Date(v) : toDate(numdate(v), 6);
+				n = v;
+			} else {
+				dt = parseDateJp(v);
+				n = validTypeNumber(df.type, dt);
+			}
+			c.v = n;
 			return formatDateVariable(df.text, dt, opts);
 		}
 	}
