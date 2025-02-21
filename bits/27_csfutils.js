@@ -99,6 +99,10 @@ function format_cell(cell/*:Cell*/, v/*:any*/, o/*:any*/) {
 	if(cell.t == 'd' && !cell.z && o && o.dateNF) cell.z = o.dateNF;
 	if(cell.t == "e") return BErr[cell.v] || cell.v;
 	if(v == undefined) return safe_format_cell(cell, cell.v);
+	if (cell.t === 'n' && cell.z) {
+		let df = analyzeDateFormat(cell.z);
+		if (df?.flag & 0xff) return (cell.w = applyFormatValue(cell, v, o));
+	}
 	return safe_format_cell(cell, v);
 }
 

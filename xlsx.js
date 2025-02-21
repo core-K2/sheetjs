@@ -5465,6 +5465,10 @@ function format_cell(cell, v, o) {
 	if(cell.t == 'd' && !cell.z && o && o.dateNF) cell.z = o.dateNF;
 	if(cell.t == "e") return BErr[cell.v] || cell.v;
 	if(v == undefined) return safe_format_cell(cell, cell.v);
+	if (cell.t === 'n' && cell.z) {
+		let df = analyzeDateFormat(cell.z);
+		if (df?.flag & 0xff) return (cell.w = applyFormatValue(cell, v, o));
+	}
 	return safe_format_cell(cell, v);
 }
 
@@ -17054,7 +17058,15 @@ function safe_format(p, fmtid, fillid, opts, themes, styles, date1904) {
 			else p.w = SSF_general(p.v,_ssfopts);
 		}
 		else if(p.t === 'd') p.w = SSF_format(fmtid,datenum(p.v, !!date1904),_ssfopts);
-		else p.w = SSF_format(fmtid,p.v,_ssfopts);
+		else {
+			let w;
+			if (p.t === 'n' && p.z) {
+				let df = analyzeDateFormat(p.z);
+				if (df?.flag) w = applyFormatValue(p, p.v, _ssfopts);
+			}
+			if (w === undefined) w = SSF_format(fmtid,p.v,_ssfopts);
+			p.w = w;
+		}
 	} catch(e) { if(opts.WTF) throw e; }
 	if(!opts.cellStyles) return;
 	if(fillid != null) try {
