@@ -757,7 +757,7 @@ function eval_fmt(fmt/*:string*/, v/*:any*/, opts/*:any*/, flen/*:number*/) {
 					out[out.length] = {t:'Z', v:o.toLowerCase()};
 					lst = o.charAt(1);
 				} else if(o.indexOf("$") > -1) {
-					o = (o.match(/\$([^-\[\]]*)/)||[])[1]||"$";
+					o = (o.match(/\$([^-\[\]]*)/)||[])[1]||'';
 					if(!fmt_is_date(fmt)) out[out.length] = {t:'t',v:o};
 				}
 				break;
