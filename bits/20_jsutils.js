@@ -979,6 +979,7 @@ function applyDataStyle(ds, v, t) {
 	return v;
 }
 function analyzeDateFormat(f) {
+	if (f.trim().toLowerCase() === 'general') return {};
 	let blk = 0;
 	let quote = 0;
 	let time = 0;
@@ -1108,7 +1109,7 @@ function analyzeDateFormat(f) {
 	};
 }
 function analyzeFormat(f, val) {
-	let df = (f.trim().toLowerCase() !== 'general') ? analyzeDateFormat(f) : {};
+	let df = analyzeDateFormat(f);
 	if (!df.flag && !isNaN(Number(val))) {
 		df.flag = 0x100;
 	}
