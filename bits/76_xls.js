@@ -88,7 +88,16 @@ function safe_format_xf(p/*:any*/, opts/*:ParseOpts*/, date1904/*:?boolean*/) {
 			}
 			else p.w = SSF_general(p.v);
 		}
-		else p.w = SSF_format(fmtid,p.v, {date1904:!!date1904, dateNF: opts && opts.dateNF});
+		else {
+			let op = {date1904:!!date1904, dateNF: opts?.dateNF};
+			let w;
+			if (p.t === 'n' && p.z) {
+				let df = analyzeDateFormat(p.z);
+				if (df?.flag) w = applyFormatValue(p, p.v, _ssfopts);
+			}
+			if (w === undefined) w = SSF_format(fmtid,p.v, op);
+			p.w = w;
+		}
 	} catch(e) { if(opts.WTF) throw e; }
 	if(opts.cellDates && fmtid && p.t == 'n' && fmt_is_date(table_fmt[fmtid] || String(fmtid))) {
 		var _d = SSF_parse_date_code(p.v + (date1904 ? 1462 : 0)); if(_d) { p.t = 'd'; p.v = new Date(Date.UTC(_d.y, _d.m-1,_d.d,_d.H,_d.M,_d.S,_d.u)); }
@@ -612,6 +621,7 @@ function parse_workbook(blob, options/*:ParseOpts*/)/*:Workbook*/ {
 	if(country !== undefined) wb.Metadata.Country = country;
 	if(supbooks.names.length > 0) Workbook.Names = supbooks.names;
 	wb.Workbook = Workbook;
+	wb.bookType = 'xls';
 	return wb;
 }
 
@@ -710,7 +720,6 @@ if(cfb.FullPaths) parse_xls_props(/*::((*/cfb/*:: :any):CFBContainer)*/, props, 
 WorkbookP.Props = WorkbookP.Custprops = props; /* TODO: split up properties */
 if(options.bookFiles) WorkbookP.cfb = cfb;
 /*WorkbookP.CompObjP = CompObjP; // TODO: storage? */
-WorkbookP.bookType = 'xls';
 return WorkbookP;
 }
 
