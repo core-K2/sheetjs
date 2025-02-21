@@ -979,7 +979,7 @@ function applyDataStyle(ds, v, t) {
 	return v;
 }
 function analyzeDateFormat(f) {
-	if (f.trim().toLowerCase() === 'general') return {};
+	if (f.includes('General')) return {};
 	let blk = 0;
 	let quote = 0;
 	let time = 0;
