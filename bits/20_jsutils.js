@@ -997,6 +997,7 @@ function analyzeDateFormat(f) {
 	let block = '';
 	let text = '';
 	let ln = '';
+	let str = '';
 	let c;
 	if (f)
 	for (let i = 0; i < f.length; i++) {
@@ -1024,6 +1025,10 @@ function analyzeDateFormat(f) {
 			}
 			let n = '';
 			switch (c) {
+			case ';':
+				str = f.substring(i + 1);
+				i += str.length;
+				continue;
 			case 'G':
 			case 'g':
 			case 'E':
@@ -1102,6 +1107,7 @@ function analyzeDateFormat(f) {
 		data: data,
 		text: text,
 		block: block,
+		str: str,
 		type: !flag ? '' :
 			!(flag & 0xf0) ? 'date' :
 			!(flag & 0x0f) ? 'time' :
@@ -1123,22 +1129,26 @@ function getAsDate(v, flg = 0) {
 	}
 	return parseDateJp(v);
 }
-function getInputFormat(z, val) {
-	if (z) {
-		let f = z.split(';')[0];
+function getInputFormat(f, val) {
+	if (f) {
 		let t, v, d;
 		let df = analyzeFormat(f, val);
 		let flg = df.flag;
 		if (flg & 0xff) {
 			let dt = getAsDate(val, 6);
-			let s = toDateTimeStringLong(dt);
-			t = df.type;
-			if (!(flg & 0xf0)) {
-				v = s.substring(0, 10);
-			} else if (!(flg & 0x0f)) {
-				v = s.substring(11, 19);
+			if (dt == null && df.str === '@') {
+				t = 'text';
+				v = val;
 			} else {
-				v = s.substring(0, 19);
+				let s = toDateTimeStringLong(dt);
+				t = df.type;
+				if (!(flg & 0xf0)) {
+					v = s.substring(0, 10);
+				} else if (!(flg & 0x0f)) {
+					v = s.substring(11, 19);
+				} else {
+					v = s.substring(0, 19);
+				}
 			}
 		} else if (flg & 0x100) {
 			let m = f.match(/\.([0Z]+)/);
