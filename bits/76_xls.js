@@ -710,6 +710,7 @@ if(cfb.FullPaths) parse_xls_props(/*::((*/cfb/*:: :any):CFBContainer)*/, props, 
 WorkbookP.Props = WorkbookP.Custprops = props; /* TODO: split up properties */
 if(options.bookFiles) WorkbookP.cfb = cfb;
 /*WorkbookP.CompObjP = CompObjP; // TODO: storage? */
+WorkbookP.bookType = 'xls';
 return WorkbookP;
 }
 
