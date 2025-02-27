@@ -25298,7 +25298,7 @@ function convert_content(wb, content, styles, setting) {
 			for (let j = 0; j < cells.length; j++) {
 				let cell = cells[j];
 				let c = Object.keys(cell).length ? makeCell(cell) : null;
-				let be = c ? setCellStyle(c, Styles, cell, cols[j], ass, oss, fonts) || !!c.v : false;
+				let be = c ? setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts) || !!c.v : false;
 				let rep = cell['number-columns-repeated'] || 1
 				let cspan = cell['number-columns-spanned'] || 0;
 				let rspan = cell['number-rows-spanned'] || 0;
@@ -25409,6 +25409,17 @@ function getPixelSize(v, u) {
 		break;
 	}
 	return n.toFixed(4);
+}
+function getTableColumn(cols, idx) {
+	let off = 0;
+	return cols.find(c => {
+		let num = c['number-columns-repeated'] || 1;
+		if (off <= idx && idx < off + num) {
+			return true;
+		}
+		off += num;
+		return false;
+	});
 }
 function makeRowStyles(rows, ass, iRowMax) {
 	let rss = [];
