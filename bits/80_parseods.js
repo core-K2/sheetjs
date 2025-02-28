@@ -1063,22 +1063,11 @@ function getPixelSize(v, u) {
 	}
 	return n.toFixed(4);
 }
-function getTableColumn(cols, idx) {
-	let off = 0;
-	return cols.find(c => {
-		let num = c['number-columns-repeated'] || 1;
-		if (off <= idx && idx < off + num) {
-			return true;
-		}
-		off += num;
-		return false;
-	});
-}
 function makeRowStyles(rows, ass, iRowMax) {
 	let rss = [];
 	let iRow = 0;
 	for (let i = 0; i < rows.length && iRow < iRowMax; i++) {
-		row = rows[i];
+		let row = rows[i];
 		let rep = row['number-rows-repeated'] || 1;
 		let rs = makeRowStyle(row, ass);
 		for (let j = 0; j < rep && iRow < iRowMax; j++, iRow++) {
@@ -1097,6 +1086,17 @@ function makeRowStyle(r, ass) {
 		if (h) ret.hpx = h;
 	}
 	return ret;
+}
+function getTableColumn(cols, idx) {
+	let off = 0;
+	return cols.find(c => {
+		let num = c['number-columns-repeated'] || 1;
+		if (off <= idx && idx < off + num) {
+			return true;
+		}
+		off += num;
+		return false;
+	});
 }
 function makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts) {
 	let cs = [];

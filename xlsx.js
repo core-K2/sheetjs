@@ -3712,6 +3712,9 @@ var Xml = {
 		asValue: 3,			// get value as bitmask (1:Number, 2:Boolean, 4:Date, 8:trim)
 		convNames: null,	// convert name map
 		asSeqArray: null,	// as sequence array object names
+		asText: null,		// as text value object names
+		convValues: null,	// convert value map
+		tagTrap: null,		// tag trap function (xmlNode, parent, bSeqParent) => {}
 	},
 	_opts: [],
 	pushOpts: function() {
@@ -3738,9 +3741,14 @@ var Xml = {
 				}
 			}
 		}
-		let seq = this.opts.asSeqArray;
-		if (seq && !Array.isArray(seq)) {
-			this.opts.asSeqArray = [seq];
+		this.setOptsAsArray('asSeqArray', 'asText');
+	},
+	setOptsAsArray: function() {
+		for (let n in arguments) {
+			let as = this.opts[n];
+			if (as && !Array.isArray(as)) {
+				this.opts[n] = [as];
+			}
 		}
 	},
 	// get property name
@@ -3763,6 +3771,25 @@ var Xml = {
 			let re = s instanceof RegExp ? s : new RegExp(s);
 			return re.test(n);
 		}) >= 0;
+	},
+	isText: function(n) {
+		let ar = this.opts.asText;
+		return ar && ar.includes(n);
+	},
+	getText: function(node) {
+		let v = this.opts.convValues?.[node.nodeName];
+		if (v === undefined) {
+			// nodeType 1:Element 3:text 8:comment
+			switch (node.nodeType) {
+			case 3:
+				v = this.toValue(node.nodeValue, true);
+				break;
+			default:
+				v = node.innerText || '';
+				break;
+			}
+		}
+		return v;
 	},
 	// convert value
 	toValue: function(v, bTrim) {
@@ -3807,10 +3834,21 @@ var Xml = {
 	},
 	// XML node to JavaScript Object
 	xmlToObject: function(xmlNode, parent, bSeqParent) {
+		let fn = this.opts.tagTrap?.[xmlNode.nodeName];
+		if (typeof fn === 'function') {
+			return fn.apply(this, [xmlNode, parent, bSeqParent]);
+		}
 		let obj = bSeqParent ? [] : {};
 		let attrs = this.parseAttributes(xmlNode.attributes);
 		// child node process
 		let len = xmlNode.childNodes.length;
+		if (this.isText(xmlNode.nodeName)) {
+			let t = '';
+			for (let i = 0; i < len; i++) {
+				t += this.getText(xmlNode.childNodes[i]);
+			}
+			return t;
+		}
 		for (let i = 0; i < len; i++) {
 			let node = xmlNode.childNodes[i];
 			let name = this.getName(node.nodeName);
@@ -25300,22 +25338,11 @@ function getPixelSize(v, u) {
 	}
 	return n.toFixed(4);
 }
-function getTableColumn(cols, idx) {
-	let off = 0;
-	return cols.find(c => {
-		let num = c['number-columns-repeated'] || 1;
-		if (off <= idx && idx < off + num) {
-			return true;
-		}
-		off += num;
-		return false;
-	});
-}
 function makeRowStyles(rows, ass, iRowMax) {
 	let rss = [];
 	let iRow = 0;
 	for (let i = 0; i < rows.length && iRow < iRowMax; i++) {
-		row = rows[i];
+		let row = rows[i];
 		let rep = row['number-rows-repeated'] || 1;
 		let rs = makeRowStyle(row, ass);
 		for (let j = 0; j < rep && iRow < iRowMax; j++, iRow++) {
@@ -25334,6 +25361,17 @@ function makeRowStyle(r, ass) {
 		if (h) ret.hpx = h;
 	}
 	return ret;
+}
+function getTableColumn(cols, idx) {
+	let off = 0;
+	return cols.find(c => {
+		let num = c['number-columns-repeated'] || 1;
+		if (off <= idx && idx < off + num) {
+			return true;
+		}
+		off += num;
+		return false;
+	});
 }
 function makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts) {
 	let cs = [];
