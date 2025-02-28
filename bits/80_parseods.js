@@ -821,6 +821,8 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:0, textPName:''});
 		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
+		xmlOpts.asText = ['text:p'];
+		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta);
 		if (opts.content) wb.content = content;
