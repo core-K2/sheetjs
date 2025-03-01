@@ -25091,12 +25091,14 @@ function parse_ods(zip, opts) {
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
-		let xmlOpts = {asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/]};
+		let xmlOpts = {
+			asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/],
+			asText: ['text:p', 'number:text'],
+		};
 		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:0, textPName:''});
 		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
-		xmlOpts.asText = ['text:p'];
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta);
