@@ -25349,8 +25349,8 @@ function makeRowStyles(rows, ass, iRowMax) {
 		let row = rows[i];
 		let rep = row['number-rows-repeated'] || 1;
 		let rs = makeRowStyle(row, ass);
-		for (let j = 0; j < rep && iRow < iRowMax; j++, iRow++) {
-			rss.push(rs);
+		for (let j = 0; j < rep && iRow < iRowMax; j++) {
+			rss[++iRow] = rs;
 		}
 	}
 	return rss;
