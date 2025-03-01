@@ -1228,13 +1228,34 @@ function validNumber(el) {
 }
 function formatDateVariable(f, dt, opts) {
 	if (!dt) return '';
-	return f.replace(/\$\{([^\}]+)\}/g, function(m, key) {
+	return f.replace(/\$\{([^\}]+)\}/g, (m, key) => {
 		return datePart(key, dt, opts);
+	});
+}
+function formatNumber(f, v, opts) {
+	if (isNaN(v)) return '';
+	let n = Number(v);
+	let fs = f.split(';');
+	f = fs[fs.length > 1 && n < 0 ? 1 : 0];
+	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
+		console.log(m, p1, p2, p3);
+		let i = p2.indexOf('0');
+		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
+		if (p3) {
+			dot = p3.length;
+			i = p3.indexOf('#');
+			mdot = i >= 0 ? i : dot;
+		}
+		return n.toLocaleString(opts?.loc || navigator.language, {
+			minimumIntegerDigits: dig || 1,
+			minimumFractionDigits: mdot || 0,
+			maximumFractionDigits: dot || 0,
+			useGrouping: grp || false,
+		});
 	});
 }
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
-	let w = v;
 	if (c.t === 'n') {
 		let df = analyzeDateFormat(f);
 		if (df.flag) {
@@ -1248,9 +1269,11 @@ function applyFormatValue(c, v, opts) {
 			}
 			c.v = n;
 			return formatDateVariable(df.text, dt, opts);
+		} else if (df.text) {
+			return formatNumber(df.text, v, opts)
 		}
 	}
-	return f ? SSF.format(f, w) : w;
+	return f ? SSF.format(f, v) : v;
 }
 
 // export core-K2 expansion
