@@ -25652,15 +25652,8 @@ function applyStyle(style, Styles, fonts, tc, pp, tp) {
 	style.alignment = makeAlignment(tc, pp);
 	style.applyAlignment = style.alignment !== null;
 	let b = makeBorder(tc);
-	if (b) {
-		style.applyBorder = true;
-		style.borderId = getOrAddObject(Styles.Borders, b);
-		return !!b.diagonal;
-	} else {
-		style.applyBorder = false;
-		style.borderId = 0;
-	}
-	return false;
+	style.borderId = b ? getOrAddObject(Styles.Borders, b) : 0;
+	return (style.applyBorder = !!b) || style.alignment;
 }
 function existValues() {
 	ret = [];
