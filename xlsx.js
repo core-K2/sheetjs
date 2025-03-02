@@ -4553,7 +4553,7 @@ function formatNumber(f, v, opts) {
 }
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
-	if (c.t === 'n') {
+	if (c.t === 'n' && f) {
 		let df = analyzeDateFormat(f);
 		if (df.flag) {
 			let n, dt;
