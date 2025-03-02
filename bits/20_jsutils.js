@@ -1237,6 +1237,9 @@ function formatNumber(f, v, opts) {
 	let n = Number(v);
 	let fs = f.split(';');
 	f = fs[fs.length > 1 && n < 0 ? 1 : 0];
+	f = f.replace(/\"([^\"]+)\"/g, (m, p1) => {
+		return p1;
+	});
 	f = f.replace(/\[.*\]|\_.{1}$/, '');
 	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
 		let i = p2.indexOf('0');
