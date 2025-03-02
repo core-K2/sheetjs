@@ -4531,8 +4531,8 @@ function formatNumber(f, v, opts) {
 	let n = Number(v);
 	let fs = f.split(';');
 	f = fs[fs.length > 1 && n < 0 ? 1 : 0];
+	f = f.replace(/\[.*\]|\_.{1}$/, '');
 	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
-		console.log(m, p1, p2, p3);
 		let i = p2.indexOf('0');
 		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
 		if (p3) {
@@ -4564,7 +4564,7 @@ function applyFormatValue(c, v, opts) {
 			c.v = n;
 			return formatDateVariable(df.text, dt, opts);
 		} else if (df.text) {
-			return formatNumber(df.text, v, opts)
+			return formatNumber(f, v, opts);
 		}
 	}
 	return f ? SSF.format(f, v) : v;
