@@ -453,7 +453,7 @@ var Xml = {
 		for (let n in arguments) {
 			let as = this.opts[n];
 			if (as && !Array.isArray(as)) {
-				this.opts[n] = [as];
+				this.opts[n] = typeof as === 'string' ? as.split(',') : [as];
 			}
 		}
 	},
@@ -491,7 +491,7 @@ var Xml = {
 				v = this.toValue(node.nodeValue, true);
 				break;
 			default:
-				v = node.innerText || '';
+				v = node.textContent || '';
 				break;
 			}
 		}
