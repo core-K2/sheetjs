@@ -22,6 +22,7 @@ function make_json_row(sheet/*:Worksheet*/, r/*:Range*/, R/*:number*/, cols/*:Ar
 		}
 		var v = val.v;
 		switch(val.t){
+			case '': break;
 			case 'z': if(v == null) break; continue;
 			case 'e': v = (v == 0 ? null : void 0); break;
 			case 's': case 'b':
