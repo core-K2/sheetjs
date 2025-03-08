@@ -25243,71 +25243,104 @@ function convert_content(wb, content, styles, setting) {
 			Hidden: getSheetHidden(sheet, ass),
 		});
 		let merges = sh['!merges'] = [];
+		let range = getDataRange(rows);
+		let iRowMax = range.e.r;
+		let iColMax = range.e.c;
 		let iRow = 0;
-		let iRowMax = -1;
-		let iColMax = -1;
 		let noSi = [];
+		let iAddRow = 0;
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
 			if (!Array.isArray(cells)) cells = [cells];
-			let iCol = -1;
-			let bData = false;
-			for (let j = 0; j < cells.length; j++) {
-				let cell = cells[j];
-				let c = Object.keys(cell).length ? makeCell(cell) : null;
-				let be = c ? setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts) || !!c.v : false;
-				let rep = cell['number-columns-repeated'] || 1
-				let cspan = cell['number-columns-spanned'] || 0;
-				let rspan = cell['number-rows-spanned'] || 0;
-				if (rspan > 0 && iRowMax < iRow + rspan) iRowMax = iRow + rspan;
-				for (k = 0; k < rep; k++) {
-					++iCol;
-					if (c && (be || iCol <= iColMax)) {
-						let cn = encode_col(iCol) + (iRow + 1);
-						sh[cn] = c;
-						if (!c.hasOwnProperty('si')) {
-							noSi.push({i: iCol, n:cn})
-						}
+			let repRow = row['number-rows-repeated'] || 1;
+			for (let r = 0; r < repRow; r++, iRow++) {
+				let beRow = 0;
+				let iCol = -1;
+				for (let j = 0; j < cells.length; j++) {
+					let cell = cells[j];
+					let c = Object.keys(cell).length ? makeCell(cell) : null;
+					let be = 0;
+					if (c) {
+						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
+						if (!!c.v) be |= 2;
 					}
-					if (cspan > 0 || rspan > 0) {
-						cspan = cspan || 1;
-						rspan = rspan || 1;
-						merges.push({
-							s: {
-								r: iRow,
-								c: iCol
-							},
-							e: {
-								r: iRow + rspan - 1,
-								c: iCol + cspan - 1
+					let rep = cell['number-columns-repeated'] || 1
+					let cspan = cell['number-columns-spanned'] || 0;
+					let rspan = cell['number-rows-spanned'] || 0;
+					for (k = 0; k < rep; k++) {
+						if (++iCol > iColMax) break;
+						if (c) {
+							let cn = encode_col(iCol) + (iRow + 1);
+							sh[cn] = c;
+							if (!c.hasOwnProperty('si')) {
+								noSi.push({i: iCol, n:cn})
 							}
-						});
-						if (be && cspan > 1) {
-							let max = iCol + cspan - 1;
-							if (iColMax < max) iColMax = max;
+						}
+						if (cspan > 0 || rspan > 0) {
+							cspan = cspan || 1;
+							rspan = rspan || 1;
+							merges.push({
+								s: {
+									r: iRow,
+									c: iCol
+								},
+								e: {
+									r: iRow + rspan - 1,
+									c: iCol + cspan - 1
+								}
+							});
+						} else if (!(be & 2) && iCol > iColMax) {
+							break;
 						}
 					}
+					beRow |= be;
 				}
-				if (be) {
-					bData |= be;
-					if (iColMax < iCol) iColMax = iCol;
+				if (iRow >= iRowMax) {
+					if (beRow && iRow === iRowMax) {
+						iAddRow = 1;
+					} else {
+						break;
+					}
 				}
-			}
-			let rep = row['number-rows-repeated'] || 1;
-			iRow += rep;
-			if (bData) {
-				if (iRowMax < iRow) iRowMax = iRow;
 			}
 		}
+		if (iAddRow) iRowMax += iAddRow;
 		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
-		noSi.forEach(function(v) {
+		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+}
+function getDataRange(rows) {
+	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
+	let iRow = 1;
+	for (let i = 0; i < rows.length; i++) {
+		let row = rows[i];
+		let cells = row['table-cell'];
+		if (!Array.isArray(cells)) cells = [cells];
+		let repRow = row['number-rows-repeated'] || 1;
+		let iCol = 0;
+		for (let j = 0; j < cells.length; j++) {
+			let cell = cells[j];
+			let rep = cell['number-columns-repeated'] || 1
+			if (cell?.['value-type']) {
+				let R = iRow, C = iCol;
+				if (R < range.s.r) range.s.r = R;
+				if (C < range.s.c) range.s.c = C;
+				R += cell['number-rows-spanned'] || 0;
+				C += cell['number-columns-spanned'] || 0;
+				if (R > range.e.r) range.e.r = R;
+				if (C > range.e.c) range.e.c = C;
+			}
+			iCol += rep;
+		}
+		iRow += repRow;
+	}
+	return range;
 }
 function getSheetHidden(sheet, ass) {
 	let sn = sheet['style-name'];
@@ -25511,7 +25544,7 @@ function makeCell(cell) {
 	return c;
 }
 function setCellStyle(c, Styles, cell, col, ass, oss, fonts) {
-	let ret = false;
+	let ret = 0;
 	let sts = existValues(cell && cell['style-name'], col && col['default-cell-style-name']);
 	if (!sts) return ret;
 	let dst, tc, pp, tp;
@@ -25543,7 +25576,7 @@ function applyStyle(style, Styles, fonts, tc, pp, tp) {
 	style.applyAlignment = style.alignment !== null;
 	let b = makeBorder(tc);
 	style.borderId = b ? getOrAddObject(Styles.Borders, b) : 0;
-	return (style.applyBorder = !!b) || style.alignment;
+	return (style.applyBorder = !!b) ? 1 : 0;
 }
 function existValues() {
 	ret = [];
