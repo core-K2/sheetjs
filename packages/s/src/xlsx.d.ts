@@ -191,6 +191,9 @@ export interface ParsingOptions extends CommonOptions {
     /* If true, output content objects */
     content?: boolean;
 
+    /* If true, output drawings objects */
+    drawings?: boolean;
+
     /* indexed colors */
     indexedColors?: Array<String>;
 

@@ -819,6 +819,15 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let xmlOpts = {
 			asSeqArray: [/^office:(.+-styles|styles)$/, /^number:.+-style$/],
 			asText: ['text:p', 'number:text'],
+			tagTrap: {
+				'text:p': function(xmlNode, parent, bSeqParent) {
+					if (xmlNode.parentNode?.nodeName?.startsWith('draw:')) {
+						let obj = this.parseNode(xmlNode, parent, bSeqParent);
+						obj.text = this.getAsText(xmlNode);
+						return obj;
+					}
+				},
+			},
 		};
 		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
@@ -826,7 +835,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
-		wb = to_excel_workbook(content, styles, settings, meta);
+		wb = to_excel_workbook(content, styles, settings, meta, opts);
 		if (opts.content) wb.content = content;
 		if (opts.cellStyles) wb.styles = styles;
 		if (opts.settings) wb.settings = settings;
@@ -847,7 +856,7 @@ function parse_fods(data/*:string*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	return wb;
 }
 
-function to_excel_workbook(content, styles, settings, meta) {
+function to_excel_workbook(content, styles, settings, meta, opts) {
 	var wb = {
 		Workbook: {
 			AppVersion: {},
@@ -900,12 +909,12 @@ function to_excel_workbook(content, styles, settings, meta) {
 		}
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
-		convert_content(wb, content, styles, settings);
+		convert_content(wb, content, styles, opts, settings);
 	}
 	return wb;
 }
 
-function convert_content(wb, content, styles, setting) {
+function convert_content(wb, content, styles, opts, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = toNameObjects(content['automatic-styles']);
@@ -942,6 +951,7 @@ function convert_content(wb, content, styles, setting) {
 			Hidden: getSheetHidden(sheet, ass),
 		});
 		let merges = sh['!merges'] = [];
+		let drawings = opts.drawings ? {} : null;
 		let range = getDataRange(rows);
 		let iRowMax = range.e.r;
 		let iColMax = range.e.c;
@@ -961,6 +971,14 @@ function convert_content(wb, content, styles, setting) {
 					let c = Object.keys(cell).length ? makeCell(cell) : null;
 					let be = 0;
 					if (c) {
+						if (drawings) {
+							let draw = cell['custom-shape'];
+							if (draw) {
+								let cn = encode_col(iCol + 1) + (iRow + 1);
+								drawings[cn] = draw;
+								be |= 4;
+							}
+						}
 						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
 						if (!!c.v) be |= 2;
 					}
@@ -968,7 +986,9 @@ function convert_content(wb, content, styles, setting) {
 					let cspan = cell['number-columns-spanned'] || 0;
 					let rspan = cell['number-rows-spanned'] || 0;
 					for (k = 0; k < rep; k++) {
-						if (++iCol > iColMax) break;
+						iCol++;
+						if (be & 4 && iCol > iColMax) iColMax = iCol;
+						if (iCol > iColMax) break;
 						if (c) {
 							let cn = encode_col(iCol) + (iRow + 1);
 							sh[cn] = c;
@@ -1008,6 +1028,7 @@ function convert_content(wb, content, styles, setting) {
 		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
+		if (drawings && Object.keys(drawings).length ) sh['!drawings'] = drawings;
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;

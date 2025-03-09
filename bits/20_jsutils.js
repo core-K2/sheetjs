@@ -497,6 +497,13 @@ var Xml = {
 		}
 		return v;
 	},
+	getAsText: function(node) {
+		let t = '';
+		node.childNodes.forEach(n => {
+			t += this.getText(n);
+		}, this);
+		return t;
+	},
 	// convert value
 	toValue: function(v, bTrim) {
 		if (v) {
@@ -542,19 +549,20 @@ var Xml = {
 	xmlToObject: function(xmlNode, parent, bSeqParent) {
 		let fn = this.opts.tagTrap?.[xmlNode.nodeName];
 		if (typeof fn === 'function') {
-			return fn.apply(this, [xmlNode, parent, bSeqParent]);
+			let v = fn.apply(this, [xmlNode, parent, bSeqParent]);
+			if (v !== undefined) return v;
 		}
+		if (this.isText(xmlNode.nodeName)) {
+			return this.getAsText(xmlNode);
+		}
+		return this.parseNode(xmlNode, parent, bSeqParent);
+	},
+	// parse node object
+	parseNode: function(xmlNode, parent, bSeqParent) {
 		let obj = bSeqParent ? [] : {};
 		let attrs = this.parseAttributes(xmlNode.attributes);
 		// child node process
 		let len = xmlNode.childNodes.length;
-		if (this.isText(xmlNode.nodeName)) {
-			let t = '';
-			for (let i = 0; i < len; i++) {
-				t += this.getText(xmlNode.childNodes[i]);
-			}
-			return t;
-		}
 		for (let i = 0; i < len; i++) {
 			let node = xmlNode.childNodes[i];
 			let name = this.getName(node.nodeName);
