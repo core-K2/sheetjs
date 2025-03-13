@@ -18,3 +18,30 @@ function parse_drawing(data, rels/*:any*/) {
 	return rels['!id'][id].Target;
 }
 
+/**
+ * parse drawings core-K2 extended
+ * @param {string} data 
+ * @param {object} wb 
+ * @param {object} opts 
+ */
+function parseDrawings(data, styles, opts) {
+	let draw = parse_xml(data);
+	let ar = draw?.twoCellAnchor;
+	if (!Array.isArray(ar)) return null;
+	let draws = {};
+	let dss = styles?.Draws;
+	if (!dss) {
+		styles.Draws = dss = [];
+	}
+	ar.forEach(a => {
+		let from = a.from;
+		let cn = encode_col(from.col) + (from.row + 1);
+		let sp = a.sp;
+		if (sp?.style) {
+			sp.si = getOrAddObject(dss, sp.style);
+			delete sp.style;
+		}
+		draws[cn] = a;
+	});
+	return draws;
+}

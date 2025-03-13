@@ -4233,6 +4233,17 @@ function applyObject(obj, v) {
 	}
 	return obj;
 }
+function getOrAddObject(ar, obj) {
+	let s = JSON.stringify(obj);
+	let i = ar.findIndex(function(o) {
+		return JSON.stringify(o) === s;
+	});
+	if (i >= 0) {
+		return i;
+	}
+	ar.push(obj);
+	return ar.length - 1;
+}
 
 const INTL_LOCATION = {
 	'ja': 'ja-JP-u-ca-japanese',
@@ -14070,7 +14081,33 @@ function parse_drawing(data, rels/*:any*/) {
 	return rels['!id'][id].Target;
 }
 
-/* L.5.5.2 SpreadsheetML Comments + VML Schema */
+/**
+ * parse drawings core-K2 extended
+ * @param {string} data 
+ * @param {object} wb 
+ * @param {object} opts 
+ */
+function parseDrawings(data, styles, opts) {
+	let draw = parse_xml(data);
+	let ar = draw?.twoCellAnchor;
+	if (!Array.isArray(ar)) return null;
+	let draws = {};
+	let dss = styles?.Draws;
+	if (!dss) {
+		styles.Draws = dss = [];
+	}
+	ar.forEach(a => {
+		let from = a.from;
+		let cn = encode_col(from.col) + (from.row + 1);
+		let sp = a.sp;
+		if (sp?.style) {
+			sp.si = getOrAddObject(dss, sp.style);
+			delete sp.style;
+		}
+		draws[cn] = a;
+	});
+	return draws;
+}/* L.5.5.2 SpreadsheetML Comments + VML Schema */
 function parse_vml(data/*:string*/, sheet, comments) {
 	var cidx = 0;
 	(str_match_xml_ns_g(data, "shape")||[]).forEach(function(m) {
@@ -26078,17 +26115,6 @@ function getProp(name) {
 	}
 	return null;
 }
-function getOrAddObject(ar, obj) {
-	let s = JSON.stringify(obj);
-	let i = ar.findIndex(function(o) {
-		return JSON.stringify(o) === s;
-	});
-	if (i >= 0) {
-		return i;
-	}
-	ar.push(obj);
-	return ar.length - 1;
-}
 function makeDrawStyle(draw, ass, dss) {
 	let style = getStyleObject(null, 'style-name', draw, null, ass);
 	getStyleObject(style, 'text-style-name', draw, null, ass);
@@ -29477,15 +29503,37 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 		var comments = [], tcomments = [];
 		if(sheetRels && sheetRels[sheet]) keys(sheetRels[sheet]).forEach(function(n) {
 			var dfile = "";
-			if(sheetRels[sheet][n].Type == RELS.CMNT) {
-				dfile = resolve_path(sheetRels[sheet][n].Target, path);
+			let rel = sheetRels[sheet][n];
+			switch (rel.Type) {
+			case RELS.CMNT:
+				dfile = resolve_path(rel.Target, path);
 				comments = parse_cmnt(getzipdata(zip, dfile, true), dfile, opts);
 				if(!comments || !comments.length) return;
 				sheet_insert_comments(_ws, comments, false);
-			}
-			if(sheetRels[sheet][n].Type == RELS.TCMNT) {
-				dfile = resolve_path(sheetRels[sheet][n].Target, path);
+				break;
+			case RELS.TCMNT:
+				dfile = resolve_path(rel.Target, path);
 				tcomments = tcomments.concat(parse_tcmnt_xml(getzipdata(zip, dfile, true), opts));
+				break;
+			case RELS.DRAW:
+				if (opts.drawings) {
+					dfile = resolve_path(rel.Target, path);
+					let draws = parseDrawings(getzipdata(zip, dfile, true), styles, opts);
+					if (draws) {
+						_ws['!drawings'] = draws;
+					}
+				}
+				break;
+			case RELS.HLINK:
+				let links = _ws['!hlinks'];
+				if (!links) links = _ws['!hlinks'] = [];
+				links.push(rel.Target);
+				break;
+			case undefined:
+				break;
+			default:
+				console.warn('Not implement rels:', rel.Type);
+				break;
 			}
 		});
 		if(tcomments && tcomments.length) sheet_insert_comments(_ws, tcomments, true, opts.people || []);

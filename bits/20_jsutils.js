@@ -865,6 +865,17 @@ function applyObject(obj, v) {
 	}
 	return obj;
 }
+function getOrAddObject(ar, obj) {
+	let s = JSON.stringify(obj);
+	let i = ar.findIndex(function(o) {
+		return JSON.stringify(o) === s;
+	});
+	if (i >= 0) {
+		return i;
+	}
+	ar.push(obj);
+	return ar.length - 1;
+}
 
 const INTL_LOCATION = {
 	'ja': 'ja-JP-u-ca-japanese',

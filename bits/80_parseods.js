@@ -1659,17 +1659,6 @@ function getProp(name) {
 	}
 	return null;
 }
-function getOrAddObject(ar, obj) {
-	let s = JSON.stringify(obj);
-	let i = ar.findIndex(function(o) {
-		return JSON.stringify(o) === s;
-	});
-	if (i >= 0) {
-		return i;
-	}
-	ar.push(obj);
-	return ar.length - 1;
-}
 function makeDrawStyle(draw, ass, dss) {
 	let style = getStyleObject(null, 'style-name', draw, null, ass);
 	getStyleObject(style, 'text-style-name', draw, null, ass);
