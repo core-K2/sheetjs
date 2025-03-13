@@ -25341,6 +25341,7 @@ function convert_content(wb, content, styles, opts, setting) {
 	let Styles = wb.Styles;
 	let ss = body.spreadsheet;
 	let sheets = ss.table;
+	let dss = null;
 	if (!Array.isArray(sheets)) sheets = [sheets];
 	for (let n in sheets) {
 		let sheet = sheets[n];
@@ -25447,7 +25448,12 @@ function convert_content(wb, content, styles, opts, setting) {
 		sh['sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
 		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
-		if (drawings && Object.keys(drawings).length ) sh['!drawings'] = drawings;
+		if (drawings && Object.keys(drawings).length ) {
+			if (!dss) {
+				Styles.Draws = dss = [];
+			}
+			sh['!drawings'] = drawings2SVG(drawings, ass, dss);
+		}
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;
@@ -26082,6 +26088,42 @@ function getOrAddObject(ar, obj) {
 	}
 	ar.push(obj);
 	return ar.length - 1;
+}
+function makeDrawStyle(draw, ass, dss) {
+	let style = getStyleObject(null, 'style-name', draw, null, ass);
+	getStyleObject(style, 'text-style-name', draw, null, ass);
+	delete draw['style-name'];
+	delete draw['text-style-name'];
+	if (Object.keys(style).length) {
+		draw.si = getOrAddObject(dss, style);
+	}
+	return style;
+}
+function drawings2SVG(drawings, ass, dss) {
+	for (let n in drawings) {
+		let draw = drawings[n];
+		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
+			if (draw.hasOwnProperty(p)) {
+				draw[p] = Number(getPixelSize(draw[p]));
+			}
+		});
+		makeDrawStyle(draw, ass, dss);
+		let p = draw.p;
+		if (p) {
+			if (!Array.isArray(p)) p = [p];
+			p.forEach(p => {
+				makeDrawStyle(p, ass, dss);
+				let span = p.span;
+				if (span) {
+					if (!Array.isArray(span)) span = [span];
+					span.forEach(s => {
+						makeDrawStyle(s, ass, dss);
+					});
+				}
+			});
+		}
+	}
+	return drawings;
 }
 /* OpenDocument */
 function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
