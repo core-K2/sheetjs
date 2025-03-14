@@ -14098,6 +14098,7 @@ function parseDrawings(data, styles, opts) {
 	}
 	ar.forEach(a => {
 		let from = a.from;
+		if (!from) return;
 		let cn = encode_col(from.col) + (from.row + 1);
 		let sp = a.sp;
 		if (sp?.style) {
