@@ -24,7 +24,7 @@ function parse_drawing(data, rels/*:any*/) {
  * @param {object} wb 
  * @param {object} opts 
  */
-function parseDrawings(data, styles, opts) {
+function parseDrawings(data, ws, styles, opts) {
 	let draw = parse_xml(data);
 	let ar = draw?.twoCellAnchor;
 	if (!Array.isArray(ar)) return null;
@@ -33,9 +33,12 @@ function parseDrawings(data, styles, opts) {
 	if (!dss) {
 		styles.Draws = dss = [];
 	}
+	let iRow = 0, iCol = 0;
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
+		iRow = Math.max(a.to.row, iRow);
+		iCol = Math.max(a.to.col, iCol);
 		let cn = encode_col(from.col) + (from.row + 1);
 		let sp = a.sp;
 		if (sp?.style) {
@@ -44,5 +47,11 @@ function parseDrawings(data, styles, opts) {
 		}
 		draws[cn] = a;
 	});
+	let d = decode_range(ws['!ref']);
+	if (d.e.r < iRow || d.e.c < iCol) {
+		d.e.r = Math.max(d.e.r, iRow);
+		d.e.c = Math.max(d.e.c, iCol);
+		ws['!ref'] = encode_range(d);
+	}
 	return draws;
 }
