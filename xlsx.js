@@ -25371,6 +25371,7 @@ function convert_content(wb, content, styles, opts, setting) {
 							iRowMax = iRow;
 						}
 					} else {
+						iRow += repRow - r;
 						break;
 					}
 				}
