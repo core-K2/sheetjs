@@ -1017,8 +1017,12 @@ function convert_content(wb, content, styles, opts, setting) {
 					beRow |= be;
 				}
 				if (iRow >= iRowMax) {
-					if (beRow && iRow === iRowMax) {
-						iAddRow = 1;
+					if (beRow) {
+						if (iRow === iRowMax) {
+							iAddRow = 1;
+						} else {
+							iRowMax = iRow;
+						}
 					} else {
 						break;
 					}
