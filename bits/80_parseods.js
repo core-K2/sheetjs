@@ -1026,15 +1026,15 @@ function convert_content(wb, content, styles, opts, setting) {
 			}
 		}
 		if (iAddRow) iRowMax += iAddRow;
-		sh['sn'] = sheet['style-name'];
-		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
-		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		if (drawings && Object.keys(drawings).length ) {
 			if (!dss) {
 				Styles.Draws = dss = [];
 			}
 			sh['!drawings'] = drawings2SVG(drawings, ass, dss);
 		}
+		sh['!sn'] = sheet['style-name'];
+		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
+		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;

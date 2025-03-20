@@ -25483,15 +25483,15 @@ function convert_content(wb, content, styles, opts, setting) {
 			}
 		}
 		if (iAddRow) iRowMax += iAddRow;
-		sh['sn'] = sheet['style-name'];
-		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
-		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		if (drawings && Object.keys(drawings).length ) {
 			if (!dss) {
 				Styles.Draws = dss = [];
 			}
 			sh['!drawings'] = drawings2SVG(drawings, ass, dss);
 		}
+		sh['!sn'] = sheet['style-name'];
+		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
+		sh['!rows'] = makeRowStyles(rows, ass, iRowMax);
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;
@@ -26402,7 +26402,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
 		/* Section 9 Tables */
 		var o/*:Array<string>*/ = [];
-		var tstyle = opts?.stayStyle && ws?.sn;
+		var tstyle = opts?.stayStyle && ws?.['!sn'];
 		if (!tstyle) tstyle = ((((wb||{}).Workbook||{}).Sheets||[])[i]||{}).Hidden ? 'ta2' : 'ta1';
 		o.push('<table:table table:name="' + escapexml(wb.SheetNames[i]) + '" table:style-name="' + tstyle + '">');
 		var R=0,C=0, range = decode_range(ws['!ref']||"A1");

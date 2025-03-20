@@ -248,7 +248,7 @@ var write_content_ods/*:{(wb:any, opts:any):string}*/ = /* @__PURE__ */(function
 	var write_ws = function(ws, wb/*:Workbook*/, i/*:number*/, opts, nfs, date1904)/*:string*/ {
 		/* Section 9 Tables */
 		var o/*:Array<string>*/ = [];
-		var tstyle = opts?.stayStyle && ws?.sn;
+		var tstyle = opts?.stayStyle && ws?.['!sn'];
 		if (!tstyle) tstyle = ((((wb||{}).Workbook||{}).Sheets||[])[i]||{}).Hidden ? 'ta2' : 'ta1';
 		o.push('<table:table table:name="' + escapexml(wb.SheetNames[i]) + '" table:style-name="' + tstyle + '">');
 		var R=0,C=0, range = decode_range(ws['!ref']||"A1");
