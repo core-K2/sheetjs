@@ -26022,11 +26022,13 @@ function getProp(name) {
 }
 function makeDrawStyle(draw, ass, dss) {
 	let style = getStyleObject(null, 'style-name', draw, null, ass);
-	getStyleObject(style, 'text-style-name', draw, null, ass);
-	delete draw['style-name'];
-	delete draw['text-style-name'];
-	if (Object.keys(style).length) {
-		draw.si = getOrAddObject(dss, style);
+	if (style) {
+		getStyleObject(style, 'text-style-name', draw, null, ass);
+		delete draw['style-name'];
+		delete draw['text-style-name'];
+		if (Object.keys(style).length) {
+			draw.si = getOrAddObject(dss, style);
+		}
 	}
 	return style;
 }
