@@ -6716,6 +6716,7 @@ var RELS = ({
 	TCMNT: "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
 	PEOPLE: "http://schemas.microsoft.com/office/2017/10/relationships/person",
 	CONN: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
+	PRN_SETT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings',
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
 });
 
@@ -29437,6 +29438,9 @@ function safe_parse_sheet(zip, path, relsPath, sheet, idx, sheetRels, sheets, st
 				links.push(rel.Target);
 				break;
 			case undefined:
+				break;
+			case RELS.PRN_SETT:
+				// printerSettings
 				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
