@@ -14091,7 +14091,8 @@ function parse_drawing(data, rels/*:any*/) {
 function parseDrawings(data, ws, styles, opts) {
 	let draw = parse_xml(data);
 	let ar = draw?.twoCellAnchor;
-	if (!Array.isArray(ar)) return null;
+	if (typeof ar !== 'object') return null;
+	if (!Array.isArray(ar)) ar = [ar];
 	let draws = {};
 	let dss = styles?.Draws;
 	if (!dss) {
