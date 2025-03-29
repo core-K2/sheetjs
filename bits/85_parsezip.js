@@ -61,7 +61,7 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 			case RELS.DRAW:
 				if (opts.drawings) {
 					dfile = resolve_path(rel.Target, path);
-					let draws = parseDrawings(getzipdata(zip, dfile, true), _ws, styles, opts);
+					let draws = parseDrawings(zip, dfile, _ws, wb, styles, opts);
 					if (draws) {
 						_ws['!drawings'] = draws;
 					}

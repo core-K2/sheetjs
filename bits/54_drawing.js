@@ -20,12 +20,15 @@ function parse_drawing(data, rels/*:any*/) {
 
 /**
  * parse drawings core-K2 extended
- * @param {string} data 
- * @param {object} wb 
+ * @param {object} zip 
+ * @param {string} dfile
+ * @param {object} ws
+ * @param {object} wb
+ * @param {object} styles
  * @param {object} opts 
  */
-function parseDrawings(data, ws, styles, opts) {
-	let draw = parse_xml(data);
+function parseDrawings(zip, dfile, ws, wb, styles, opts) {
+	let draw = parse_xml(getzipdata(zip, dfile, true));
 	let ar = draw?.twoCellAnchor;
 	if (typeof ar !== 'object') return null;
 	if (!Array.isArray(ar)) ar = [ar];
@@ -54,5 +57,49 @@ function parseDrawings(data, ws, styles, opts) {
 		d.e.c = Math.max(d.e.c, iCol);
 		ws['!ref'] = encode_range(d);
 	}
+	let rPath = dfile.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
+	let rStr = getzipstr(zip, rPath, true);
+	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
+	if (rels) {
+		let rs = {};
+		if (!Array.isArray(rels)) rels = [rels];
+		rels.forEach(r => {
+			rs[r.Id] = getMedia(zip, wb, r)
+		});
+		ws['!drawRels'] = rs;
+		console.log(rels, wb['$media'], rs);
+	}
 	return draws;
 }
+function getMedia(zip, wb, rel) {
+	let media = wb['$media'];
+	if (!media) media = wb['$media'] = {};
+	let t = rel.Target;
+	let m = media[t];
+	if (!m) {
+		m = {
+			type: rel.Type.split('/').at(-1)
+		};
+		switch (rel.Type) {
+		case RELS.IMG:
+			m.ext = t.split('.').at(-1);
+			let data = getzipdata(zip, t.replace('..', 'xl'), true);
+			let b64 = binaryStringToBase64(data);
+			m.data = `data:image/${m.ext};base64,${b64}`;
+			break;
+		default:
+			console.warn('Not implement rels type:', rel.Type);
+			break;
+		}
+		media[t] = m;
+	}
+	return m;
+}
+function binaryStringToBase64(bstr) {
+	const bytes = new Uint8Array(bstr.length);
+	for (let i = 0; i < bstr.length; i++) {
+		bytes[i] = bstr.charCodeAt(i);
+	}
+	return btoa(String.fromCharCode.apply(null, bytes));
+}
+ 
