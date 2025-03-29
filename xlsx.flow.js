@@ -14131,7 +14131,6 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 			rs[r.Id] = getMedia(zip, wb, r)
 		});
 		ws['!drawRels'] = rs;
-		console.log(rels, wb['$media'], rs);
 	}
 	return draws;
 }
