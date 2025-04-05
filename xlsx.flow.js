@@ -14113,6 +14113,12 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 			sp.si = getOrAddObject(dss, sp.style);
 			delete sp.style;
 		}
+		let d = draws[cn];
+		if (d) {
+			if (!Array.isArray(d)) d = [d];
+			d.push(a);
+			a = d;
+		}
 		draws[cn] = a;
 	});
 	let d = decode_range(ws['!ref']);
