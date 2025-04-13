@@ -4017,7 +4017,9 @@ var Xml = {
 				let attr = attrs[i];
 				let name = this.getName(attr.name);
 				if (!name) continue;
-				obj[prefix + name] = this.toValue(attr.value);
+				let n = prefix + name;
+				if (obj.hasOwnProperty(n)) n = prefix + attr.name;
+				obj[n] = this.toValue(attr.value);
 			}
 		}
 		return obj;
