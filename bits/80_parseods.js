@@ -973,12 +973,8 @@ function convert_content(wb, content, styles, opts, setting) {
 					let be = 0;
 					if (c) {
 						if (drawings) {
-							let draw = cell['custom-shape'];
-							if (draw) {
-								let cn = encode_col(iCol + 1) + (iRow + 1);
-								drawings[cn] = draw;
-								be |= 4;
-							}
+							be |= addDraw(drawings, cell['custom-shape'], iCol, iRow);
+							be |= addDraw(drawings, cell['frame'], iCol, iRow);
 						}
 						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
 						if (!!c.v) be |= 2;
@@ -1045,6 +1041,21 @@ function convert_content(wb, content, styles, opts, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+}
+function addDraw(drawings, draw, iCol, iRow) {
+	if (!draw) return 0;
+	let cn = encode_col(iCol + 1) + (iRow + 1);
+	if (drawings[cn]) {
+		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
+		if (Array.isArray(draw)) {
+			drawings[cn] = [].concat(drawings[cn], draw);
+		} else {
+			drawings[cn].push(draw);
+		}
+	} else {
+		drawings[cn] = draw;
+	}
+	return 4;
 }
 function getDataRange(rows) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
