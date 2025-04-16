@@ -927,7 +927,7 @@ function convert_content(wb, content, styles, opts, setting) {
 	for (let n in sheets) {
 		let sheet = sheets[n];
 		let rows = sheet['table-row'];
-		if (!rows) continue;
+		if (!rows) rows = [];
 		else if (!Array.isArray(rows)) rows = [rows];
 		let cols = sheet['table-column'];
 		let thcols = sheet['table-header-columns'];
@@ -959,6 +959,10 @@ function convert_content(wb, content, styles, opts, setting) {
 		let iRow = 0;
 		let noSi = [];
 		let iAddRow = 0;
+		if (drawings) {
+			let shapes = sheet.shapes;
+			if (shapes) addDraw(drawings, shapes['custom-shape']);
+		}
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
@@ -974,7 +978,6 @@ function convert_content(wb, content, styles, opts, setting) {
 					if (c) {
 						if (drawings) {
 							be |= addDraw(drawings, cell['custom-shape'], iCol, iRow);
-							be |= addDraw(drawings, cell['frame'], iCol, iRow);
 						}
 						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
 						if (!!c.v) be |= 2;
@@ -1662,7 +1665,7 @@ function getProp(name) {
 }
 function addDraw(drawings, draw, iCol, iRow) {
 	if (!draw) return 0;
-	let cn = encode_col(iCol + 1) + (iRow + 1);
+	let cn = iCol === undefined ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
 	if (drawings[cn]) {
 		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
 		if (Array.isArray(draw)) {
@@ -1689,27 +1692,30 @@ function makeDrawStyle(draw, ass, dss) {
 }
 function drawings2SVG(drawings, ass, dss) {
 	for (let n in drawings) {
-		let draw = drawings[n];
-		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
-			if (draw.hasOwnProperty(p)) {
-				draw[p] = Number(getPixelSize(draw[p]));
-			}
-		});
-		makeDrawStyle(draw, ass, dss);
-		let p = draw.p;
-		if (p) {
-			if (!Array.isArray(p)) p = [p];
-			p.forEach(p => {
-				makeDrawStyle(p, ass, dss);
-				let span = p.span;
-				if (span) {
-					if (!Array.isArray(span)) span = [span];
-					span.forEach(s => {
-						makeDrawStyle(s, ass, dss);
-					});
+		let draws = drawings[n];
+		if (!Array.isArray(draws)) draws = [draws];
+		draws.forEach(draw => {
+			['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
+				if (draw.hasOwnProperty(p)) {
+					draw[p] = Number(getPixelSize(draw[p]));
 				}
 			});
-		}
+			makeDrawStyle(draw, ass, dss);
+			let p = draw.p;
+			if (p) {
+				if (!Array.isArray(p)) p = [p];
+				p.forEach(p => {
+					makeDrawStyle(p, ass, dss);
+					let span = p.span;
+					if (span) {
+						if (!Array.isArray(span)) span = [span];
+						span.forEach(s => {
+							makeDrawStyle(s, ass, dss);
+						});
+					}
+				});
+			}
+		});
 	}
 	return drawings;
 }
