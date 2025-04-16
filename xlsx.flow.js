@@ -25533,7 +25533,11 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let iAddRow = 0;
 		if (drawings) {
 			let shapes = sheet.shapes;
-			if (shapes) addDraw(drawings, shapes['custom-shape']);
+			if (shapes) {
+				let be = addDraw(drawings, shapes.g);
+				be |= addDraw(drawings, shapes['custom-shape']);
+				if (be && !iRowMax) iRowMax = 1;
+			}
 		}
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
@@ -25603,10 +25607,14 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		}
 		if (iAddRow) iRowMax += iAddRow;
 		if (drawings && Object.keys(drawings).length ) {
-			if (!dss) {
-				Styles.Draws = dss = [];
+			if (!dss) Styles.Draws = dss = [];
+			sh['!drawings'] = drawings;
+			for (let n in drawings) {
+				// let c = decode_cell(n);
+				// if (iRowMax < c.r) iRowMax = c.r;
+				// if (iColMax < c.c) iColMax = c.c;
+				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
-			sh['!drawings'] = drawings2SVG(drawings, ass, dss, wb, sh, zip);
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
@@ -26276,43 +26284,40 @@ function makeDrawImage(img, wb, ws, zip) {
 		rel[href] = m;
 	}
 }
-function drawings2SVG(drawings, ass, dss, wb, ws, zip) {
-	for (let n in drawings) {
-		let draws = drawings[n];
-		if (!Array.isArray(draws)) draws = [draws];
-		draws.forEach(draw => {
-			['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
-				if (draw.hasOwnProperty(p)) {
-					draw[p] = Number(getPixelSize(draw[p]));
-				}
-			});
-			makeDrawStyle(draw, ass, dss);
-			let p = draw.p;
-			if (p && !Array.isArray(p)) p = [p];
-			let img = draw.image;
-			if (img) {
-				makeDrawImage(img, wb, ws, zip);
-				if (img.p) {
-					let ip = img.p;
-					if (!Array.isArray(ip)) ip = [ip];
-					p = p ? [].concat(p, ip) : ip;
-				}
-			}
-			if (p) {
-				p.forEach(p => {
-					makeDrawStyle(p, ass, dss);
-					let span = p.span;
-					if (span) {
-						if (!Array.isArray(span)) span = [span];
-						span.forEach(s => {
-							makeDrawStyle(s, ass, dss);
-						});
-					}
-				});
+function drawing2SVG(draws, ass, dss, wb, ws, zip) {
+	if (!Array.isArray(draws)) draws = [draws];
+	draws.forEach(draw => {
+		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
+			if (draw.hasOwnProperty(p)) {
+				draw[p] = Number(getPixelSize(draw[p]));
 			}
 		});
-	}
-	return drawings;
+		makeDrawStyle(draw, ass, dss);
+		let p = draw.p;
+		if (p && !Array.isArray(p)) p = [p];
+		let img = draw.image;
+		if (img) {
+			makeDrawImage(img, wb, ws, zip);
+			if (img.p) {
+				let ip = img.p;
+				if (!Array.isArray(ip)) ip = [ip];
+				p = p ? [].concat(p, ip) : ip;
+			}
+		}
+		if (p) {
+			p.forEach(p => {
+				makeDrawStyle(p, ass, dss);
+				let span = p.span;
+				if (span) {
+					if (!Array.isArray(span)) span = [span];
+					span.forEach(s => {
+						makeDrawStyle(s, ass, dss);
+					});
+				}
+			});
+		}
+	});
+	return draws;
 }
 /* OpenDocument */
 function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
