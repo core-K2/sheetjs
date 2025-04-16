@@ -25534,9 +25534,8 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		if (drawings) {
 			let shapes = sheet.shapes;
 			if (shapes) {
-				let be = addDraw(drawings, shapes.g);
-				be |= addDraw(drawings, shapes['custom-shape']);
-				if (be && !iRowMax) iRowMax = 1;
+				addDraw(drawings, shapes.g);
+				addDraw(drawings, shapes['custom-shape']);
 			}
 		}
 		for (let i = 0; i < rows.length; i++) {
@@ -25610,9 +25609,9 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			if (!dss) Styles.Draws = dss = [];
 			sh['!drawings'] = drawings;
 			for (let n in drawings) {
-				// let c = decode_cell(n);
-				// if (iRowMax < c.r) iRowMax = c.r;
-				// if (iColMax < c.c) iColMax = c.c;
+				let c = decode_cell(n);
+				if (iRowMax <= c.r) iRowMax = c.r + 1;
+				if (iColMax < c.c) iColMax = c.c;
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
 		}
