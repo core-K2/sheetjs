@@ -3827,14 +3827,12 @@ var Xml = {
 	},
 	// get property name
 	getName: function(n) {
+		let cns = this.opts.convNames;
+		if (cns && cns[n]) return cns[n];
 		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
 			n = n.split(':').at(-1);
-		}
-		if (this.opts.convNames) {
-			let conv = this.opts.convNames[n];
-			if (conv) return conv;
 		}
 		return n;
 	},
@@ -25401,7 +25399,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:0, textPName:''});
-		xmlOpts.convNames = {'covered-table-cell': 'table-cell'};
+		xmlOpts.convNames = {'table:covered-table-cell': 'table-cell', 'draw:frame': 'custom-shape'};
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta, opts);
@@ -25610,21 +25608,6 @@ function convert_content(wb, content, styles, opts, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
-}
-function addDraw(drawings, draw, iCol, iRow) {
-	if (!draw) return 0;
-	let cn = encode_col(iCol + 1) + (iRow + 1);
-	if (drawings[cn]) {
-		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
-		if (Array.isArray(draw)) {
-			drawings[cn] = [].concat(drawings[cn], draw);
-		} else {
-			drawings[cn].push(draw);
-		}
-	} else {
-		drawings[cn] = draw;
-	}
-	return 4;
 }
 function getDataRange(rows) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
@@ -26243,6 +26226,21 @@ function getProp(name) {
 		}
 	}
 	return null;
+}
+function addDraw(drawings, draw, iCol, iRow) {
+	if (!draw) return 0;
+	let cn = encode_col(iCol + 1) + (iRow + 1);
+	if (drawings[cn]) {
+		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
+		if (Array.isArray(draw)) {
+			drawings[cn] = [].concat(drawings[cn], draw);
+		} else {
+			drawings[cn].push(draw);
+		}
+	} else {
+		drawings[cn] = draw;
+	}
+	return 4;
 }
 function makeDrawStyle(draw, ass, dss) {
 	let style = getStyleObject(null, 'style-name', draw, null, ass);

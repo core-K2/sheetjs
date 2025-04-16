@@ -459,14 +459,12 @@ var Xml = {
 	},
 	// get property name
 	getName: function(n) {
+		let cns = this.opts.convNames;
+		if (cns && cns[n]) return cns[n];
 		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
 			n = n.split(':').at(-1);
-		}
-		if (this.opts.convNames) {
-			let conv = this.opts.convNames[n];
-			if (conv) return conv;
 		}
 		return n;
 	},
