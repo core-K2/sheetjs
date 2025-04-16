@@ -835,7 +835,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		xmlOpts.convNames = {'table:covered-table-cell': 'table-cell', 'draw:frame': 'custom-shape'};
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
-		wb = to_excel_workbook(content, styles, settings, meta, opts);
+		wb = to_excel_workbook(content, styles, settings, meta, opts, zip);
 		if (opts.content) wb.content = content;
 		if (opts.cellStyles) wb.styles = styles;
 		if (opts.settings) wb.settings = settings;
@@ -856,7 +856,7 @@ function parse_fods(data/*:string*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	return wb;
 }
 
-function to_excel_workbook(content, styles, settings, meta, opts) {
+function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 	var wb = {
 		Workbook: {
 			AppVersion: {},
@@ -909,12 +909,12 @@ function to_excel_workbook(content, styles, settings, meta, opts) {
 		}
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
-		convert_content(wb, content, styles, opts, settings);
+		convert_content(wb, content, styles, opts, zip, settings);
 	}
 	return wb;
 }
 
-function convert_content(wb, content, styles, opts, setting) {
+function convert_content(wb, content, styles, opts, zip, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = toNameObjects(content['automatic-styles']);
@@ -1034,7 +1034,7 @@ function convert_content(wb, content, styles, opts, setting) {
 			if (!dss) {
 				Styles.Draws = dss = [];
 			}
-			sh['!drawings'] = drawings2SVG(drawings, ass, dss);
+			sh['!drawings'] = drawings2SVG(drawings, ass, dss, wb, sh, zip);
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
@@ -1690,7 +1690,21 @@ function makeDrawStyle(draw, ass, dss) {
 	}
 	return style;
 }
-function drawings2SVG(drawings, ass, dss) {
+function makeDrawImage(img, wb, ws, zip) {
+	let href = img.href;
+	if (href) {
+		let media = wb['$media'];
+		if (!media) media = wb['$media'] = {};
+		let m = media[href];
+		if (!m) {
+			m = media[href] = getImageAsBase64(zip, href);
+		}
+		let rel = ws['!drawRels'];
+		if (!rel) rel = ws['!drawRels'] = {};
+		rel[href] = m;
+	}
+}
+function drawings2SVG(drawings, ass, dss, wb, ws, zip) {
 	for (let n in drawings) {
 		let draws = drawings[n];
 		if (!Array.isArray(draws)) draws = [draws];
@@ -1702,8 +1716,17 @@ function drawings2SVG(drawings, ass, dss) {
 			});
 			makeDrawStyle(draw, ass, dss);
 			let p = draw.p;
+			if (p && !Array.isArray(p)) p = [p];
+			let img = draw.image;
+			if (img) {
+				makeDrawImage(img, wb, ws, zip);
+				if (img.p) {
+					let ip = img.p;
+					if (!Array.isArray(ip)) ip = [ip];
+					p = p ? [].concat(p, ip) : ip;
+				}
+			}
 			if (p) {
-				if (!Array.isArray(p)) p = [p];
 				p.forEach(p => {
 					makeDrawStyle(p, ass, dss);
 					let span = p.span;

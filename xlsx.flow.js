@@ -4665,6 +4665,56 @@ function applyFormatValue(c, v, opts) {
 	}
 	return f ? SSF.format(f, v) : v;
 }
+function analyzeImageData(bstr) {
+	const bytes = new Uint8Array(bstr.length);
+	for (let i = 0; i < bstr.length; i++) {
+		bytes[i] = bstr.charCodeAt(i);
+	}
+	let t, w, h;
+
+	// PNG
+	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+		t = 'png';
+		w = (bytes[16] << 24) + (bytes[17] << 16) + (bytes[18] << 8) + bytes[19];
+		h = (bytes[20] << 24) + (bytes[21] << 16) + (bytes[22] << 8) + bytes[23];
+	}
+
+	// JPEG
+	if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+		for (let i = 0; i < bytes.length - 9; i++) {
+			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
+				t = 'jpeg';
+				h = (bytes[i + 5] << 8) + bytes[i + 6];
+				w = (bytes[i + 7] << 8) + bytes[i + 8];
+				break;
+			}
+		}
+	}
+
+	// GIF
+	if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
+		t = 'gif';
+		w = bytes[6] + (bytes[7] << 8);
+		h = bytes[8] + (bytes[9] << 8);
+	}
+
+	// BMP
+	if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
+		t = 'bmp';
+		w = bytes[18] + (bytes[19] << 8) + (bytes[20] << 16) + (bytes[21] << 24);
+		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
+	}
+
+	if (!t) {
+		throw new Error('Unsupported image format', );
+	}
+	return {
+		type: t,
+		w: w,
+		h: h,
+		b64: btoa(String.fromCharCode.apply(null, bytes))
+	};
+}
 
 // export core-K2 expansion
 var CK2 = {
@@ -4786,6 +4836,14 @@ function resolve_path(path/*:string*/, base/*:string*/)/*:string*/ {
 		else if (step !== '.') result.push(step);
 	}
 	return result.join('/');
+}
+
+function getImageAsBase64(zip, path) {
+	let m = analyzeImageData(getzipdata(zip, path, true));
+	m.ext = path.split('.').at(-1);
+	m.data = `data:image/${m.type};base64,${m.b64}`;
+	delete m.b64;
+	return m;
 }
 var XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
 var attregexg=/\s([^"\s?>\/]+)\s*=\s*((?:")([^"]*)(?:")|(?:')([^']*)(?:')|([^'">\s]+))/g;
@@ -14148,10 +14206,7 @@ function getMedia(zip, wb, rel) {
 	if (!m) {
 		switch (rel.Type) {
 		case RELS.IMG:
-			m = analyzeImageData(getzipdata(zip, t.replace('..', 'xl'), true));
-			m.ext = t.split('.').at(-1);
-			m.data = `data:image/${m.type};base64,${m.b64}`;
-			delete m.b64;
+			m = getImageAsBase64(zip, t.replace('..', 'xl'));
 			break;
 		default:
 			console.warn('Not implement rels type:', rel.Type);
@@ -14167,56 +14222,6 @@ function binaryStringToBase64(bstr) {
 		bytes[i] = bstr.charCodeAt(i);
 	}
 	return btoa(String.fromCharCode.apply(null, bytes));
-}
-function analyzeImageData(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
-	}
-	let t, w, h;
-
-	// PNG
-	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
-		t = 'png';
-		w = (bytes[16] << 24) + (bytes[17] << 16) + (bytes[18] << 8) + bytes[19];
-		h = (bytes[20] << 24) + (bytes[21] << 16) + (bytes[22] << 8) + bytes[23];
-	}
-
-	// JPEG
-	if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
-		for (let i = 0; i < bytes.length - 9; i++) {
-			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
-				t = 'jpeg';
-				h = (bytes[i + 5] << 8) + bytes[i + 6];
-				w = (bytes[i + 7] << 8) + bytes[i + 8];
-				break;
-			}
-		}
-	}
-
-	// GIF
-	if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
-		t = 'gif';
-		w = bytes[6] + (bytes[7] << 8);
-		h = bytes[8] + (bytes[9] << 8);
-	}
-
-	// BMP
-	if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
-		t = 'bmp';
-		w = bytes[18] + (bytes[19] << 8) + (bytes[20] << 16) + (bytes[21] << 24);
-		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
-	}
-
-	if (!t) {
-		throw new Error('Unsupported image format', );
-	}
-	return {
-		type: t,
-		w: w,
-		h: h,
-		b64: btoa(String.fromCharCode.apply(null, bytes))
-	};
 }
 /* L.5.5.2 SpreadsheetML Comments + VML Schema */
 function parse_vml(data/*:string*/, sheet, comments) {
@@ -25402,7 +25407,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		xmlOpts.convNames = {'table:covered-table-cell': 'table-cell', 'draw:frame': 'custom-shape'};
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
-		wb = to_excel_workbook(content, styles, settings, meta, opts);
+		wb = to_excel_workbook(content, styles, settings, meta, opts, zip);
 		if (opts.content) wb.content = content;
 		if (opts.cellStyles) wb.styles = styles;
 		if (opts.settings) wb.settings = settings;
@@ -25423,7 +25428,7 @@ function parse_fods(data/*:string*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	return wb;
 }
 
-function to_excel_workbook(content, styles, settings, meta, opts) {
+function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 	var wb = {
 		Workbook: {
 			AppVersion: {},
@@ -25476,12 +25481,12 @@ function to_excel_workbook(content, styles, settings, meta, opts) {
 		}
 		if (settings) settings = settings.settings;
 		if (meta) wb.Props = meta.meta;
-		convert_content(wb, content, styles, opts, settings);
+		convert_content(wb, content, styles, opts, zip, settings);
 	}
 	return wb;
 }
 
-function convert_content(wb, content, styles, opts, setting) {
+function convert_content(wb, content, styles, opts, zip, setting) {
 	let body = content.body;
 	let fonts = content['font-face-decls'];
 	let ass = toNameObjects(content['automatic-styles']);
@@ -25601,7 +25606,7 @@ function convert_content(wb, content, styles, opts, setting) {
 			if (!dss) {
 				Styles.Draws = dss = [];
 			}
-			sh['!drawings'] = drawings2SVG(drawings, ass, dss);
+			sh['!drawings'] = drawings2SVG(drawings, ass, dss, wb, sh, zip);
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
@@ -26257,7 +26262,21 @@ function makeDrawStyle(draw, ass, dss) {
 	}
 	return style;
 }
-function drawings2SVG(drawings, ass, dss) {
+function makeDrawImage(img, wb, ws, zip) {
+	let href = img.href;
+	if (href) {
+		let media = wb['$media'];
+		if (!media) media = wb['$media'] = {};
+		let m = media[href];
+		if (!m) {
+			m = media[href] = getImageAsBase64(zip, href);
+		}
+		let rel = ws['!drawRels'];
+		if (!rel) rel = ws['!drawRels'] = {};
+		rel[href] = m;
+	}
+}
+function drawings2SVG(drawings, ass, dss, wb, ws, zip) {
 	for (let n in drawings) {
 		let draws = drawings[n];
 		if (!Array.isArray(draws)) draws = [draws];
@@ -26269,8 +26288,17 @@ function drawings2SVG(drawings, ass, dss) {
 			});
 			makeDrawStyle(draw, ass, dss);
 			let p = draw.p;
+			if (p && !Array.isArray(p)) p = [p];
+			let img = draw.image;
+			if (img) {
+				makeDrawImage(img, wb, ws, zip);
+				if (img.p) {
+					let ip = img.p;
+					if (!Array.isArray(ip)) ip = [ip];
+					p = p ? [].concat(p, ip) : ip;
+				}
+			}
 			if (p) {
-				if (!Array.isArray(p)) p = [p];
 				p.forEach(p => {
 					makeDrawStyle(p, ass, dss);
 					let span = p.span;
