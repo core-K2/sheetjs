@@ -25691,9 +25691,8 @@ function toNameObjects(v) {
 	return o;
 }
 function getPixelSize(v, u) {
-	if (!v) return v;
-	const re = /(\d+(\.\d+)?)([^0-9.]*)?/;
-	let m = v.match(re);
+	if (!v || typeof v === 'number') return v;
+	let m = /(\d+(\.\d+)?)([^0-9.]*)?/.exec(v);
 	if (!m) throw new Error(`invalid number format "${v}"`);
 	let n = parseFloat(m[1]);
 	let unit = m[3].toLowerCase();
@@ -26292,11 +26291,16 @@ function makeDrawImage(img, wb, ws, zip, key) {
 	return null;
 }
 function drawing2SVG(draws, ass, dss, wb, ws, zip) {
+	if (!draws) return;
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
-		if (draw.g) {
-			drawing2SVG(draw.g, ass, dss, wb, ws, zip);
+		let g = draw.g;
+		if (g) {
+			drawing2SVG(g, ass, dss, wb, ws, zip);
+			drawing2SVG(g.g, ass, dss, wb, ws, zip);
+			drawing2SVG(g['custom-shape'], ass, dss, wb, ws, zip);
 		}
+		drawing2SVG(draw['custom-shape'], ass, dss, wb, ws, zip);
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
 				draw[p] = Number(getPixelSize(draw[p]));
