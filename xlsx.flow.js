@@ -26294,12 +26294,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip) {
 	if (!draws) return;
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
-		let g = draw.g;
-		if (g) {
-			drawing2SVG(g, ass, dss, wb, ws, zip);
-			drawing2SVG(g.g, ass, dss, wb, ws, zip);
-			drawing2SVG(g['custom-shape'], ass, dss, wb, ws, zip);
-		}
+		drawing2SVG(draw.g, ass, dss, wb, ws, zip);
 		drawing2SVG(draw['custom-shape'], ass, dss, wb, ws, zip);
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
