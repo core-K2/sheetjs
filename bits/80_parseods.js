@@ -1042,6 +1042,12 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				if (iColMax < c.c) iColMax = c.c;
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
+			styles.forEach(s => {
+				let img = s['fill-image'];
+				if (img) {
+					makeDrawImage(img, wb, sh, zip, img.name);
+				}
+			});
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
@@ -1697,23 +1703,28 @@ function makeDrawStyle(draw, ass, dss) {
 	}
 	return style;
 }
-function makeDrawImage(img, wb, ws, zip) {
+function makeDrawImage(img, wb, ws, zip, key) {
 	let href = img.href;
 	if (href) {
-		let media = wb['$media'];
-		if (!media) media = wb['$media'] = {};
+		let media = wb.Workbook['$media'];
+		if (!media) media = wb.Workbook['$media'] = {};
 		let m = media[href];
 		if (!m) {
 			m = media[href] = getImageAsBase64(zip, href);
 		}
 		let rel = ws['!drawRels'];
 		if (!rel) rel = ws['!drawRels'] = {};
-		rel[href] = m;
+		rel[key || href] = m;
+		return m;
 	}
+	return null;
 }
 function drawing2SVG(draws, ass, dss, wb, ws, zip) {
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
+		if (draw.g) {
+			drawing2SVG(draw.g, ass, dss, wb, ws, zip);
+		}
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
 				draw[p] = Number(getPixelSize(draw[p]));
