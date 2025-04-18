@@ -26263,16 +26263,15 @@ function addDraw(drawings, draw, iCol, iRow) {
 	return 4;
 }
 function makeDrawStyle(draw, ass, dss) {
-	let style = getStyleObject(null, 'style-name', draw, null, ass);
-	if (style) {
-		getStyleObject(style, 'text-style-name', draw, null, ass);
-		delete draw['style-name'];
-		delete draw['text-style-name'];
+	['style-name', 'text-style-name'].forEach((n, i) => {
+		let style = getStyleObject(null, n, draw, null, ass);
+		if (!style) return;
+		delete draw[n];
 		if (Object.keys(style).length) {
-			draw.si = getOrAddObject(dss, style);
+			draw[(i > 0 ? n.charAt(0) : '') + 'si'] = getOrAddObject(dss, style);
 		}
-	}
-	return style;
+	});
+	return draw;
 }
 function makeDrawImage(img, wb, ws, zip, key) {
 	let href = img.href;
