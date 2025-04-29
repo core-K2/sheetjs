@@ -1043,9 +1043,17 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
 			styles.forEach(s => {
-				let img = s['fill-image'];
-				if (img) {
-					makeDrawImage(img, wb, sh, zip, img.name);
+				for (let k in s) {
+					switch (k) {
+					case 'fill-image':
+						makeDrawImage(s[k], wb, sh, zip, s[k].name);
+						break;
+					case 'hatch':
+					case 'gradient':
+					case 'opacity':
+						addDrawRel(sh, s[k]);
+						break;
+					}
 				}
 			});
 		}
@@ -1701,6 +1709,12 @@ function makeDrawStyle(draw, ass, dss) {
 	});
 	return draw;
 }
+function addDrawRel(ws, v, key) {
+	let rel = ws['!drawRels'];
+	if (!rel) rel = ws['!drawRels'] = {};
+	rel[key || v.name] = v;
+	return rel;
+}
 function makeDrawImage(img, wb, ws, zip, key) {
 	let href = img.href;
 	if (href) {
@@ -1710,9 +1724,7 @@ function makeDrawImage(img, wb, ws, zip, key) {
 		if (!m) {
 			m = media[href] = getImageAsBase64(zip, href);
 		}
-		let rel = ws['!drawRels'];
-		if (!rel) rel = ws['!drawRels'] = {};
-		rel[key || href] = m;
+		addDrawRel(ws, m, key || href);
 		return m;
 	}
 	return null;
