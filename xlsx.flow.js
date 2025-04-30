@@ -14189,12 +14189,12 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	let rStr = getzipstr(zip, rPath, true);
 	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
 	if (rels) {
-		let rs = {};
+		let rs = wb['!drawRels'];
+		if (!rs) rs = wb['!drawRels'] = {};
 		if (!Array.isArray(rels)) rels = [rels];
 		rels.forEach(r => {
 			rs[r.Id] = getMedia(zip, wb, r)
 		});
-		ws['!drawRels'] = rs;
 	}
 	return draws;
 }
@@ -25614,20 +25614,6 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				if (iColMax < c.c) iColMax = c.c;
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
-			styles.forEach(s => {
-				for (let k in s) {
-					switch (k) {
-					case 'fill-image':
-						makeDrawImage(s[k], wb, sh, zip, s[k].name);
-						break;
-					case 'hatch':
-					case 'gradient':
-					case 'opacity':
-						addDrawRel(sh, s[k]);
-						break;
-					}
-				}
-			});
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
@@ -25635,6 +25621,22 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let csts = sh['!cols'] = makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts);
 		noSi.forEach(v => {
 			sh[v.n].si = csts[v.i].si;
+		});
+	}
+	if (opts.drawings) {
+		styles.forEach(s => {
+			for (let k in s) {
+				switch (k) {
+				case 'fill-image':
+					makeDrawImage(s[k], wb, zip, s[k].name);
+					break;
+				case 'hatch':
+				case 'gradient':
+				case 'opacity':
+					addDrawRel(wb, s[k]);
+					break;
+				}
+			}
 		});
 	}
 }
@@ -26292,13 +26294,13 @@ function makeDrawStyle(draw, ass, dss) {
 	});
 	return draw;
 }
-function addDrawRel(ws, v, key) {
-	let rel = ws['!drawRels'];
-	if (!rel) rel = ws['!drawRels'] = {};
+function addDrawRel(wb, v, key) {
+	let rel = wb['!drawRels'];
+	if (!rel) rel = wb['!drawRels'] = {};
 	rel[key || v.name] = v;
 	return rel;
 }
-function makeDrawImage(img, wb, ws, zip, key) {
+function makeDrawImage(img, wb, zip, key) {
 	let href = img.href;
 	if (href) {
 		let media = wb.Workbook['$media'];
@@ -26307,7 +26309,7 @@ function makeDrawImage(img, wb, ws, zip, key) {
 		if (!m) {
 			m = media[href] = getImageAsBase64(zip, href);
 		}
-		addDrawRel(ws, m, key || href);
+		addDrawRel(wb, m, key || href);
 		return m;
 	}
 	return null;
@@ -26328,7 +26330,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip) {
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
 		if (img) {
-			makeDrawImage(img, wb, ws, zip);
+			makeDrawImage(img, wb, zip);
 			if (img.p) {
 				let ip = img.p;
 				if (!Array.isArray(ip)) ip = [ip];

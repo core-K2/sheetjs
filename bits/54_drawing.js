@@ -67,12 +67,12 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	let rStr = getzipstr(zip, rPath, true);
 	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
 	if (rels) {
-		let rs = {};
+		let rs = wb['!drawRels'];
+		if (!rs) rs = wb['!drawRels'] = {};
 		if (!Array.isArray(rels)) rels = [rels];
 		rels.forEach(r => {
 			rs[r.Id] = getMedia(zip, wb, r)
 		});
-		ws['!drawRels'] = rs;
 	}
 	return draws;
 }
