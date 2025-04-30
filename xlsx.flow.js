@@ -26257,7 +26257,18 @@ function getProp(name) {
 }
 function addDraw(drawings, draw, iCol, iRow) {
 	if (!draw) return 0;
-	let cn = iCol === undefined ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
+	const isTS = iCol === undefined;
+	if (isTS) {
+		// is table.shapes
+		if (Array.isArray(draw)) {
+			draw.forEach(d => {
+				d.$ts = true;
+			});
+		} else {
+			draw.$ts = true;
+		}
+	}
+	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
 	if (drawings[cn]) {
 		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
 		if (Array.isArray(draw)) {
