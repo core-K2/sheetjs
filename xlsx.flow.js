@@ -25614,11 +25614,15 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				if (iColMax < c.c) iColMax = c.c;
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
-			const GP = 'graphic-properties';
-			let def = getDefaultStyle(styles, 'graphic')?.[GP];
+			const def = getDefaultStyle(styles, 'graphic');
 			if (def) {
+				const GP = 'graphic-properties';
+				const TP = 'text-properties';
+				const gp = def[GP];
+				const tp = def[TP];
 				dss.forEach(d => {
-					if (d[GP]) applyObject(d[GP], def);
+					if (d[GP]) applyObject(d[GP], gp);
+					if (d[TP]) applyObject(d[TP], tp);
 				});
 			}
 		}
