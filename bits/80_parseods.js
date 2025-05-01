@@ -1042,6 +1042,13 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				if (iColMax < c.c) iColMax = c.c;
 				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
 			}
+			const GP = 'graphic-properties';
+			let def = getDefaultStyle(styles, 'graphic')?.[GP];
+			if (def) {
+				dss.forEach(d => {
+					if (d[GP]) applyObject(d[GP], def);
+				});
+			}
 		}
 		sh['!sn'] = sheet['style-name'];
 		sh['!ref'] = 'A1:' + encode_col(iColMax) + iRowMax;
