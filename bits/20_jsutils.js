@@ -851,7 +851,7 @@ function cloneObject(obj) {
 	}
 	return o;
 }
-function applyObject(obj, v) {
+function applyObject(obj, v, deep) {
 	if (v && typeof v === 'object') {
 		if (!obj || !Object.keys(obj).length) {
 			obj = cloneObject(v);
@@ -859,6 +859,8 @@ function applyObject(obj, v) {
 			for (let n in v) {
 				if (!obj.hasOwnProperty(n)) {
 					obj[n] = v[n];
+				} else if (deep && typeof v[n] === 'object') {
+					applyObject(obj[n], v[n], deep);
 				}
 			}
 		}

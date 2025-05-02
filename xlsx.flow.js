@@ -4219,7 +4219,7 @@ function cloneObject(obj) {
 	}
 	return o;
 }
-function applyObject(obj, v) {
+function applyObject(obj, v, deep) {
 	if (v && typeof v === 'object') {
 		if (!obj || !Object.keys(obj).length) {
 			obj = cloneObject(v);
@@ -4227,6 +4227,8 @@ function applyObject(obj, v) {
 			for (let n in v) {
 				if (!obj.hasOwnProperty(n)) {
 					obj[n] = v[n];
+				} else if (deep && typeof v[n] === 'object') {
+					applyObject(obj[n], v[n], deep);
 				}
 			}
 		}
@@ -25612,18 +25614,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				let c = decode_cell(n);
 				if (iRowMax <= c.r) iRowMax = c.r + 1;
 				if (iColMax < c.c) iColMax = c.c;
-				drawing2SVG(drawings[n], ass, dss, wb, sh, zip);
-			}
-			const def = getDefaultStyle(styles, 'graphic');
-			if (def) {
-				const GP = 'graphic-properties';
-				const TP = 'text-properties';
-				const gp = def[GP];
-				const tp = def[TP];
-				dss.forEach(d => {
-					if (d[GP]) applyObject(d[GP], gp);
-					if (d[TP]) applyObject(d[TP], tp);
-				});
+				drawing2SVG(drawings[n], ass, dss, wb, sh, zip, styles);
 			}
 		}
 		sh['!sn'] = sheet['style-name'];
@@ -26294,9 +26285,20 @@ function addDraw(drawings, draw, iCol, iRow) {
 	}
 	return 4;
 }
-function makeDrawStyle(draw, ass, dss) {
+function getDrawStyle(name, st, styles, ass) {
+	let o = st && st[name];
+	if (typeof o === 'string') {
+		o = ass?.[o] || styles?.[o];
+	}
+	let obj = cloneObject(o);
+	if (styles && o?.['parent-style-name'] === 'Default') {
+		applyObject(obj, getDefaultStyle(styles, o.family), true);
+	}
+	return obj;
+}
+function makeDrawStyle(draw, ass, dss, styles) {
 	['style-name', 'text-style-name'].forEach((n, i) => {
-		let style = getStyleObject(null, n, draw, null, ass);
+		let style = getDrawStyle(n, draw, styles, ass);
 		if (!style) return;
 		delete draw[n];
 		if (Object.keys(style).length) {
@@ -26325,18 +26327,18 @@ function makeDrawImage(img, wb, zip, key) {
 	}
 	return null;
 }
-function drawing2SVG(draws, ass, dss, wb, ws, zip) {
+function drawing2SVG(draws, ass, dss, wb, ws, zip, styles) {
 	if (!draws) return;
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
-		drawing2SVG(draw.g, ass, dss, wb, ws, zip);
-		drawing2SVG(draw['custom-shape'], ass, dss, wb, ws, zip);
+		drawing2SVG(draw.g, ass, dss, wb, ws, zip, styles);
+		drawing2SVG(draw['custom-shape'], ass, dss, wb, ws, zip, styles);
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
 				draw[p] = Number(getPixelSize(draw[p]));
 			}
 		});
-		makeDrawStyle(draw, ass, dss);
+		makeDrawStyle(draw, ass, dss, styles);
 		let p = draw.p;
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
