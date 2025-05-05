@@ -959,13 +959,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let iRow = 0;
 		let noSi = [];
 		let iAddRow = 0;
-		if (drawings) {
-			let shapes = sheet.shapes;
-			if (shapes) {
-				addDraw(drawings, shapes.g);
-				addDraw(drawings, shapes['custom-shape']);
-			}
-		}
+		if (drawings && sheet.shapes) addDraws(drawings, sheet.shapes);
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
@@ -979,9 +973,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 					let c = Object.keys(cell).length ? makeCell(cell) : null;
 					let be = 0;
 					if (c) {
-						if (drawings) {
-							be |= addDraw(drawings, cell['custom-shape'], iCol, iRow);
-						}
+						if (drawings) be |= addDraws(drawings, cell, iCol, iRow);
 						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
 						if (!!c.v) be |= 2;
 					}
@@ -1684,6 +1676,9 @@ function getProp(name) {
 		}
 	}
 	return null;
+}
+function addDraws(drawings, draw, iCol, iRow) {
+	return addDraw(drawings, draw.g ? draw : draw['custom-shape'], iCol, iRow);
 }
 function addDraw(drawings, draw, iCol, iRow) {
 	if (!draw) return 0;
