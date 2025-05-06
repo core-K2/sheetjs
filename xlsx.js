@@ -25432,7 +25432,12 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			for (let r = 0; r < repRow; r++, iRow++) {
 				let beRow = 0;
 				let iCol = -1;
-				for (let j = 0; j < cells.length; j++) {
+				let iCols = cells.length;
+				while (iCols > 0) {
+					if (Object.keys(cells[iCols - 1]).length > 0) break;
+					iCols--;
+				}
+				for (let j = 0; j < iCols; j++) {
 					let cell = cells[j];
 					let c = Object.keys(cell).length ? makeCell(cell) : null;
 					let be = 0;
@@ -25441,7 +25446,8 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
 						if (!!c.v) be |= 2;
 					}
-					let rep = cell['number-columns-repeated'] || 1
+					let rep = cell['number-columns-repeated'] || 1;
+					if (rep > 1 && rep < 40 && j < iCols - 1 && iCol + rep > iColMax) iColMax = iCol + rep;
 					let cspan = cell['number-columns-spanned'] || 0;
 					let rspan = cell['number-rows-spanned'] || 0;
 					for (k = 0; k < rep; k++) {
