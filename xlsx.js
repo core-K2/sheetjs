@@ -12850,7 +12850,7 @@ function makeNumberFmt(v, themes) {
 	for (let n in table_fmt) {
 		ar[n] = table_fmt[n];
 	}
-	let dt = v.numFmt;
+	let dt = v?.numFmt;
 	if (dt && !Array.isArray(dt)) dt = [dt];
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
