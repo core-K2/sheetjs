@@ -25623,22 +25623,24 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
-	if (opts.drawings) {
-		styles.forEach(s => {
-			for (let k in s) {
-				switch (k) {
-				case 'fill-image':
-					makeDrawImage(s[k], wb, zip, s[k].name);
-					break;
-				case 'hatch':
-				case 'gradient':
-				case 'opacity':
-					addDrawRel(wb, s[k]);
-					break;
-				}
+	styles.forEach(s => {
+		for (let k in s) {
+			switch (k) {
+			case 'fill-image':
+				if (opts.drawings) makeDrawImage(s[k], wb, zip, s[k].name);
+				break;
+			case 'hatch':
+			case 'gradient':
+			case 'opacity':
+				if (opts.drawings) addDrawRel(wb, s[k]);
+				break;
+			case 'theme':
+				const t = s[k];
+				wb.Themes[t.name || k] = t;
+				break;
 			}
-		});
-	}
+		}
+	});
 }
 function getDataRange(rows) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
