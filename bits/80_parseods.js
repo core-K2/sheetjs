@@ -943,7 +943,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			cols.splice(0, 0, ...hcols);
 		}
 		let sh = {};
-		n = sheet.name;
+		n = '' + sheet.name;
 		wb.SheetNames.push(n);
 		wb.Sheets[n] = sh;
 		wb.Workbook.Sheets.push({
