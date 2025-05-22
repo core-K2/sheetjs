@@ -26260,7 +26260,10 @@ function getProp(name) {
 	return null;
 }
 function addDraws(drawings, draw, iCol, iRow) {
-	return addDraw(drawings, draw.g ? draw : draw['custom-shape'], iCol, iRow);
+	let ret = addDraw(drawings, draw.g ? draw : draw['custom-shape'], iCol, iRow);
+	if (draw.caption)
+		ret |= addDraw(drawings, draw.caption, iCol, iRow);
+	return ret;
 }
 function addDraw(drawings, draw, iCol, iRow) {
 	if (!draw) return 0;
