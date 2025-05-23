@@ -14059,7 +14059,10 @@ function parse_drawing(data, rels) {
  * @param {object} opts 
  */
 function parseDrawings(zip, dfile, ws, wb, styles, opts) {
-	let draw = parse_xml(getzipdata(zip, dfile, true));
+	const xmlOpts = {
+		asSeqArray: [/^a:path$/],
+	};
+	let draw = parse_xml(getzipdata(zip, dfile, true), xmlOpts);
 	let ar = draw?.twoCellAnchor;
 	if (typeof ar !== 'object') return null;
 	if (!Array.isArray(ar)) ar = [ar];
