@@ -25409,7 +25409,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 		let styles = opts.cellStyles ? parse_zip_xml(zip, 'styles.xml', xmlOpts) : null;
 		let settings = opts.settings ? parse_zip_xml(zip, 'settings.xml') : null;
 		let meta = parse_zip_xml(zip, 'meta.xml', {asValue:0, textPName:''});
-		xmlOpts.convNames = {'table:covered-table-cell': 'table-cell', 'draw:frame': 'custom-shape'};
+		xmlOpts.convNames = {'table:covered-table-cell': 'table-cell'};
 		xmlOpts.convValues = {'text:s': ' '};
 		let content = parse_zip_xml(zip, 'content.xml', xmlOpts);
 		wb = to_excel_workbook(content, styles, settings, meta, opts, zip);
@@ -26262,24 +26262,30 @@ function getProp(name) {
 	}
 	return null;
 }
+const DRAW_SHAPES = [
+	'custom-shape', 'frame', 'caption', 'ellipse',
+];
 function addDraws(drawings, draw, iCol, iRow) {
-	let ret = addDraw(drawings, draw.g ? draw : draw['custom-shape'], iCol, iRow);
-	if (draw.caption)
-		ret |= addDraw(drawings, draw.caption, iCol, iRow);
+	let ret = draw.g ? addDraw(drawings, draw, iCol, iRow, 'group') : 0;
+	DRAW_SHAPES.forEach(n => {
+		const shape = draw[n];
+		if (shape && typeof shape === 'object') {
+			ret |= addDraw(drawings, shape, iCol, iRow, n);
+		}
+	});
 	return ret;
 }
-function addDraw(drawings, draw, iCol, iRow) {
+function addDraw(drawings, draw, iCol, iRow, type) {
 	if (!draw) return 0;
 	const isTS = iCol === undefined;
-	if (isTS) {
-		// is table.shapes
-		if (Array.isArray(draw)) {
-			draw.forEach(d => {
-				d.$ts = true;
-			});
-		} else {
-			draw.$ts = true;
-		}
+	if (Array.isArray(draw)) {
+		draw.forEach(d => {
+			d.$ts = isTS;
+			d.$type = type;
+		});
+	} else {
+		draw.$ts = isTS;
+		draw.$type = type;
 	}
 	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
 	if (drawings[cn]) {
