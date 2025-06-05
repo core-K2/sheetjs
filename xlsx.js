@@ -26153,41 +26153,42 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'custom-shape', 'frame', 'caption', 'ellipse',
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse',
 ];
 function addDraws(drawings, draw, iCol, iRow) {
-	let ret = draw.g ? addDraw(drawings, draw, iCol, iRow, 'group') : 0;
+	let ret = 0;
 	DRAW_SHAPES.forEach(n => {
 		const shape = draw[n];
 		if (shape && typeof shape === 'object') {
-			ret |= addDraw(drawings, shape, iCol, iRow, n);
+			ret |= addDraw(drawings, n === 'g' ? draw : shape, iCol, iRow, n);
 		}
 	});
 	return ret;
 }
+function setDrawType(draw, isTS) {
+	DRAW_SHAPES.forEach(n => {
+		const shape = draw[n];
+		if (shape && typeof shape === 'object') {
+			(Array.isArray(shape) ? shape : [shape]).forEach(d => {
+				d.$ts = isTS;
+				d.$type = n;
+				if (n === 'g') setDrawType(d, isTS);
+			});
+		}
+	});
+}
 function addDraw(drawings, draw, iCol, iRow, type) {
 	if (!draw) return 0;
 	const isTS = iCol === undefined;
-	if (Array.isArray(draw)) {
-		draw.forEach(d => {
-			d.$ts = isTS;
-			d.$type = type;
-		});
-	} else {
-		draw.$ts = isTS;
-		draw.$type = type;
-	}
+	const isGroup = type === 'g';
+	if (!Array.isArray(draw)) draw = [draw];
+	draw.forEach(d => {
+		d.$ts = isTS;
+		d.$type = type;
+		if (isGroup) setDrawType(d, isTS);
+	});
 	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
-	if (drawings[cn]) {
-		if (!Array.isArray(drawings[cn])) drawings[cn] = [drawings[cn]];
-		if (Array.isArray(draw)) {
-			drawings[cn] = [].concat(drawings[cn], draw);
-		} else {
-			drawings[cn].push(draw);
-		}
-	} else {
-		drawings[cn] = draw;
-	}
+	drawings[cn] = drawings[cn] ? [].concat(drawings[cn], draw) : draw;
 	return 4;
 }
 function getDrawStyle(name, st, styles, ass) {
@@ -26236,8 +26237,10 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles) {
 	if (!draws) return;
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
-		drawing2SVG(draw.g, ass, dss, wb, ws, zip, styles);
-		drawing2SVG(draw['custom-shape'], ass, dss, wb, ws, zip, styles);
+		DRAW_SHAPES.forEach(n => {
+			const d = draw[n];
+			if (d) drawing2SVG(d, ass, dss, wb, ws, zip, styles);
+		});
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
 				draw[p] = Number(getPixelSize(draw[p]));
