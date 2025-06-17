@@ -26153,7 +26153,7 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'g', 'custom-shape', 'frame', 'caption', 'ellipse',
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure',
 ];
 function addDraws(drawings, draw, iCol, iRow) {
 	let ret = 0;
