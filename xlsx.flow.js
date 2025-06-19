@@ -25626,6 +25626,10 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
+	let markers;
+	if (opts.drawings) {
+		Styles.Markers = markers = [];
+	}
 	styles.forEach(s => {
 		for (let k in s) {
 			switch (k) {
@@ -25640,6 +25644,9 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			case 'theme':
 				const t = s[k];
 				wb.Themes[t.name || k] = t;
+				break;
+			case 'marker':
+				if (markers) markers.push(s[k]);
 				break;
 			}
 		}
