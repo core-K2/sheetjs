@@ -1049,9 +1049,10 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			sh[v.n].si = csts[v.i].si;
 		});
 	}
-	let markers;
+	let markers, strokes;
 	if (opts.drawings) {
 		Styles.Markers = markers = [];
+		Styles.Strokes = strokes = [];
 	}
 	styles.forEach(s => {
 		for (let k in s) {
@@ -1070,6 +1071,9 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				break;
 			case 'marker':
 				if (markers) markers.push(s[k]);
+				break;
+			case 'stroke-dash':
+				if (strokes) strokes.push(s[k]);
 				break;
 			}
 		}
