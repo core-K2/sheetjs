@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250620';
+XLSX.version = '0.20.3.20250624';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -14073,6 +14073,9 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		styles.Draws = dss = [];
 	}
 	let iRow = 0, iCol = 0;
+	const isExist = (ar, n) => {
+		return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
+	};
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
@@ -14087,7 +14090,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		let d = draws[cn];
 		if (d) {
 			if (!Array.isArray(d)) d = [d];
-			d.push(a);
+			if (!isExist(d, sp?.nvSpPr?.cNvPr?.name)) d.push(a);
 			a = d;
 		}
 		draws[cn] = a;

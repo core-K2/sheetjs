@@ -41,6 +41,9 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		styles.Draws = dss = [];
 	}
 	let iRow = 0, iCol = 0;
+	const isExist = (ar, n) => {
+		return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
+	};
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
@@ -55,7 +58,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		let d = draws[cn];
 		if (d) {
 			if (!Array.isArray(d)) d = [d];
-			d.push(a);
+			if (!isExist(d, sp?.nvSpPr?.cNvPr?.name)) d.push(a);
 			a = d;
 		}
 		draws[cn] = a;
