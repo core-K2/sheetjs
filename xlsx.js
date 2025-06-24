@@ -14073,9 +14073,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		styles.Draws = dss = [];
 	}
 	let iRow = 0, iCol = 0;
-	const isExist = (ar, n) => {
-		return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
-	};
+	const isExist = (ar, n) => n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
