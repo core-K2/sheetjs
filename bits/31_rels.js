@@ -32,7 +32,8 @@ var RELS = ({
 	PEOPLE: "http://schemas.microsoft.com/office/2017/10/relationships/person",
 	CONN: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
 	PRN_SETT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings',
-	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
+	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
 }/*:any*/);
 
 /* 9.3.3 Representing Relationships */

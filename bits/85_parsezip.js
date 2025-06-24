@@ -77,6 +77,20 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 			case RELS.PRN_SETT:
 				// printerSettings
 				break;
+			case RELS.CTL_PROP:
+				let props = _ws['!props'];
+				if (!props) props = _ws['!props'] = {};
+				dfile = resolve_path(rel.Target, path);
+				props[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				break;
+			case RELS.VML:
+				if (opts.drawings) {
+					let vml = _ws['!vml'];
+					if (!vml) vml = _ws['!vml'] = {};
+					dfile = resolve_path(rel.Target, path);
+					vml[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				}
+				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
 				break;

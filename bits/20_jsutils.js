@@ -461,7 +461,7 @@ var Xml = {
 	getName: function(n) {
 		let cns = this.opts.convNames;
 		if (cns && cns[n]) return cns[n];
-		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
+		if (this.opts.noXmlns && /^xmlns(\:.*|$)/.test(n)) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
 			n = n.split(':').at(-1);

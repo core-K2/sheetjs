@@ -3755,7 +3755,7 @@ var Xml = {
 	getName: function(n) {
 		let cns = this.opts.convNames;
 		if (cns && cns[n]) return cns[n];
-		if (this.opts.noXmlns && n.startsWith('xmlns:')) {
+		if (this.opts.noXmlns && /^xmlns(\:.*|$)/.test(n)) {
 			return '';
 		} else if (this.opts.noNamePrefix) {
 			n = n.split(':').at(-1);
@@ -6777,7 +6777,8 @@ var RELS = ({
 	PEOPLE: "http://schemas.microsoft.com/office/2017/10/relationships/person",
 	CONN: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
 	PRN_SETT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings',
-	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
+	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
 });
 
 /* 9.3.3 Representing Relationships */
@@ -29666,6 +29667,20 @@ function safe_parse_sheet(zip, path, relsPath, sheet, idx, sheetRels, sheets, st
 				break;
 			case RELS.PRN_SETT:
 				// printerSettings
+				break;
+			case RELS.CTL_PROP:
+				let props = _ws['!props'];
+				if (!props) props = _ws['!props'] = {};
+				dfile = resolve_path(rel.Target, path);
+				props[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				break;
+			case RELS.VML:
+				if (opts.drawings) {
+					let vml = _ws['!vml'];
+					if (!vml) vml = _ws['!vml'] = {};
+					dfile = resolve_path(rel.Target, path);
+					vml[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				}
 				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
