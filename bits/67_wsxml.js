@@ -21,6 +21,13 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	var s = ({}/*:any*/); if(opts.dense) s["!data"] = [];
 	var refguess/*:Range*/ = ({s: {r:2000000, c:2000000}, e: {r:0, c:0} }/*:any*/);
 
+	// core-K2 expansion(copy parse xml object properties)
+	let obj = Xml.xmlStrToObject(data);
+	['sheetFormatPr', 'AlternateContent'].forEach(n => {
+		let o = obj[n];
+		if (o) s['$' + n] = o;
+	});
+
 	var data1 = "", data2 = "";
 	var mtch/*:?any*/ = str_match_xml_ns(data, "sheetData");
 	if(mtch) {
@@ -34,7 +41,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
 	// output sheetFormatPr if exist (core-K2 expansion)
-	str_match_xml_ns(data, 'sheetFormatPr', s);
+	//str_match_xml_ns(data, 'sheetFormatPr', s);
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
