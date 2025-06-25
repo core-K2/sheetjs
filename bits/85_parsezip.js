@@ -46,6 +46,7 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 		var comments = [], tcomments = [];
 		if(sheetRels && sheetRels[sheet]) keys(sheetRels[sheet]).forEach(function(n) {
 			var dfile = "";
+			let relDraw = null;
 			let rel = sheetRels[sheet][n];
 			switch (rel.Type) {
 			case RELS.CMNT:
@@ -78,26 +79,24 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 				// printerSettings
 				break;
 			case RELS.CTL_PROP:
-				let props = _ws['!props'];
-				if (!props) props = _ws['!props'] = {};
-				dfile = resolve_path(rel.Target, path);
-				props[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				relDraw = '!props';
 				break;
 			case RELS.VML:
-				if (opts.drawings) {
-					let vml = _ws['!vml'];
-					if (!vml) vml = _ws['!vml'] = {};
-					dfile = resolve_path(rel.Target, path);
-					vml[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
-				}
+				relDraw = '!vml';
 				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
 				break;
 			}
+			if (relDraw && opts.drawings) {
+				let rObj = _ws[relDraw];
+				if (!rObj) rObj = _ws[relDraw] = {};
+				dfile = resolve_path(rel.Target, path);
+				rObj[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+			}
 		});
 		if(tcomments && tcomments.length) sheet_insert_comments(_ws, tcomments, true, opts.people || []);
-		parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
+		if (!opts.drawings) parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
 	} catch(e) { if(opts.WTF) throw e; }
 }
 
