@@ -959,7 +959,10 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let iRow = 0;
 		let noSi = [];
 		let iAddRow = 0;
-		if (drawings && sheet.shapes) addDraws(drawings, sheet.shapes);
+		if (drawings) {
+			sh.$forms = sheet.forms;
+			if (sheet.shapes) addDraws(drawings, sheet.shapes);
+		}
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
