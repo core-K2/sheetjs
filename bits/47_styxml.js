@@ -539,6 +539,7 @@ function writeBorders(dt, opts) {
 }
 function makeXfTag(tag, dt) {
 	var o = [];
+	if (!Array.isArray(dt)) dt = [dt];
 	o[o.length] = `<${tag} count="${dt.length}">`;
 	dt.forEach(function(x) {
 		o[o.length] = makeXmlTag('xf', x, function(x, attrs) {
@@ -560,6 +561,7 @@ function writeCellXfs(dt, opts) {
 }
 function writeCellStyles(dt, opts) {
 	var o = [];
+	if (!Array.isArray(dt)) dt = [dt];
 	o[o.length] = `<cellStyles count="${dt.length}">`;
 	dt.forEach(function(x) {
 		o[o.length] = makeXmlTag('cellStyle', x, null, '*');
