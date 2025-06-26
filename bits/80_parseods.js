@@ -960,7 +960,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let noSi = [];
 		let iAddRow = 0;
 		if (drawings) {
-			sh.$forms = sheet.forms;
+			if (sheet.forms) sh.$forms = sheet.forms;
 			if (sheet.shapes) addDraws(drawings, sheet.shapes);
 		}
 		for (let i = 0; i < rows.length; i++) {
