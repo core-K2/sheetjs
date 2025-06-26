@@ -1725,18 +1725,27 @@ function setDrawType(draw, isTS) {
 	});
 }
 function addDraw(drawings, draw, iCol, iRow, type) {
-	if (!draw) return 0;
+	let ret = 0;
+	if (!draw) return ret;
 	const isTS = iCol === undefined;
+	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
+	let ar = drawings[cn];
+	if (!ar) ar = []
+	else if (!Array.isArray(ar)) ar = [ar];
 	const isGroup = type === 'g';
 	if (!Array.isArray(draw)) draw = [draw];
 	draw.forEach(d => {
+		if (ar && ar.find(o => {
+			return o.name === d.name;
+		})) return;
 		d.$ts = isTS;
 		d.$type = type;
 		if (isGroup) setDrawType(d, isTS);
+		ar.push(d);
+		ret = 4;
 	});
-	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
-	drawings[cn] = drawings[cn] ? [].concat(drawings[cn], draw) : draw;
-	return 4;
+	if (ret) drawings[cn] = ar;
+	return ret;
 }
 function getDrawStyle(name, st, styles, ass) {
 	let o = st && st[name];
