@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250624';
+XLSX.version = '0.20.3.20250626';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -12887,6 +12887,7 @@ function writeBorders(dt, opts) {
 }
 function makeXfTag(tag, dt) {
 	var o = [];
+	if (!Array.isArray(dt)) dt = [dt];
 	o[o.length] = `<${tag} count="${dt.length}">`;
 	dt.forEach(function(x) {
 		o[o.length] = makeXmlTag('xf', x, function(x, attrs) {
@@ -12908,6 +12909,7 @@ function writeCellXfs(dt, opts) {
 }
 function writeCellStyles(dt, opts) {
 	var o = [];
+	if (!Array.isArray(dt)) dt = [dt];
 	o[o.length] = `<cellStyles count="${dt.length}">`;
 	dt.forEach(function(x) {
 		o[o.length] = makeXmlTag('cellStyle', x, null, '*');
@@ -17448,6 +17450,13 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	var s = ({}/*:any*/); if(opts.dense) s["!data"] = [];
 	var refguess/*:Range*/ = ({s: {r:2000000, c:2000000}, e: {r:0, c:0} }/*:any*/);
 
+	// core-K2 expansion(copy parse xml object properties)
+	let obj = Xml.xmlStrToObject(data);
+	['sheetFormatPr', 'AlternateContent'].forEach(n => {
+		let o = obj[n];
+		if (o) s['$' + n] = o;
+	});
+
 	var data1 = "", data2 = "";
 	var mtch/*:?any*/ = str_match_xml_ns(data, "sheetData");
 	if(mtch) {
@@ -17461,7 +17470,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	else if((sheetPr = str_match_xml_ns(data1, "sheetPr"))) parse_ws_xml_sheetpr2(sheetPr[0], sheetPr[1]||"", s, wb, idx, styles, themes);
 
 	// output sheetFormatPr if exist (core-K2 expansion)
-	str_match_xml_ns(data, 'sheetFormatPr', s);
+	//str_match_xml_ns(data, 'sheetFormatPr', s);
 
 	/* 18.3.1.35 dimension CT_SheetDimension */
 	var ridx = (data1.match(/<(?:\w*:)?dimension/)||{index:-1}).index;
@@ -25538,7 +25547,10 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		let iRow = 0;
 		let noSi = [];
 		let iAddRow = 0;
-		if (drawings && sheet.shapes) addDraws(drawings, sheet.shapes);
+		if (drawings) {
+			if (sheet.forms) sh.$forms = sheet.forms;
+			if (sheet.shapes) addDraws(drawings, sheet.shapes);
+		}
 		for (let i = 0; i < rows.length; i++) {
 			let row = rows[i];
 			let cells = row['table-cell'];
@@ -26301,18 +26313,27 @@ function setDrawType(draw, isTS) {
 	});
 }
 function addDraw(drawings, draw, iCol, iRow, type) {
-	if (!draw) return 0;
+	let ret = 0;
+	if (!draw) return ret;
 	const isTS = iCol === undefined;
+	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
+	let ar = drawings[cn];
+	if (!ar) ar = []
+	else if (!Array.isArray(ar)) ar = [ar];
 	const isGroup = type === 'g';
 	if (!Array.isArray(draw)) draw = [draw];
 	draw.forEach(d => {
+		if (ar && ar.find(o => {
+			return o.name === d.name;
+		})) return;
 		d.$ts = isTS;
 		d.$type = type;
 		if (isGroup) setDrawType(d, isTS);
+		ar.push(d);
+		ret = 4;
 	});
-	const cn = isTS ? 'A1' : encode_col(iCol + 1) + (iRow + 1);
-	drawings[cn] = drawings[cn] ? [].concat(drawings[cn], draw) : draw;
-	return 4;
+	if (ret) drawings[cn] = ar;
+	return ret;
 }
 function getDrawStyle(name, st, styles, ass) {
 	let o = st && st[name];
@@ -29748,6 +29769,7 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 		var comments = [], tcomments = [];
 		if(sheetRels && sheetRels[sheet]) keys(sheetRels[sheet]).forEach(function(n) {
 			var dfile = "";
+			let relDraw = null;
 			let rel = sheetRels[sheet][n];
 			switch (rel.Type) {
 			case RELS.CMNT:
@@ -29780,26 +29802,24 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 				// printerSettings
 				break;
 			case RELS.CTL_PROP:
-				let props = _ws['!props'];
-				if (!props) props = _ws['!props'] = {};
-				dfile = resolve_path(rel.Target, path);
-				props[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+				relDraw = '!props';
 				break;
 			case RELS.VML:
-				if (opts.drawings) {
-					let vml = _ws['!vml'];
-					if (!vml) vml = _ws['!vml'] = {};
-					dfile = resolve_path(rel.Target, path);
-					vml[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
-				}
+				relDraw = '!vml';
 				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
 				break;
 			}
+			if (relDraw && opts.drawings) {
+				let rObj = _ws[relDraw];
+				if (!rObj) rObj = _ws[relDraw] = {};
+				dfile = resolve_path(rel.Target, path);
+				rObj[rel.Id] = parse_xml(getzipdata(zip, dfile, true));
+			}
 		});
 		if(tcomments && tcomments.length) sheet_insert_comments(_ws, tcomments, true, opts.people || []);
-		parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
+		if (!opts.drawings) parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
 	} catch(e) { if(opts.WTF) throw e; }
 }
 
