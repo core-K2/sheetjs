@@ -98,8 +98,10 @@ function addAlterContent(ar, alt) {
 		for (let n in a) {
 			let o = a[n], c;
 			if (typeof o === 'object' && (c = o.twoCellAnchor)) {
-				if (typeof c === 'object')
+				if (typeof c === 'object') {
+					c.$type = n;
 					addOrExShape(ar, c);
+				}
 			}
 		}
 	});
