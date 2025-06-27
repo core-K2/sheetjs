@@ -89,7 +89,8 @@ function findExistShape(ar, shape) {
 function addOrExShape(ar, shape) {
 	let found = findExistShape(ar, shape);
 	if (!found) {
-		if (shape.from?.col && shape.to?.col) ar.push(shape);
+		const f = shape.from, t = shape.to;
+		if (f && t && (f.col || f.colOff || t.col || t.rowOff)) ar.push(shape);
 	} else extendObj(found, shape);
 }
 function addAlterContent(ar, alt) {
