@@ -33,15 +33,16 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	};
 	let draw = parse_xml(getzipdata(zip, dfile, true), xmlOpts);
 	let ar = draw?.twoCellAnchor;
-	if (typeof ar !== 'object') return null;
-	if (!Array.isArray(ar)) ar = [ar];
+	if (typeof ar !== 'object') ar = [];
+	else if (!Array.isArray(ar)) ar = [ar];
+	addAlterContent(ar, draw?.AlternateContent);
+	if (ar.length < 1) return null;
 	let draws = {};
 	let dss = styles?.Draws;
 	if (!dss) {
 		styles.Draws = dss = [];
 	}
 	let iRow = 0, iCol = 0;
-	const isExist = (ar, n) => n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
@@ -56,7 +57,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		let d = draws[cn];
 		if (d) {
 			if (!Array.isArray(d)) d = [d];
-			if (!isExist(d, sp?.nvSpPr?.cNvPr?.name)) d.push(a);
+			addOrExShape(d, a);
 			a = d;
 		}
 		draws[cn] = a;
@@ -79,6 +80,29 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		ws['!drawRels'] = rs;
 	}
 	return draws;
+}
+// find same name shape from array
+function findExistShape(ar, shape) {
+	const n = shape?.sp?.nvSpPr?.cNvPr?.name;
+	return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
+}
+function addOrExShape(ar, shape) {
+	let found = findExistShape(ar, shape);
+	if (!found) ar.push(shape);
+	else extendObj(found, shape);
+}
+function addAlterContent(ar, alt) {
+	if (!alt) return;
+	if (!Array.isArray(alt)) alt = [alt];
+	alt.forEach(a => {
+		for (let n in a) {
+			let o = a[n], c;
+			if (typeof o === 'object' && (c = o.twoCellAnchor)) {
+				if (typeof c === 'object')
+					addOrExShape(ar, c);
+			}
+		}
+	});
 }
 function getMedia(zip, wb, rel) {
 	let media = wb['$media'];

@@ -689,6 +689,49 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function extendObj(d, s) {
+	if (typeof s === 'object') {
+		for (let n in s) {
+			let v = s[n];
+			if (typeof v === 'object') {
+				d[n] = extendObj(d[n] || (Array.isArray(v) ? [] : {}), v);
+			} else if (!d.hasOwnProperty(n)) {
+				d[n] = v;	
+			}
+		}
+	}
+	return d;
+}
+function mergeObject(...objs) {
+	return objs.reduce((a, b) => ({...a, ...b}));
+}
+function cloneObject(obj) {
+	// if (!obj || typeof obj !== 'object') return obj;
+	// const o = Array.isArray(obj) ? [] : {};
+	// for (const key in obj) {
+	// 	if (obj.hasOwnProperty(key)) {
+	// 		o[key] = cloneObject(obj[key]);
+	// 	}
+	// }
+	// return o;
+	return structuredClone(obj)
+}
+function applyObject(obj, v, deep) {
+	if (v && typeof v === 'object') {
+		if (!obj || !Object.keys(obj).length) {
+			obj = cloneObject(v);
+		} else {
+			for (let n in v) {
+				if (!obj.hasOwnProperty(n)) {
+					obj[n] = v[n];
+				} else if (deep && typeof v[n] === 'object') {
+					applyObject(obj[n], v[n], deep);
+				}
+			}
+		}
+	}
+	return obj;
+}
 function toBoolean(v) {
 	if (typeof v === 'boolean') return v;
 	if (isNaN(v)) {
@@ -840,32 +883,6 @@ function convertToOfficeTimeValue(v) {
 function singleObject(v) {
 	let keys = typeof v === 'object' ? Object.keys(v) : null;
 	return keys && keys.length === 1 ? v[keys[0]] : v;
-}
-function cloneObject(obj) {
-	if (!obj || typeof obj !== 'object') return obj;
-	const o = Array.isArray(obj) ? [] : {};
-	for (const key in obj) {
-		if (obj.hasOwnProperty(key)) {
-			o[key] = cloneObject(obj[key]);
-		}
-	}
-	return o;
-}
-function applyObject(obj, v, deep) {
-	if (v && typeof v === 'object') {
-		if (!obj || !Object.keys(obj).length) {
-			obj = cloneObject(v);
-		} else {
-			for (let n in v) {
-				if (!obj.hasOwnProperty(n)) {
-					obj[n] = v[n];
-				} else if (deep && typeof v[n] === 'object') {
-					applyObject(obj[n], v[n], deep);
-				}
-			}
-		}
-	}
-	return obj;
 }
 function getOrAddObject(ar, obj) {
 	let s = JSON.stringify(obj);
