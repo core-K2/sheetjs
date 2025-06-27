@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250626';
+XLSX.version = '0.20.3.20250627';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -3983,6 +3983,49 @@ function extendObject(d, s) {
 		if (d[n] === undefined) d[n] = s[n];
 	}
 }
+function extendObj(d, s) {
+	if (typeof s === 'object') {
+		for (let n in s) {
+			let v = s[n];
+			if (typeof v === 'object') {
+				d[n] = extendObj(d[n] || (Array.isArray(v) ? [] : {}), v);
+			} else if (!d.hasOwnProperty(n)) {
+				d[n] = v;	
+			}
+		}
+	}
+	return d;
+}
+function mergeObject(...objs) {
+	return objs.reduce((a, b) => ({...a, ...b}));
+}
+function cloneObject(obj) {
+	// if (!obj || typeof obj !== 'object') return obj;
+	// const o = Array.isArray(obj) ? [] : {};
+	// for (const key in obj) {
+	// 	if (obj.hasOwnProperty(key)) {
+	// 		o[key] = cloneObject(obj[key]);
+	// 	}
+	// }
+	// return o;
+	return structuredClone(obj)
+}
+function applyObject(obj, v, deep) {
+	if (v && typeof v === 'object') {
+		if (!obj || !Object.keys(obj).length) {
+			obj = cloneObject(v);
+		} else {
+			for (let n in v) {
+				if (!obj.hasOwnProperty(n)) {
+					obj[n] = v[n];
+				} else if (deep && typeof v[n] === 'object') {
+					applyObject(obj[n], v[n], deep);
+				}
+			}
+		}
+	}
+	return obj;
+}
 function toBoolean(v) {
 	if (typeof v === 'boolean') return v;
 	if (isNaN(v)) {
@@ -4134,32 +4177,6 @@ function convertToOfficeTimeValue(v) {
 function singleObject(v) {
 	let keys = typeof v === 'object' ? Object.keys(v) : null;
 	return keys && keys.length === 1 ? v[keys[0]] : v;
-}
-function cloneObject(obj) {
-	if (!obj || typeof obj !== 'object') return obj;
-	const o = Array.isArray(obj) ? [] : {};
-	for (const key in obj) {
-		if (obj.hasOwnProperty(key)) {
-			o[key] = cloneObject(obj[key]);
-		}
-	}
-	return o;
-}
-function applyObject(obj, v, deep) {
-	if (v && typeof v === 'object') {
-		if (!obj || !Object.keys(obj).length) {
-			obj = cloneObject(v);
-		} else {
-			for (let n in v) {
-				if (!obj.hasOwnProperty(n)) {
-					obj[n] = v[n];
-				} else if (deep && typeof v[n] === 'object') {
-					applyObject(obj[n], v[n], deep);
-				}
-			}
-		}
-	}
-	return obj;
 }
 function getOrAddObject(ar, obj) {
 	let s = JSON.stringify(obj);
@@ -14067,15 +14084,16 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	};
 	let draw = parse_xml(getzipdata(zip, dfile, true), xmlOpts);
 	let ar = draw?.twoCellAnchor;
-	if (typeof ar !== 'object') return null;
-	if (!Array.isArray(ar)) ar = [ar];
+	if (typeof ar !== 'object') ar = [];
+	else if (!Array.isArray(ar)) ar = [ar];
+	addAlterContent(ar, draw?.AlternateContent);
+	if (ar.length < 1) return null;
 	let draws = {};
 	let dss = styles?.Draws;
 	if (!dss) {
 		styles.Draws = dss = [];
 	}
 	let iRow = 0, iCol = 0;
-	const isExist = (ar, n) => n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
@@ -14090,7 +14108,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		let d = draws[cn];
 		if (d) {
 			if (!Array.isArray(d)) d = [d];
-			if (!isExist(d, sp?.nvSpPr?.cNvPr?.name)) d.push(a);
+			addOrExShape(d, a);
 			a = d;
 		}
 		draws[cn] = a;
@@ -14113,6 +14131,33 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		ws['!drawRels'] = rs;
 	}
 	return draws;
+}
+// find same name shape from array
+function findExistShape(ar, shape) {
+	const n = shape?.sp?.nvSpPr?.cNvPr?.name;
+	return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
+}
+function addOrExShape(ar, shape) {
+	let found = findExistShape(ar, shape);
+	if (!found) {
+		const f = shape.from, t = shape.to;
+		if (f && t && (f.col || f.colOff || t.col || t.rowOff)) ar.push(shape);
+	} else extendObj(found, shape);
+}
+function addAlterContent(ar, alt) {
+	if (!alt) return;
+	if (!Array.isArray(alt)) alt = [alt];
+	alt.forEach(a => {
+		for (let n in a) {
+			let o = a[n], c;
+			if (typeof o === 'object' && (c = o.twoCellAnchor)) {
+				if (typeof c === 'object') {
+					c.$type = n;
+					addOrExShape(ar, c);
+				}
+			}
+		}
+	});
 }
 function getMedia(zip, wb, rel) {
 	let media = wb['$media'];
