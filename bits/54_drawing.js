@@ -134,3 +134,87 @@ function binaryStringToBase64(bstr) {
 	}
 	return btoa(String.fromCharCode.apply(null, bytes));
 }
+
+function analyzeVmlDrawing(ws) {
+	const draws = ws['!drawings'];
+	const vml = ws['!vml'][ws['!legrel']];
+	if (!draws || !vml) return;
+	let shape = vml.shape;
+	if (!shape) return;
+	if (!Array.isArray(shape)) shape = [shape];
+	const getVml = (spid, id) => shape.find(o => spid && (o.spid === spid || o.id === spid) || id && o.id === id);
+	const pixelToEmu = v => v * 914400 / 96;
+	const setCell = (obj, ar, idx) => {
+		for (let i = 0; i < 4; i++) {
+			const v = Number(ar[idx + i].trim());
+			switch (i) {
+			case 0:
+				obj.col = v;
+				break;
+			case 1:
+				obj.colOff = pixelToEmu(v);
+				break;
+			case 2:
+				obj.row = v;
+				break;
+			case 3:
+				obj.rowOff = pixelToEmu(v);
+				break;
+			}
+		}
+	};
+	for (let n in draws) {
+		let dr = draws[n];
+		if (!Array.isArray(dr)) dr = [dr];
+		const isTop = n === 'A1';
+		const move = [];
+		dr.forEach((d, i) => {
+			const cNvPr = d?.sp?.nvSpPr?.cNvPr;
+			if (!cNvPr) return;
+			let spid;
+			let ext = cNvPr.extLst?.ext;
+			if (typeof ext === 'object') {
+				if (!Array.isArray(ext)) ext = [ext];
+				ext.find(ex => {
+					spid = ex.compatExt?.spid;
+					return !!spid;
+				}, this);
+			}
+			const vml = getVml(spid, cNvPr.name);
+			if (vml) {
+				d._vml = vml;
+				if (isTop) {
+					const from = d.from, to = d.to;
+					if (!from || !to || from.col || from.colOff || from.row || from.rowOff || to.col || to.colOff || to.row || to.rowOff) return;
+					const anchor = vml.ClientData?.Anchor;
+					if (!anchor) return;
+					const ar = anchor.split(',');
+					setCell(from, ar, 0);
+					setCell(to, ar, 4);
+					move.push(i);
+				}
+			}
+		});
+		const len = move.length;
+		if (len > 0) {
+			for (let i = len - 1; i >= 0; i--) {
+				const del = move[i];
+				const d = dr[del];
+				const from = d.from;
+				const cn = encode_col(from.col) + (from.row + 1);
+				let draw = draws[cn];
+				if (!draw) {
+					draws[cn] = d;
+				} else if (Array.isArray(draw)) {
+					draw.push(d);
+				} else {
+					draws[cn] = new Array(draw, d);
+				}
+				dr.splice(del, 1);
+			}
+			if (dr.length < 1) {
+				delete draws[n];
+			}
+		}
+	}
+}

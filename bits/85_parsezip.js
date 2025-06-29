@@ -96,7 +96,8 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 			}
 		});
 		if(tcomments && tcomments.length) sheet_insert_comments(_ws, tcomments, true, opts.people || []);
-		if (!opts.drawings) parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
+		if (opts.drawings) analyzeVmlDrawing(_ws);
+		else parse_sheet_legacy_drawing(_ws, stype, zip, path, idx, opts, wb, comments);
 	} catch(e) { if(opts.WTF) throw e; }
 }
 
