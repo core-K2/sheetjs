@@ -752,6 +752,32 @@ function toNumber(v, def) {
 	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
 	return isNaN(ret) ? def === undefined ? 0 : def : ret;
 }
+function getPixelSize(v, u) {
+	if (!v || typeof v === 'number') return v;
+	let m = /(\d+(\.\d+)?)([^0-9.]*)?/.exec(v);
+	if (!m) throw new Error(`invalid number format "${v}"`);
+	let n = parseFloat(m[1]);
+	let unit = m[3].toLowerCase();
+	if (u && u === unit) {
+		return n;
+	}
+	switch (unit) {
+	case 'mm':
+		n *= 10;
+	case 'cm':
+		n *= 96 / 2.54;
+		break;
+	case 'pt':
+		n *= 96 / 72;
+		break;
+	case 'inch':
+	case 'in':
+		n *= 96;
+		break;
+	}
+	return n.toFixed(4);
+}
+
 /**
  * convert to valid Date object
  * @param {any} v input value ('now': get current date)
