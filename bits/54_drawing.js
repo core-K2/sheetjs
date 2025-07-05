@@ -281,7 +281,7 @@ function analyzeVmlDrawing(ws) {
 		if (!txt || !(div = txt.div)) return;
 		const font = div.font;
 		if (font) {
-			const style = getStyle(div.style, d.clientData);
+			const style = getStyle(div.style, d._vml?.ClientData);
 			let t, rPr = {};
 			if (typeof font === 'object') {
 				for (let n in font) {
@@ -291,7 +291,7 @@ function analyzeVmlDrawing(ws) {
 						t = v;
 						break;
 					case 'size':
-						rPr.sz = v * 4;
+						rPr.sz = v * 5;
 						break;
 					case 'color':
 						rPr.solidFill = {
@@ -324,7 +324,9 @@ function analyzeVmlDrawing(ws) {
 					algn: style.algn
 				};
 			}
-			if (Object.keys.length > 0)	p.r.rPr = rPr;
+			if (Object.keys(rPr).length > 0) {
+				p.r.rPr = rPr;
+			}
 		}
 	};
 	shape.forEach(vml => {
@@ -333,7 +335,7 @@ function analyzeVmlDrawing(ws) {
 		if (!anchor) return;
 		const ar = anchor.split(',');
 		let d = {
-			clientData: vml.ClientData,
+			_vml: vml,
 			from: {},
 			to: {},
 			sp: {

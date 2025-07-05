@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250629';
+XLSX.version = '0.20.3.20250705';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4120,6 +4120,32 @@ function toNumber(v, def) {
 	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
 	return isNaN(ret) ? def === undefined ? 0 : def : ret;
 }
+function getPixelSize(v, u) {
+	if (!v || typeof v === 'number') return v;
+	let m = /(\d+(\.\d+)?)([^0-9.]*)?/.exec(v);
+	if (!m) throw new Error(`invalid number format "${v}"`);
+	let n = parseFloat(m[1]);
+	let unit = m[3].toLowerCase();
+	if (u && u === unit) {
+		return n;
+	}
+	switch (unit) {
+	case 'mm':
+		n *= 10;
+	case 'cm':
+		n *= 96 / 2.54;
+		break;
+	case 'pt':
+		n *= 96 / 72;
+		break;
+	case 'inch':
+	case 'in':
+		n *= 96;
+		break;
+	}
+	return n.toFixed(4);
+}
+
 /**
  * convert to valid Date object
  * @param {any} v input value ('now': get current date)
@@ -14230,12 +14256,12 @@ function findExistShape(ar, shape) {
 	const n = shape?.sp?.nvSpPr?.cNvPr?.name;
 	return n && ar.find(a => a?.sp?.nvSpPr?.cNvPr?.name === n);
 }
-function addOrExShape(ar, shape) {
+function addOrExShape(ar, shape, extOnly) {
 	let found = findExistShape(ar, shape);
 	if (!found) {
 		// const f = shape.from, t = shape.to;
 		// if (f && t && (f.col || f.colOff || t.col || t.rowOff)) ar.push(shape);
-		ar.push(shape);
+		if (!extOnly) ar.push(shape);
 	} else extendObj(found, shape);
 }
 function addAlterContent(ar, alt) {
@@ -14247,7 +14273,7 @@ function addAlterContent(ar, alt) {
 			if (typeof o === 'object' && (c = o.twoCellAnchor)) {
 				if (typeof c === 'object') {
 					c.$type = n;
-					addOrExShape(ar, c);
+					addOrExShape(ar, c, true);
 				}
 			}
 		}
@@ -14280,11 +14306,11 @@ function binaryStringToBase64(bstr) {
 }
 
 function analyzeVmlDrawing(ws) {
-	const draws = ws['!drawings'];
 	const vml = ws['!vml'][ws['!legrel']];
-	if (!draws || !vml) return;
-	let shape = vml.shape;
-	if (!shape) return;
+	let shape;
+	if (!vml || !(shape = vml.shape)) return;
+	let draws = ws['!drawings'];
+	if (!draws) draws = ws['!drawings'] = {};
 	if (!Array.isArray(shape)) shape = [shape];
 	const getVml = (spid, id) => shape.find(o => spid && (o.spid === spid || o.id === spid) || id && o.id === id);
 	const pixelToEmu = v => v * 914400 / 96;
@@ -14292,20 +14318,27 @@ function analyzeVmlDrawing(ws) {
 		for (let i = 0; i < 4; i++) {
 			const v = Number(ar[idx + i].trim());
 			switch (i) {
-			case 0:
-				obj.col = v;
-				break;
-			case 1:
-				obj.colOff = pixelToEmu(v);
-				break;
-			case 2:
-				obj.row = v;
-				break;
-			case 3:
-				obj.rowOff = pixelToEmu(v);
-				break;
+			case 0:	obj.col = v;	break;
+			case 1:	obj.colOff = pixelToEmu(v);	break;
+			case 2:	obj.row = v;	break;
+			case 3:	obj.rowOff = pixelToEmu(v);	break;
 			}
 		}
+	};
+	const addDraw = (draws, d, chk) => {
+		const cn = encode_col(d.from.col) + (d.from.row + 1);
+		let draw = draws[cn];
+		if (!draw) {
+			draws[cn] = d;
+		} else {
+			if (chk && chk(draw, d)) return false;
+			if (Array.isArray(draw)) {
+				draw.push(d);
+			} else {
+				draws[cn] = new Array(draw, d);
+			}
+		}
+		return true;
 	};
 	for (let n in draws) {
 		let dr = draws[n];
@@ -14327,6 +14360,7 @@ function analyzeVmlDrawing(ws) {
 			const vml = getVml(spid, cNvPr.name);
 			if (vml) {
 				d._vml = vml;
+				vml.$found = true;
 				if (isTop) {
 					const from = d.from, to = d.to;
 					if (!from || !to || from.col || from.colOff || from.row || from.rowOff || to.col || to.colOff || to.row || to.rowOff) return;
@@ -14343,17 +14377,7 @@ function analyzeVmlDrawing(ws) {
 		if (len > 0) {
 			for (let i = len - 1; i >= 0; i--) {
 				const del = move[i];
-				const d = dr[del];
-				const from = d.from;
-				const cn = encode_col(from.col) + (from.row + 1);
-				let draw = draws[cn];
-				if (!draw) {
-					draws[cn] = d;
-				} else if (Array.isArray(draw)) {
-					draw.push(d);
-				} else {
-					draws[cn] = new Array(draw, d);
-				}
+				addDraw(draws, dr[del]);
 				dr.splice(del, 1);
 			}
 			if (dr.length < 1) {
@@ -14361,6 +14385,144 @@ function analyzeVmlDrawing(ws) {
 			}
 		}
 	}
+	const toTwip = (v) => Math.round(pixelToEmu(getPixelSize(v)));
+	const analyzeStyle = (d, style) => {
+		if (!style) return;
+		const ar = style.split(';');
+		const xfrm = d.sp.spPr.xfrm;
+		ar.forEach(s => {
+			const nv = s.split(':');
+			if (nv.length !== 2) return;
+			let v = nv[1].trim();
+			switch (nv[0].trim()) {
+			case 'margin-left': xfrm.off.x = toTwip(v); break;
+			case 'margin-top': xfrm.off.y = toTwip(v); break;
+			case 'width': xfrm.ext.cx = toTwip(v); break;
+			case 'height': xfrm.ext.cy = toTwip(v); break;
+			}
+		});
+	};
+	const nearV = (a, b) => Math.abs(a - b) < 9525;
+	const isSame = (a, b) => {
+		const xf1 = a.sp.spPr.xfrm, xf2 = b.sp.spPr.xfrm;
+		const e1 = xf1.ext, e2 = xf2.ext;
+		const o1 = xf1.off, o2 = xf2.off;
+		return nearV(e1.cx, e2.cx) && nearV(e1.cy, e2.cy) && nearV(o1.x, o2.x) && nearV(o1.y, o2.y);
+	};
+	const chkDraw = (draw, d) => {
+		if (Array.isArray(draw)) {
+			if (draw.find(a => isSame(a, d))) return true;
+		} else if (isSame(draw, d)) return true;
+		return false;
+	};
+	const getStyle = (s, cd) => {
+		let style = {};
+		switch (cd?.TextVAlign) {
+		case 'Center': style.anchor = 'ctr'; break;
+		case 'Top': style.anchor = 't'; break;
+		case 'Bottom': style.anchor = 'b'; break;
+		}
+		if (s) {
+			let ar = s.split(';');
+			ar.forEach(s => {
+				let nv = s.split(':')
+				if (nv.length === 2) {
+					switch (nv[0].trim()) {
+					case 'text-align':
+						let v;
+						switch (nv[1].trim()) {
+						case 'start':
+						case 'left':	v = 'l'; break;
+						case 'end':
+						case 'right':	v = 'r'; break;
+						case 'justify':
+						case 'center':	v = 'ctr'; break;
+						}
+						style.algn = v;
+						break;
+					}
+				}
+			});
+		}
+		return style;
+	};
+	const analyzeText = (d, txt) => {
+		let div;
+		if (!txt || !(div = txt.div)) return;
+		const font = div.font;
+		if (font) {
+			const style = getStyle(div.style, d._vml?.ClientData);
+			let t, rPr = {};
+			if (typeof font === 'object') {
+				for (let n in font) {
+					let v = font[n];
+					switch (n) {
+					case 'value':
+						t = v;
+						break;
+					case 'size':
+						rPr.sz = v * 5;
+						break;
+					case 'color':
+						rPr.solidFill = {
+							srgbClr: {val: v.substring(1)}
+						};
+						break;
+					case 'face':
+						rPr.ea = {
+							typeface: v
+						};
+						break;
+					}
+				}
+			} else {
+				t = font;
+			}
+			const txBody = d.sp.txBody = {
+				p: {
+					r: {t}
+				}
+			};
+			if (style.anchor) {
+				txBody.bodyPr = {
+					anchor: style.anchor
+				};
+			}
+			const p = txBody.p;
+			if (style.algn) {
+				p.pPr = {
+					algn: style.algn
+				};
+			}
+			if (Object.keys(rPr).length > 0) {
+				p.r.rPr = rPr;
+			}
+		}
+	};
+	shape.forEach(vml => {
+		if (vml.$found) return;
+		const anchor = vml.ClientData?.Anchor;
+		if (!anchor) return;
+		const ar = anchor.split(',');
+		let d = {
+			_vml: vml,
+			from: {},
+			to: {},
+			sp: {
+				spPr: {
+					xfrm: {
+						ext: {},
+						off: {},
+					},
+				},
+			},
+		};
+		setCell(d.from, ar, 0);
+		setCell(d.to, ar, 4);
+		analyzeStyle(d, vml.style);
+		if (!addDraw(draws, d, chkDraw)) return;
+		analyzeText(d, vml.textbox);
+	});
 }
 /* L.5.5.2 SpreadsheetML Comments + VML Schema */
 function parse_vml(data/*:string*/, sheet, comments) {
@@ -25859,31 +26021,6 @@ function toNameObjects(v) {
 		}
 	}
 	return o;
-}
-function getPixelSize(v, u) {
-	if (!v || typeof v === 'number') return v;
-	let m = /(\d+(\.\d+)?)([^0-9.]*)?/.exec(v);
-	if (!m) throw new Error(`invalid number format "${v}"`);
-	let n = parseFloat(m[1]);
-	let unit = m[3].toLowerCase();
-	if (u && u === unit) {
-		return n;
-	}
-	switch (unit) {
-	case 'mm':
-		n *= 10;
-	case 'cm':
-		n *= 96 / 2.54;
-		break;
-	case 'pt':
-		n *= 96 / 72;
-		break;
-	case 'inch':
-	case 'in':
-		n *= 96;
-		break;
-	}
-	return n.toFixed(4);
 }
 function makeRowStyles(rows, ass, iRowMax) {
 	let rss = [];
