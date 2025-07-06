@@ -100,7 +100,8 @@ function parse_theme_xml(data/*:string*/, opts) {
 	/* themeElements CT_BaseStyles */
 	if(!(t=str_match_xml(data, "a:themeElements"))) throw new Error('themeElements not found in theme');
 	parse_themeElements(t[0], themes, opts);
-	//themes.raw = data;
+
+	if (opts.ck2Ex) themes.$raw = parseThemeXml(data, opts);
 	return themes;
 }
 
@@ -274,4 +275,8 @@ function write_theme(Themes, opts)/*:string*/ {
 	o[o.length] =  '<a:extraClrSchemeLst/>';
 	o[o.length] = '</a:theme>';
 	return o.join("");
+}
+
+function parseThemeXml(data, opts) {
+	return parse_xml(data);
 }

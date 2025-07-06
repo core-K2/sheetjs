@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250705';
+XLSX.version = '0.20.3.20250706';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -13604,7 +13604,8 @@ function parse_theme_xml(data/*:string*/, opts) {
 	/* themeElements CT_BaseStyles */
 	if(!(t=str_match_xml(data, "a:themeElements"))) throw new Error('themeElements not found in theme');
 	parse_themeElements(t[0], themes, opts);
-	//themes.raw = data;
+
+	if (opts.ck2Ex) themes.$raw = parseThemeXml(data, opts);
 	return themes;
 }
 
@@ -13779,7 +13780,10 @@ function write_theme(Themes, opts)/*:string*/ {
 	o[o.length] = '</a:theme>';
 	return o.join("");
 }
-/* [MS-XLS] 2.4.326 TODO: payload is a zip file */
+
+function parseThemeXml(data, opts) {
+	return parse_xml(data);
+}/* [MS-XLS] 2.4.326 TODO: payload is a zip file */
 function parse_Theme(blob, length, opts) {
 	var end = blob.l + length;
 	var dwThemeVersion = blob.read_shift(4);
