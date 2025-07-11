@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250706';
+XLSX.version = '0.20.3.20250711';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -26449,7 +26449,7 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline',
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control',
 ];
 function addDraws(drawings, draw, iCol, iRow) {
 	let ret = 0;
@@ -26484,9 +26484,12 @@ function addDraw(drawings, draw, iCol, iRow, type) {
 	const isGroup = type === 'g';
 	if (!Array.isArray(draw)) draw = [draw];
 	draw.forEach(d => {
-		if (ar && ar.find(o => {
-			return o.name === d.name;
-		})) return;
+		let prop = ['name', 'id'].find(n => d.hasOwnProperty(n));
+		if (prop) {
+			if (ar.find(o => {
+				return o[prop] && o[prop] === d[prop];
+			})) return;
+		}
 		d.$ts = isTS;
 		d.$type = type;
 		if (isGroup) setDrawType(d, isTS);
