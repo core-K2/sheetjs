@@ -587,8 +587,8 @@ function parse_sty_xml_ck2(data, themes, opts) {
 	styles.Fills = makeFills(dt.fills, themes);
 	styles.Borders = makeBorders(dt.borders, themes);
 	styles.CellXf = makeXfs(dt.cellXfs, dt.cellStyleXfs, themes);
-	styles.cellStyleXfs = dt.cellStyleXfs.xf;
-	styles.cellStyles = dt.cellStyles.cellStyle;
+	styles.cellStyleXfs = dt.cellStyleXfs?.xf;
+	styles.cellStyles = dt.cellStyles?.cellStyle;
 	return styles;
 }
 function makeNumberFmt(v, themes) {

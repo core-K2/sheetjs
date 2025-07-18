@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250711';
+XLSX.version = '0.20.3.20250718';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -12978,8 +12978,8 @@ function parse_sty_xml_ck2(data, themes, opts) {
 	styles.Fills = makeFills(dt.fills, themes);
 	styles.Borders = makeBorders(dt.borders, themes);
 	styles.CellXf = makeXfs(dt.cellXfs, dt.cellStyleXfs, themes);
-	styles.cellStyleXfs = dt.cellStyleXfs.xf;
-	styles.cellStyles = dt.cellStyles.cellStyle;
+	styles.cellStyleXfs = dt.cellStyleXfs?.xf;
+	styles.cellStyles = dt.cellStyles?.cellStyle;
 	return styles;
 }
 function makeNumberFmt(v, themes) {
