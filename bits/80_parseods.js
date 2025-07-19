@@ -926,9 +926,15 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 	if (!Array.isArray(sheets)) sheets = [sheets];
 	for (let n in sheets) {
 		let sheet = sheets[n];
+		let hrows = sheet['table-header-rows'];
+		if (hrows) {
+			hrows = hrows['table-row'];
+			if (hrows && !Array.isArray(hrows)) hrows = [hrows];
+		}
 		let rows = sheet['table-row'];
 		if (!rows) rows = [];
 		else if (!Array.isArray(rows)) rows = [rows];
+		if (hrows) rows = hrows.concat(rows);
 		let cols = sheet['table-column'];
 		let thcols = sheet['table-header-columns'];
 		let hcols = thcols && thcols['table-column'];
@@ -1082,6 +1088,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		}
 	});
 }
+const MAX_NO_DATA_ROW_REPEAT = 10;
 function getDataRange(rows) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
 	let iRow = 1;
@@ -1091,10 +1098,12 @@ function getDataRange(rows) {
 		if (!Array.isArray(cells)) cells = [cells];
 		let repRow = row['number-rows-repeated'] || 1;
 		let iCol = 0;
+		let be = 0;
 		for (let j = 0; j < cells.length; j++) {
 			let cell = cells[j];
 			let rep = cell['number-columns-repeated'] || 1
 			if (cell?.['value-type']) {
+				be++;
 				let R = iRow, C = iCol;
 				if (R < range.s.r) range.s.r = R;
 				if (C < range.s.c) range.s.c = C;
@@ -1105,6 +1114,7 @@ function getDataRange(rows) {
 			}
 			iCol += rep;
 		}
+		if (!be && repRow > MAX_NO_DATA_ROW_REPEAT) row['number-rows-repeated'] = repRow = MAX_NO_DATA_ROW_REPEAT;
 		iRow += repRow;
 	}
 	return range;
