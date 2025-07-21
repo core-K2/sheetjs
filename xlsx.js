@@ -24581,7 +24581,19 @@ function make_html_row(ws, r, R, o) {
 			}
 		}
 		/* TODO: html entities */
-		var w = (cell && cell.v != null) && (cell.h || escapehtml(cell.w || (format_cell(cell), cell.w))) || "";
+		var w = (cell && cell.v != null) && (cell.w || (format_cell(cell), cell.w)) || "";
+		if (w.includes('<span')) {
+			let ar = w.split('\n');
+			if (ar.length > 1) {
+				let s = '';
+				ar.forEach((txt, i) => {
+					if (i > 0) s += '<br>';
+					if (!txt.startsWith('<') || !txt.endsWith('>')) s += `<span>${txt}</span>`;
+					else s += txt;
+				});
+				w = s;
+			}
+		}else w = escapehtml(w);
 		sp = ({});
 		if(RS > 1) sp.rowspan = RS;
 		if(CS > 1) sp.colspan = CS;
@@ -25595,10 +25607,18 @@ function parse_ods(zip, opts) {
 			asText: ['text:p', 'number:text'],
 			tagTrap: {
 				'text:p': function(xmlNode, parent, bSeqParent) {
-					if (xmlNode.parentNode?.nodeName?.startsWith('draw:')) {
-						let obj = this.parseNode(xmlNode, parent, bSeqParent);
-						obj.text = this.getAsText(xmlNode);
-						return obj;
+					let pn = xmlNode.parentNode?.nodeName;
+					if (pn) {
+						if (pn === 'table:table-cell') {
+							let obj = this.parseNode(xmlNode, parent, bSeqParent);
+							if (typeof obj === 'object' && obj.a || obj.span) return obj;
+						} else if (pn.startsWith('draw:')) {
+							let obj = this.parseNode(xmlNode, parent, bSeqParent);
+							if (typeof obj === 'object') {
+								obj.text = this.getAsText(xmlNode);
+								return obj;
+							}
+						}
 					}
 				},
 			},
@@ -25758,7 +25778,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				}
 				for (let j = 0; j < iCols; j++) {
 					let cell = cells[j];
-					let c = Object.keys(cell).length ? makeCell(cell) : null;
+					let c = Object.keys(cell).length ? makeCell(cell, Styles, ass, oss, fonts) : null;
 					let be = 0;
 					if (c) {
 						if (drawings) be |= addDraws(drawings, cell, iCol, iRow);
@@ -26016,7 +26036,7 @@ function getDefaultStyle(styles, family) {
 			}) : def.family === family ? def : null;
 	}
 }
-function makeCell(cell) {
+function makeCell(cell, Styles, ass, oss, fonts) {
 	let c = {};
 	let sn = cell['style-name'];
 	if (sn) c.sn = sn;
@@ -26025,18 +26045,43 @@ function makeCell(cell) {
 	if (vt) c.vt = vt;
 	let p = cell.p;
 	let v = cell[vt + '-value'] || cell.value || p;
-	let w = p ? Array.isArray(p) ? p.join('\n') : p : v;
-	if (typeof v === 'object') {
-		let a = v.a;
-		if (a && a.href) {
-			// anchor
-			c.l = {
-				Target: a.href
-			};
-			w = a.value;
-		}
-		v = JSON.stringify(v);
+	let w;
+	if (typeof p === 'object') {
+		w = '';
+		if (!Array.isArray(p)) p = [p];
+		p.forEach(o => {
+			let s = '';
+			if (typeof o === 'object') {
+				let a = o.a;
+				let span = o.span;
+				if (a && a.href) {
+					// anchor
+					c.l = {
+						Target: a.href
+					};
+					s = a.value;
+				} else if (span) {
+					if (!Array.isArray(span)) span = [span];
+					span.forEach(sp => {
+						let sv = sp.value || '';
+						let st = {};
+						setCellStyle(st, Styles, sp, null, ass, oss, fonts);
+						if (st.si != null) sv = `<span si="${st.si}">${sv}</span>`; 
+						s += sv;
+					});
+				} else {
+					s = o.text;
+				}
+			} else {
+				s = o;
+			}
+			if (w) w += '\n';
+			w += s;
+		});
+	} else {
+		w = p || v;
 	}
+	if (typeof v === 'object') v = JSON.stringify(v);
 	let f = cell['formula'];
 	if (f) {
 		if (f.startsWith('of:=')) f = f.substring(4);

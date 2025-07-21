@@ -89,7 +89,19 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			}
 		}
 		/* TODO: html entities */
-		var w = (cell && cell.v != null) && (cell.h || escapehtml(cell.w || (format_cell(cell), cell.w))) || "";
+		var w = (cell && cell.v != null) && (cell.w || (format_cell(cell), cell.w)) || "";
+		if (w.includes('<span')) {
+			let ar = w.split('\n');
+			if (ar.length > 1) {
+				let s = '';
+				ar.forEach((txt, i) => {
+					if (i > 0) s += '<br>';
+					if (!txt.startsWith('<') || !txt.endsWith('>')) s += `<span>${txt}</span>`;
+					else s += txt;
+				});
+				w = s;
+			}
+		}else w = escapehtml(w);
 		sp = ({}/*:any*/);
 		if(RS > 1) sp.rowspan = RS;
 		if(CS > 1) sp.colspan = CS;
