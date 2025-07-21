@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250719';
+XLSX.version = '0.20.3.20250721';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -26328,6 +26328,7 @@ function makeAlignment(tc, pp) {
 		v = getProp('wrap-option', tc);
 		if (v) ret.wrapText = v === 'wrap';
 		if (tc?.direction) ret.direction = tc.direction;
+		if (toBoolean(getProp('shrink-to-fit', tc))) ret.shrinkToFit = true;
 	}
 	ret.horizontal = getProp('text-align', pp) || 'general';
 	return ret;

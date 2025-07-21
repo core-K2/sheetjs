@@ -1444,6 +1444,7 @@ function makeAlignment(tc, pp) {
 		v = getProp('wrap-option', tc);
 		if (v) ret.wrapText = v === 'wrap';
 		if (tc?.direction) ret.direction = tc.direction;
+		if (toBoolean(getProp('shrink-to-fit', tc))) ret.shrinkToFit = true;
 	}
 	ret.horizontal = getProp('text-align', pp) || 'general';
 	return ret;
