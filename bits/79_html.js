@@ -89,7 +89,7 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 			}
 		}
 		/* TODO: html entities */
-		var w = (cell && cell.v != null) && (cell.w || (format_cell(cell), cell.w)) || "";
+		var w = (cell && cell.v != null) && (cell.h || cell.w || (format_cell(cell), cell.w)) || "";
 		if (w.includes('<span')) {
 			let ar = w.split('\n');
 			if (ar.length > 1) {
@@ -101,7 +101,9 @@ function make_html_row(ws/*:Worksheet*/, r/*:Range*/, R/*:number*/, o/*:Sheet2HT
 				});
 				w = s;
 			}
-		}else w = escapehtml(w);
+		} else {
+			w = escapehtml(w.replace(/<br\/>/g, '\n'));
+		}
 		sp = ({}/*:any*/);
 		if(RS > 1) sp.rowspan = RS;
 		if(CS > 1) sp.colspan = CS;
