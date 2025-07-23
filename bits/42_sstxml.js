@@ -194,20 +194,178 @@ function parse_si(x, opts) {
 /* 18.4 Shared String Table */
 var sstr1 = /<(?:\w+:)?(?:si|sstItem)>/g;
 var sstr2 = /<\/(?:\w+:)?(?:si|sstItem)>/;
-function parse_sst_xml(data/*:string*/, opts)/*:SST*/ {
+function parse_sst_xml(data/*:string*/, opts, themes, styles)/*:SST*/ {
 	var s/*:SST*/ = ([]/*:any*/), ss = "";
 	if(!data) return s;
-	/* 18.4.9 sst CT_Sst */
-	var sst = str_match_xml_ns(data, "sst");
-	if(sst) {
-		ss = sst[1].replace(sstr1,"").split(sstr2);
-		for(var i = 0; i != ss.length; ++i) {
-			var o = parse_si(ss[i].trim(), opts);
-			if(o != null) s[s.length] = o;
+	let sst;
+	if (opts.ck2Ex) {
+		sst = parse_xml(data)
+		s = parseStringItem(sst.si, themes, styles);
+	} else {
+		/* 18.4.9 sst CT_Sst */
+		sst = str_match_xml_ns(data, "sst");
+		if(sst) {
+			ss = sst[1].replace(sstr1,"").split(sstr2);
+			for(var i = 0; i != ss.length; ++i) {
+				var o = parse_si(ss[i].trim(), opts);
+				if(o != null) s[s.length] = o;
+			}
+			sst = parsexmltag(sst[0].slice(0, sst[0].indexOf(">")));
 		}
-		sst = parsexmltag(sst[0].slice(0, sst[0].indexOf(">"))); s.Count = sst.count; s.Unique = sst.uniqueCount;
 	}
+	if (sst) {
+		s.Count = sst.count;
+		s.Unique = sst.uniqueCount;
+	}
+console.log(s, themes, styles);
 	return s;
+}
+
+function parseStringItem(si, themes, styles) {
+	let sis = [];
+	if (Array.isArray(si)) {
+		const getAsArray = v => {
+			if (!v) return null;
+			if (!Array.isArray(v)) v = [v];
+			return v;
+		};
+		const getText = v => {
+			if (!v) return '';
+			switch (typeof v) {
+			case 'string': return v;
+			case 'object':
+				if (Array.isArray(v)) {
+					let ar = [];
+					v.forEach(o => ar.push(getText(o)));
+					return ar.join('\n');
+				}
+				if (v.hasOwnProperty('value')) return v.value;
+				if (v.t) return getText(v.t);
+			}
+			return String(v);
+		};
+		const getColor = o => {
+			let c;
+			switch (typeof o) {
+			case 'string':
+				return o;
+			case 'object':
+				for (let n in o) {
+					let v = o[n];
+					switch (n) {
+					case 'rgb':
+						return '#' + v;
+					case 'indexed':
+						c = '#' + themes?.indexedColors[v];
+						break;
+					case 'theme':
+						const th = themes?.themeElements?.clrScheme;
+						if (th) {
+							let t;
+							if (isNaN(v)) {
+								t = th.find(t.name === v);
+							} else {
+								t = th[v];
+							}
+							if (t) c = '#' + t.rgb;
+						}
+						break;
+					default:
+						console.warn('Not implement color:' + n, v);
+						continue;
+					}
+				}
+				break;
+			}
+			return c || 'auto';
+		};
+		const getStyle = o => {
+			let ar = [];
+			let dec = [];
+			for (let p in o) {
+				switch (p) {
+				case 't':
+					continue;
+				case 'space':
+					ar.push({
+						'white-space': 'pre'
+					});
+					break;
+				case 'rPr':
+					const rPr = o[p];
+					if (rPr && typeof rPr === 'object') {
+						for (let n in rPr) {
+							let v = rPr[n];
+							let st;
+							switch (n) {
+							case 'b':
+								st = 'font-weight:bold';
+								break;
+							case 'i':
+								st = 'font-style:italic';
+								break;
+							case 'u':
+								dec.push('underline');
+								st = `text-decoration-style:${v.val}`;
+								break;
+							case 'strike':
+								dec.push('line-through');
+								break;
+							case 'charset':
+							case 'family':
+								break;
+							case 'rFont':
+								st = `font-family:${v.val}`;
+								break;
+							case 'sz':
+								st = `font-size:${v.val}pt`;
+								break;
+							case 'color':
+								st = `color:${getColor(v)}`;
+								break;
+							default:
+								console.warn('Not implement rPr:' + n, v);
+								continue;
+							}
+							if (st) ar.push(st)
+						}
+					}
+					break;
+				default:
+					console.warn('Not implement rPr:' + p, o[p]);
+					continue;
+				}
+			}
+			if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
+			return ar.length > 0 ? ar.join(';') : '';
+		};
+		const getHtml = v => {
+			let s = '';
+			if (!v) return s;
+			if (!Array.isArray(v)) v = [v];
+			v.forEach((o, i) => {
+				if (i > 0) s += '\n';
+				let t;
+				if (typeof o === 'object') {
+					t = getText(o.t || o);
+					let st = getStyle(o);
+					if (st) t = `<span style="${st}">${t}</span>`;
+				} else {
+					t = String(o);
+				}
+				s += t;
+			});
+			return s;
+		};
+		si.forEach(s => {
+			let ar = getAsArray(s.r);
+			let t = getText(ar || s.t);
+			let h = getHtml(ar);
+			// let r = JSON.stringify(s);
+			sis.push({t, h});
+		});
+	}
+	return sis;
 }
 
 var straywsregex = /^\s|\s$|[\t\n\r]/;
