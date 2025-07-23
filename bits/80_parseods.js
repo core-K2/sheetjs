@@ -1295,7 +1295,32 @@ function makeCell(cell, Styles, ass, oss, fonts) {
 	} else {
 		w = p || v;
 	}
-	if (typeof v === 'object') v = JSON.stringify(v);
+	if (typeof v === 'object') {
+		let s = '';
+		const getText = o => {
+			let s = '';
+			if (!o) return s;
+			switch (typeof o) {
+			case 'string': return o;
+			case 'object': break;
+			default: return String(o);
+			}
+			let span = o.span;
+			if (!span) return o.value || s;
+			if (!Array.isArray(span)) span = [span];
+			span.forEach((sp, i) => {
+				if (i > 0) s += '\n';
+				s += getText(sp);
+			});
+			return s;
+		};
+		if (!Array.isArray(v)) v = [v];
+		v.forEach((o, i) => {
+			if (i > 0) s += '\n';
+			s += getText(o);
+		});
+		v = s;
+	}
 	let f = cell['formula'];
 	if (f) {
 		if (f.startsWith('of:=')) f = f.substring(4);
