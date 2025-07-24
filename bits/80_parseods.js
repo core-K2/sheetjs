@@ -967,7 +967,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		});
 		let merges = sh['!merges'] = [];
 		let drawings = opts.drawings ? {} : null;
-		let range = getDataRange(rows);
+		let range = getDataRange(rows, opts.maxNoData);
 		let iRowMax = range.e.r;
 		let iColMax = range.e.c;
 		let iRow = 0;
@@ -1096,8 +1096,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		}
 	});
 }
-const MAX_NO_DATA_ROW_REPEAT = 10;
-function getDataRange(rows) {
+function getDataRange(rows, maxNoData) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
 	let iRow = 1;
 	for (let i = 0; i < rows.length; i++) {
@@ -1122,7 +1121,7 @@ function getDataRange(rows) {
 			}
 			iCol += rep;
 		}
-		if (!be && repRow > MAX_NO_DATA_ROW_REPEAT) row['number-rows-repeated'] = repRow = MAX_NO_DATA_ROW_REPEAT;
+		if (!be && maxNoData > 0 && repRow > maxNoData) row['number-rows-repeated'] = repRow = maxNoData;
 		iRow += repRow;
 	}
 	return range;

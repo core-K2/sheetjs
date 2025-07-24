@@ -573,7 +573,39 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 	}
 	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
-	if(rows.length > 0) s['!rows'] = rows;
+	if(rows.length > 0) {
+		let maxNoData;
+		if ((maxNoData = opts.maxNoData) > 0) {
+			const adjustCellRow = (idx, del) => {
+				rows.splice(idx, del);
+				endCell.r = rows.length;
+				for (let n in s) {
+					const m = /^([A-Z]+)(\d+)$/.exec(n);
+					if (m) {
+						let r = Number(m[2]);
+						if (r > idx) {
+							r -= del;
+							s[m[1] + r] = s[n];
+							delete s[n];
+						}
+					}
+				}
+			};
+			let skip;
+			for (let i = rows.length - 1; i > 0; i--) {
+				if (rows[i] == null) {
+					if (skip > 0) skip++;
+					else skip = 1;
+				} else if (skip > 0) {
+					if (skip > maxNoData) {
+						adjustCellRow(i + 1, skip - maxNoData)
+					}
+					skip = 0;
+				}
+			}
+		}
+		s['!rows'] = rows;
+	}
 }; })();
 
 function write_ws_xml_data(ws/*:Worksheet*/, opts, idx/*:number*/, wb/*:Workbook*//*::, rels*/)/*:string*/ {

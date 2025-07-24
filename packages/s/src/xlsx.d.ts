@@ -199,6 +199,9 @@ export interface ParsingOptions extends CommonOptions {
 
     /* add indexed colors */
     addIndexedColors?: Array<String>;
+
+    /* maximum count of no data repeat */
+    maxNoData?: Number;
 }
 
 /** Options for write and writeFile */
