@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250721';
+XLSX.version = '0.20.3.20250724';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -11668,20 +11668,187 @@ function parse_si(x, opts) {
 /* 18.4 Shared String Table */
 var sstr1 = /<(?:\w+:)?(?:si|sstItem)>/g;
 var sstr2 = /<\/(?:\w+:)?(?:si|sstItem)>/;
-function parse_sst_xml(data, opts) {
+function parse_sst_xml(data, opts, themes, styles) {
 	var s = ([]), ss = "";
 	if(!data) return s;
-	/* 18.4.9 sst CT_Sst */
-	var sst = str_match_xml_ns(data, "sst");
-	if(sst) {
-		ss = sst[1].replace(sstr1,"").split(sstr2);
-		for(var i = 0; i != ss.length; ++i) {
-			var o = parse_si(ss[i].trim(), opts);
-			if(o != null) s[s.length] = o;
+	let sst;
+	if (opts.ck2Ex) {
+		sst = parse_xml(data)
+		s = parseStringItem(sst.si, themes, styles);
+	} else {
+		/* 18.4.9 sst CT_Sst */
+		sst = str_match_xml_ns(data, "sst");
+		if(sst) {
+			ss = sst[1].replace(sstr1,"").split(sstr2);
+			for(var i = 0; i != ss.length; ++i) {
+				var o = parse_si(ss[i].trim(), opts);
+				if(o != null) s[s.length] = o;
+			}
+			sst = parsexmltag(sst[0].slice(0, sst[0].indexOf(">")));
 		}
-		sst = parsexmltag(sst[0].slice(0, sst[0].indexOf(">"))); s.Count = sst.count; s.Unique = sst.uniqueCount;
+	}
+	if (sst) {
+		s.Count = sst.count;
+		s.Unique = sst.uniqueCount;
 	}
 	return s;
+}
+
+function parseStringItem(si, themes, styles) {
+	let sis = [];
+	if (Array.isArray(si)) {
+		const getAsArray = v => {
+			if (!v) return null;
+			if (!Array.isArray(v)) v = [v];
+			return v;
+		};
+		const getText = v => {
+			if (!v) return '';
+			switch (typeof v) {
+			case 'string': return v;
+			case 'object':
+				if (Array.isArray(v)) {
+					let ar = [];
+					v.forEach(o => ar.push(getText(o)));
+					return ar.join();
+				}
+				if (v.hasOwnProperty('value')) return v.value;
+				if (v.t) return getText(v.t);
+			}
+			return String(v);
+		};
+		const getRgbColor = c => {
+			const m = /^[a-f0-9]+$/i.exec(c);
+			if (m) {
+				const a = c.length > 6 ? c.substring(0, 2) : '';
+				return '#' + c.slice(-6) + a;
+			}
+			return c;
+		};
+		const getColor = o => {
+			let c;
+			switch (typeof o) {
+			case 'string':
+				return o;
+			case 'object':
+				for (let n in o) {
+					let v = o[n];
+					switch (n) {
+					case 'rgb':
+						return getRgbColor(v);
+					case 'indexed':
+						c = getRgbColor(themes?.indexedColors[v % 8]);
+						break;
+					case 'theme':
+						const th = themes?.themeElements?.clrScheme;
+						if (th) {
+							let t;
+							if (isNaN(v)) {
+								t = th.find(t.name === v);
+							} else {
+								t = th[v];
+							}
+							if (t) c = getRgbColor(t.rgb);
+						}
+						break;
+					default:
+						console.warn('Not implement color:' + n, v);
+						continue;
+					}
+				}
+				break;
+			}
+			return c || 'auto';
+		};
+		const getStyle = o => {
+			let ar = [];
+			for (let p in o) {
+				switch (p) {
+				case 'value':
+				case 't':
+					continue;
+				case 'space':
+					// ar.push('white-space:pre');
+					break;
+				case 'rPr':
+					const rPr = o[p];
+					if (rPr && typeof rPr === 'object') {
+						let dec = [];
+						let bold;
+						for (let n in rPr) {
+							let v = rPr[n];
+							let st;
+							switch (n) {
+							case 'b':
+								if (v.val || Object.keys(v).length === 0) bold = 'bold';
+								break;
+							case 'i':
+								st = 'font-style:italic';
+								break;
+							case 'u':
+								dec.push('underline');
+								st = `text-decoration-style:${v.val}`;
+								break;
+							case 'strike':
+								dec.push('line-through');
+								break;
+							case 'charset':
+							case 'family':
+							case 'scheme':
+								break;
+							case 'rFont':
+								st = `font-family:${v.val}`;
+								break;
+							case 'sz':
+								st = `font-size:${v.val}pt`;
+								break;
+							case 'color':
+								st = `color:${getColor(v)}`;
+								break;
+							default:
+								console.warn('Not implement rPr:' + n, v);
+								continue;
+							}
+							if (st) ar.push(st)
+						}
+						ar.push(`font-weight:${bold || 'normal'}`);
+						if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
+					}
+					break;
+				default:
+					console.warn('Not implement style:' + p, o[p]);
+					continue;
+				}
+			}
+			return ar.length > 0 ? ar.join(';') : '';
+		};
+		const getHtml = v => {
+			let s = '';
+			if (!v) return s;
+			if (!Array.isArray(v)) v = [v];
+			v.forEach((o, i) => {
+				// if (i > 0) s += '\n';
+				let t;
+				if (typeof o === 'object') {
+					t = getText(o.t || o);
+					let st = getStyle(o);
+					if (st) t = `<span style="${st}">${t}</span>`;
+				} else {
+					t = String(o);
+				}
+				s += t;
+			});
+			return s;
+		};
+		si.forEach(s => {
+			let ar = getAsArray(s.r);
+			let t = getText(ar || s.t);
+			let h = getHtml(ar);
+			// let r = JSON.stringify(s);
+			sis.push({t, h});
+		});
+	}
+	return sis;
 }
 
 var straywsregex = /^\s|\s$|[\t\n\r]/;
@@ -18204,7 +18371,39 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 	}
 	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
-	if(rows.length > 0) s['!rows'] = rows;
+	if(rows.length > 0) {
+		let maxNoData;
+		if ((maxNoData = opts.maxNoData) > 0) {
+			const adjustCellRow = (idx, del) => {
+				rows.splice(idx, del);
+				endCell.r = rows.length;
+				for (let n in s) {
+					const m = /^([A-Z]+)(\d+)$/.exec(n);
+					if (m) {
+						let r = Number(m[2]);
+						if (r > idx) {
+							r -= del;
+							s[m[1] + r] = s[n];
+							delete s[n];
+						}
+					}
+				}
+			};
+			let skip;
+			for (let i = rows.length - 1; i > 0; i--) {
+				if (rows[i] == null) {
+					if (skip > 0) skip++;
+					else skip = 1;
+				} else if (skip > 0) {
+					if (skip > maxNoData) {
+						adjustCellRow(i + 1, skip - maxNoData)
+					}
+					skip = 0;
+				}
+			}
+		}
+		s['!rows'] = rows;
+	}
 }; })();
 
 function write_ws_xml_data(ws, opts, idx, wb) {
@@ -20367,9 +20566,9 @@ function parse_sty(data, name, themes, opts) {
 	return parse_sty_xml((data), themes, opts);
 }
 
-function parse_sst(data, name, opts) {
+function parse_sst(data, name, opts, themes, styles) {
 	if(name.slice(-4)===".bin") return parse_sst_bin((data), opts);
-	return parse_sst_xml((data), opts);
+	return parse_sst_xml((data), opts, themes, styles);
 }
 
 function parse_cmnt(data, name, opts) {
@@ -25755,7 +25954,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		});
 		let merges = sh['!merges'] = [];
 		let drawings = opts.drawings ? {} : null;
-		let range = getDataRange(rows);
+		let range = getDataRange(rows, opts.maxNoData);
 		let iRowMax = range.e.r;
 		let iColMax = range.e.c;
 		let iRow = 0;
@@ -25884,8 +26083,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 		}
 	});
 }
-const MAX_NO_DATA_ROW_REPEAT = 10;
-function getDataRange(rows) {
+function getDataRange(rows, maxNoData) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
 	let iRow = 1;
 	for (let i = 0; i < rows.length; i++) {
@@ -25910,7 +26108,7 @@ function getDataRange(rows) {
 			}
 			iCol += rep;
 		}
-		if (!be && repRow > MAX_NO_DATA_ROW_REPEAT) row['number-rows-repeated'] = repRow = MAX_NO_DATA_ROW_REPEAT;
+		if (!be && maxNoData > 0 && repRow > maxNoData) row['number-rows-repeated'] = repRow = maxNoData;
 		iRow += repRow;
 	}
 	return range;
@@ -26083,7 +26281,32 @@ function makeCell(cell, Styles, ass, oss, fonts) {
 	} else {
 		w = p || v;
 	}
-	if (typeof v === 'object') v = JSON.stringify(v);
+	if (typeof v === 'object') {
+		let s = '';
+		const getText = o => {
+			let s = '';
+			if (!o) return s;
+			switch (typeof o) {
+			case 'string': return o;
+			case 'object': break;
+			default: return String(o);
+			}
+			let span = o.span;
+			if (!span) return o.value || s;
+			if (!Array.isArray(span)) span = [span];
+			span.forEach((sp, i) => {
+				if (i > 0) s += '\n';
+				s += getText(sp);
+			});
+			return s;
+		};
+		if (!Array.isArray(v)) v = [v];
+		v.forEach((o, i) => {
+			if (i > 0) s += '\n';
+			s += getText(o);
+		});
+		v = s;
+	}
 	let f = cell['formula'];
 	if (f) {
 		if (f.startsWith('of:=')) f = f.substring(4);
@@ -30103,11 +30326,11 @@ function parse_zip(zip, opts) {
 	var styles = ({});
 	if(!opts.bookSheets && !opts.bookProps) {
 		strs = [];
-		if(dir.sst) try { strs=parse_sst(getzipdata(zip, strip_front_slash(dir.sst)), dir.sst, opts); } catch(e) { if(opts.WTF) throw e; }
-
 		if(opts.cellStyles && dir.themes.length) themes = parse_theme_xml(getzipstr(zip, dir.themes[0].replace(/^\//,''), true)||"", opts);
 
 		if(dir.style) styles = parse_sty(getzipdata(zip, strip_front_slash(dir.style)), dir.style, themes, opts);
+
+		if(dir.sst) try { strs=parse_sst(getzipdata(zip, strip_front_slash(dir.sst)), dir.sst, opts, themes, styles); } catch(e) { if(opts.WTF) throw e; }
 	}
 
 	/*var externbooks = */dir.links.map(function(link) {

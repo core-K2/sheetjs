@@ -263,7 +263,7 @@ function parseStringItem(si, themes, styles) {
 					case 'rgb':
 						return getRgbColor(v);
 					case 'indexed':
-						c = getRgbColor(themes?.indexedColors[v]);
+						c = getRgbColor(themes?.indexedColors[v % 8]);
 						break;
 					case 'theme':
 						const th = themes?.themeElements?.clrScheme;
@@ -320,6 +320,7 @@ function parseStringItem(si, themes, styles) {
 								break;
 							case 'charset':
 							case 'family':
+							case 'scheme':
 								break;
 							case 'rFont':
 								st = `font-family:${v.val}`;
