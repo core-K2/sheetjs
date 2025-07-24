@@ -217,7 +217,6 @@ function parse_sst_xml(data/*:string*/, opts, themes, styles)/*:SST*/ {
 		s.Count = sst.count;
 		s.Unique = sst.uniqueCount;
 	}
-console.log(s, themes, styles);
 	return s;
 }
 
@@ -237,12 +236,20 @@ function parseStringItem(si, themes, styles) {
 				if (Array.isArray(v)) {
 					let ar = [];
 					v.forEach(o => ar.push(getText(o)));
-					return ar.join('\n');
+					return ar.join();
 				}
 				if (v.hasOwnProperty('value')) return v.value;
 				if (v.t) return getText(v.t);
 			}
 			return String(v);
+		};
+		const getRgbColor = c => {
+			const m = /^[a-f0-9]+$/i.exec(c);
+			if (m) {
+				const a = c.length > 6 ? c.substring(0, 2) : '';
+				return '#' + c.slice(-6) + a;
+			}
+			return c;
 		};
 		const getColor = o => {
 			let c;
@@ -254,9 +261,9 @@ function parseStringItem(si, themes, styles) {
 					let v = o[n];
 					switch (n) {
 					case 'rgb':
-						return '#' + v;
+						return getRgbColor(v);
 					case 'indexed':
-						c = '#' + themes?.indexedColors[v];
+						c = getRgbColor(themes?.indexedColors[v]);
 						break;
 					case 'theme':
 						const th = themes?.themeElements?.clrScheme;
@@ -267,7 +274,7 @@ function parseStringItem(si, themes, styles) {
 							} else {
 								t = th[v];
 							}
-							if (t) c = '#' + t.rgb;
+							if (t) c = getRgbColor(t.rgb);
 						}
 						break;
 					default:
@@ -281,25 +288,25 @@ function parseStringItem(si, themes, styles) {
 		};
 		const getStyle = o => {
 			let ar = [];
-			let dec = [];
 			for (let p in o) {
 				switch (p) {
+				case 'value':
 				case 't':
 					continue;
 				case 'space':
-					ar.push({
-						'white-space': 'pre'
-					});
+					// ar.push('white-space:pre');
 					break;
 				case 'rPr':
 					const rPr = o[p];
 					if (rPr && typeof rPr === 'object') {
+						let dec = [];
+						let bold;
 						for (let n in rPr) {
 							let v = rPr[n];
 							let st;
 							switch (n) {
 							case 'b':
-								st = 'font-weight:bold';
+								if (v.val || Object.keys(v).length === 0) bold = 'bold';
 								break;
 							case 'i':
 								st = 'font-style:italic';
@@ -329,14 +336,15 @@ function parseStringItem(si, themes, styles) {
 							}
 							if (st) ar.push(st)
 						}
+						ar.push(`font-weight:${bold || 'normal'}`);
+						if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
 					}
 					break;
 				default:
-					console.warn('Not implement rPr:' + p, o[p]);
+					console.warn('Not implement style:' + p, o[p]);
 					continue;
 				}
 			}
-			if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
 			return ar.length > 0 ? ar.join(';') : '';
 		};
 		const getHtml = v => {
@@ -344,7 +352,7 @@ function parseStringItem(si, themes, styles) {
 			if (!v) return s;
 			if (!Array.isArray(v)) v = [v];
 			v.forEach((o, i) => {
-				if (i > 0) s += '\n';
+				// if (i > 0) s += '\n';
 				let t;
 				if (typeof o === 'object') {
 					t = getText(o.t || o);
