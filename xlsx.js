@@ -11710,7 +11710,7 @@ function parseStringItem(si, themes, styles) {
 				if (Array.isArray(v)) {
 					let ar = [];
 					v.forEach(o => ar.push(getText(o)));
-					return ar.join();
+					return ar.join("");
 				}
 				if (v.hasOwnProperty('value')) return v.value;
 				if (v.t) return getText(v.t);
