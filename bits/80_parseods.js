@@ -889,7 +889,6 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
                     rgb: '000000'
                 },
                 name: 'Yu Gothic',
-                family: 2
 			}],
 			Fills: [{
 				patternType: 'none'
@@ -923,11 +922,15 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 }
 
 function convert_content(wb, content, styles, opts, zip, setting) {
+	let Styles = wb.Styles;
 	let body = content.body;
-	let fonts = content['font-face-decls'];
+	let fonts = content['font-face-decls']?.['font-face'];
+	if (fonts) {
+		if (!Array.isArray(fonts)) fonts = [fonts];
+		Styles.FontFaces = fonts;
+	}
 	let ass = toNameObjects(content['automatic-styles']);
 	let oss = toNameObjects(styles);
-	let Styles = wb.Styles;
 	let ss = body.spreadsheet;
 	let sheets = ss.table;
 	let dss = null;
@@ -1420,7 +1423,7 @@ function getStyleObject(obj, name, st, styles, ass) {
 	}
 	return obj;
 }
-function makeFont(tp, fonts, decls) {
+function makeFont(tp, Fonts, fonts) {
 	if (!tp) return 0;
 	let fn = tp['font-name-asian'] || tp['font-name'];
 	let fs = tp['font-size-asian'] || tp['font-size'];
@@ -1428,7 +1431,7 @@ function makeFont(tp, fonts, decls) {
 	let f = {
 		sz: getPixelSize(fs, 'pt'),
 		name: fn,
-		family: getFontFamily(tp['font-family-generic-asian'] || tp['font-family-generic'], decls)
+		family: getFontFamily(fn, fonts)
 	};
 	let fc = tp.color;
 	if (fc) {
@@ -1444,14 +1447,12 @@ function makeFont(tp, fonts, decls) {
 	if (us && us !== 'none') f.underline = getUnderLine(us, tp['text-underline-type']);
 	let lt = tp['text-line-through-style'];
 	if (lt && lt !== 'none') f.strike = true;
-	return getOrAddObject(fonts, f);
+	return getOrAddObject(Fonts, f);
 }
-function getFontFamily(ff, decls) {
-	let i = 0;
-	for (let d in decls) {
-		let v = decls[d];
-		if (v && v['font-family-generic'] == ff) return i;
-		i++;
+function getFontFamily(ff, fonts) {
+	if (Array.isArray(fonts)) {
+		let i = fonts.findIndex(f => f.name === ff);
+		if (i >= 0) return i;
 	}
 	return 0;
 }

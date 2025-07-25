@@ -263,7 +263,7 @@ function parseStringItem(si, themes, styles) {
 					case 'rgb':
 						return getRgbColor(v);
 					case 'indexed':
-						c = getRgbColor(themes?.indexedColors[v % 8]);
+						c = getRgbColor(themes?.indexedColors?.[v % 8]);
 						break;
 					case 'theme':
 						const th = themes?.themeElements?.clrScheme;
