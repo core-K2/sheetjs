@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250724';
+XLSX.version = '0.20.3.20250725';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -11714,6 +11714,7 @@ function parseStringItem(si, themes, styles) {
 				}
 				if (v.hasOwnProperty('value')) return v.value;
 				if (v.t) return getText(v.t);
+				return '';
 			}
 			return String(v);
 		};
@@ -11737,7 +11738,7 @@ function parseStringItem(si, themes, styles) {
 					case 'rgb':
 						return getRgbColor(v);
 					case 'indexed':
-						c = getRgbColor(themes?.indexedColors[v % 8]);
+						c = getRgbColor(themes?.indexedColors?.[v % 8]);
 						break;
 					case 'theme':
 						const th = themes?.themeElements?.clrScheme;
@@ -25876,7 +25877,6 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
                     rgb: '000000'
                 },
                 name: 'Yu Gothic',
-                family: 2
 			}],
 			Fills: [{
 				patternType: 'none'
@@ -25910,11 +25910,12 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 }
 
 function convert_content(wb, content, styles, opts, zip, setting) {
+	let Styles = wb.Styles;
 	let body = content.body;
-	let fonts = content['font-face-decls'];
+	let fonts = content['font-face-decls']?.['font-face'];
+	if (fonts && !Array.isArray(fonts)) fonts = [fonts];
 	let ass = toNameObjects(content['automatic-styles']);
 	let oss = toNameObjects(styles);
-	let Styles = wb.Styles;
 	let ss = body.spreadsheet;
 	let sheets = ss.table;
 	let dss = null;
@@ -26407,7 +26408,7 @@ function getStyleObject(obj, name, st, styles, ass) {
 	}
 	return obj;
 }
-function makeFont(tp, fonts, decls) {
+function makeFont(tp, Fonts, fonts) {
 	if (!tp) return 0;
 	let fn = tp['font-name-asian'] || tp['font-name'];
 	let fs = tp['font-size-asian'] || tp['font-size'];
@@ -26415,8 +26416,11 @@ function makeFont(tp, fonts, decls) {
 	let f = {
 		sz: getPixelSize(fs, 'pt'),
 		name: fn,
-		family: getFontFamily(tp['font-family-generic-asian'] || tp['font-family-generic'], decls)
 	};
+	if (Array.isArray(fonts)) {
+		let ff = fonts.find(f => f.name === fn);
+		if (ff) f.fontFamily = ff['font-family'];
+	}
 	let fc = tp.color;
 	if (fc) {
 		f.color = {
@@ -26431,16 +26435,7 @@ function makeFont(tp, fonts, decls) {
 	if (us && us !== 'none') f.underline = getUnderLine(us, tp['text-underline-type']);
 	let lt = tp['text-line-through-style'];
 	if (lt && lt !== 'none') f.strike = true;
-	return getOrAddObject(fonts, f);
-}
-function getFontFamily(ff, decls) {
-	let i = 0;
-	for (let d in decls) {
-		let v = decls[d];
-		if (v && v['font-family-generic'] == ff) return i;
-		i++;
-	}
-	return 0;
+	return getOrAddObject(Fonts, f);
 }
 function getUnderLine(us, ut) {
 	let ul = 1;
