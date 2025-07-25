@@ -240,6 +240,7 @@ function parseStringItem(si, themes, styles) {
 				}
 				if (v.hasOwnProperty('value')) return v.value;
 				if (v.t) return getText(v.t);
+				return '';
 			}
 			return String(v);
 		};
