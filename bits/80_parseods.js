@@ -925,10 +925,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 	let Styles = wb.Styles;
 	let body = content.body;
 	let fonts = content['font-face-decls']?.['font-face'];
-	if (fonts) {
-		if (!Array.isArray(fonts)) fonts = [fonts];
-		Styles.FontFaces = fonts;
-	}
+	if (fonts && !Array.isArray(fonts)) fonts = [fonts];
 	let ass = toNameObjects(content['automatic-styles']);
 	let oss = toNameObjects(styles);
 	let ss = body.spreadsheet;
@@ -1431,8 +1428,11 @@ function makeFont(tp, Fonts, fonts) {
 	let f = {
 		sz: getPixelSize(fs, 'pt'),
 		name: fn,
-		family: getFontFamily(fn, fonts)
 	};
+	if (Array.isArray(fonts)) {
+		let ff = fonts.find(f => f.name === fn);
+		if (ff) f.fontFamily = ff['font-family'];
+	}
 	let fc = tp.color;
 	if (fc) {
 		f.color = {
@@ -1448,13 +1448,6 @@ function makeFont(tp, Fonts, fonts) {
 	let lt = tp['text-line-through-style'];
 	if (lt && lt !== 'none') f.strike = true;
 	return getOrAddObject(Fonts, f);
-}
-function getFontFamily(ff, fonts) {
-	if (Array.isArray(fonts)) {
-		let i = fonts.findIndex(f => f.name === ff);
-		if (i >= 0) return i;
-	}
-	return 0;
 }
 function getUnderLine(us, ut) {
 	let ul = 1;
