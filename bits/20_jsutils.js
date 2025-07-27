@@ -1393,6 +1393,158 @@ function analyzeImageData(bstr) {
 	};
 }
 
+/**
+ * text parser contain rPr
+ */
+var textParser = {
+	themes: {},
+	getAsArray: function(v) {
+		if (!v) return null;
+		if (!Array.isArray(v)) v = [v];
+		return v;
+	},
+	getText: function(v) {
+		if (!v) return '';
+		switch (typeof v) {
+		case 'string': return v;
+		case 'object':
+			if (Array.isArray(v)) {
+				let ar = [];
+				v.forEach(function(o) {
+					ar.push(this.getText(o));
+				}, this);
+				return ar.join("");
+			}
+			if (v.hasOwnProperty('value')) return v.value;
+			if (v.t) return this.getText(v.t);
+			return '';
+		}
+		return String(v);
+	},
+	getRgbColor: function(c) {
+		const m = /^[a-f0-9]+$/i.exec(c);
+		if (m) {
+			const a = c.length > 6 ? c.substring(0, 2) : '';
+			return '#' + c.slice(-6) + a;
+		}
+		return c;
+	},
+	getColor: function(o) {
+		let c;
+		switch (typeof o) {
+		case 'string':
+			return o;
+		case 'object':
+			for (let n in o) {
+				let v = o[n];
+				switch (n) {
+				case 'rgb':
+					return this.getRgbColor(v);
+				case 'indexed':
+					c = this.getRgbColor(this.themes?.indexedColors?.[v % 8]);
+					break;
+				case 'theme':
+					const th = this.themes?.themeElements?.clrScheme;
+					if (th) {
+						let t;
+						if (isNaN(v)) {
+							t = th.find(t => t.name === v);
+						} else {
+							t = th[v];
+						}
+						if (t) c = this.getRgbColor(t.rgb);
+					}
+					break;
+				default:
+					console.warn('Not implement color:' + n, v);
+					continue;
+				}
+			}
+			break;
+		}
+		return c || 'auto';
+	},
+	getStyle: function(o) {
+		let ar = [];
+		for (let p in o) {
+			switch (p) {
+			case 'value':
+			case 't':
+				continue;
+			case 'space':
+				// ar.push('white-space:pre');
+				break;
+			case 'rPr':
+				const rPr = o[p];
+				if (rPr && typeof rPr === 'object') {
+					let dec = [];
+					let bold;
+					for (let n in rPr) {
+						let v = rPr[n];
+						let st;
+						switch (n) {
+						case 'b':
+							if (v.val || Object.keys(v).length === 0) bold = 'bold';
+							break;
+						case 'i':
+							st = 'font-style:italic';
+							break;
+						case 'u':
+							dec.push('underline');
+							st = `text-decoration-style:${v.val}`;
+							break;
+						case 'strike':
+							dec.push('line-through');
+							break;
+						case 'charset':
+						case 'family':
+						case 'scheme':
+							break;
+						case 'rFont':
+							st = `font-family:${v.val}`;
+							break;
+						case 'sz':
+							st = `font-size:${v.val}pt`;
+							break;
+						case 'color':
+							st = `color:${this.getColor(v)}`;
+							break;
+						default:
+							console.warn('Not implement rPr:' + n, v);
+							continue;
+						}
+						if (st) ar.push(st)
+					}
+					ar.push(`font-weight:${bold || 'normal'}`);
+					if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
+				}
+				break;
+			default:
+				console.warn('Not implement style:' + p, o[p]);
+				continue;
+			}
+		}
+		return ar.length > 0 ? ar.join(';') : '';
+	},
+	getHtml: function(v) {
+		let s = '';
+		if (!v) return s;
+		if (!Array.isArray(v)) v = [v];
+		v.forEach(function(o) {
+			let t;
+			if (typeof o === 'object') {
+				t = this.getText(o.t || o);
+				let st = this.getStyle(o);
+				if (st) t = `<span style="${st}">${t}</span>`;
+			} else {
+				t = String(o);
+			}
+			s += t;
+		}, this);
+		return s;
+	},
+};
+
 // export core-K2 expansion
 var CK2 = {
 	Xml: Xml,
