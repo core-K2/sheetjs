@@ -1,5 +1,8 @@
 /* 18.7 Comments */
 function parse_comments_xml(data/*:string*/, opts)/*:Array<RawComment>*/ {
+	if (opts.ck2Ex) {
+		return parseComments(parse_xml(data));
+	}
 	/* 18.7.6 CT_Comments */
 	if(data.match(/<(?:\w+:)?comments *\/>/)) return [];
 	var authors/*:Array<string>*/ = [];
@@ -28,6 +31,31 @@ function parse_comments_xml(data/*:string*/, opts)/*:Array<RawComment>*/ {
 		commentList.push(comment);
 	});
 	return commentList;
+}
+
+function parseComments(xml) {
+	let lst = xml?.commentList?.comment;
+	if (lst) {
+		if (!Array.isArray(lst)) lst = [lst];
+		let authors = xml.authors || '';
+		if (!Array.isArray(authors)) authors = [authors];
+		lst.forEach(l => {
+			const a = l.authorId;
+			const s = l.text;
+			if (a != null) {
+				l.author = authors[a]?.author || '';
+				delete l.authorId;
+			}
+			if (s != null) {
+				let ar = textParser.getAsArray(s.r);
+				l.t = textParser.getText(ar || s.t);
+				l.h = textParser.getHtml(ar);
+				l.r = s.r;
+				delete l.text;
+			}
+		});
+	}
+	return lst || [];
 }
 
 function write_comments_xml(data/*::, opts*/) {
