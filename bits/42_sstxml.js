@@ -194,13 +194,13 @@ function parse_si(x, opts) {
 /* 18.4 Shared String Table */
 var sstr1 = /<(?:\w+:)?(?:si|sstItem)>/g;
 var sstr2 = /<\/(?:\w+:)?(?:si|sstItem)>/;
-function parse_sst_xml(data/*:string*/, opts, themes, styles)/*:SST*/ {
+function parse_sst_xml(data/*:string*/, opts)/*:SST*/ {
 	var s/*:SST*/ = ([]/*:any*/), ss = "";
 	if(!data) return s;
 	let sst;
 	if (opts.ck2Ex) {
 		sst = parse_xml(data)
-		s = parseStringItem(sst.si, themes, styles);
+		s = parseStringItem(sst.si);
 	} else {
 		/* 18.4.9 sst CT_Sst */
 		sst = str_match_xml_ns(data, "sst");
@@ -220,10 +220,9 @@ function parse_sst_xml(data/*:string*/, opts, themes, styles)/*:SST*/ {
 	return s;
 }
 
-function parseStringItem(si, themes, styles) {
+function parseStringItem(si) {
 	let sis = [];
 	if (Array.isArray(si)) {
-		textParser.themes = themes;
 		si.forEach(s => {
 			let ar = textParser.getAsArray(s.r);
 			let t = textParser.getText(ar || s.t);

@@ -28,9 +28,9 @@ function parse_sty(data, name/*:string*/, themes, opts) {
 	return parse_sty_xml((data/*:any*/), themes, opts);
 }
 
-function parse_sst(data, name/*:string*/, opts, themes, styles)/*:SST*/ {
+function parse_sst(data, name/*:string*/, opts)/*:SST*/ {
 	if(name.slice(-4)===".bin") return parse_sst_bin((data/*:any*/), opts);
-	return parse_sst_xml((data/*:any*/), opts, themes, styles);
+	return parse_sst_xml((data/*:any*/), opts);
 }
 
 function parse_cmnt(data, name/*:string*/, opts)/*:Array<RawComment>*/ {
