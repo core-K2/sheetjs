@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250725';
+XLSX.version = '0.20.3.20250727';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4686,6 +4686,158 @@ function analyzeImageData(bstr) {
 		b64: btoa(String.fromCharCode.apply(null, bytes))
 	};
 }
+
+/**
+ * text parser contain rPr
+ */
+var textParser = {
+	themes: {},
+	getAsArray: function(v) {
+		if (!v) return null;
+		if (!Array.isArray(v)) v = [v];
+		return v;
+	},
+	getText: function(v) {
+		if (!v) return '';
+		switch (typeof v) {
+		case 'string': return v;
+		case 'object':
+			if (Array.isArray(v)) {
+				let ar = [];
+				v.forEach(function(o) {
+					ar.push(this.getText(o));
+				}, this);
+				return ar.join("");
+			}
+			if (v.hasOwnProperty('value')) return v.value;
+			if (v.t) return this.getText(v.t);
+			return '';
+		}
+		return String(v);
+	},
+	getRgbColor: function(c) {
+		const m = /^[a-f0-9]+$/i.exec(c);
+		if (m) {
+			const a = c.length > 6 ? c.substring(0, 2) : '';
+			return '#' + c.slice(-6) + a;
+		}
+		return c;
+	},
+	getColor: function(o) {
+		let c;
+		switch (typeof o) {
+		case 'string':
+			return o;
+		case 'object':
+			for (let n in o) {
+				let v = o[n];
+				switch (n) {
+				case 'rgb':
+					return this.getRgbColor(v);
+				case 'indexed':
+					c = this.getRgbColor(this.themes?.indexedColors?.[v % 8]);
+					break;
+				case 'theme':
+					const th = this.themes?.themeElements?.clrScheme;
+					if (th) {
+						let t;
+						if (isNaN(v)) {
+							t = th.find(t => t.name === v);
+						} else {
+							t = th[v];
+						}
+						if (t) c = this.getRgbColor(t.rgb);
+					}
+					break;
+				default:
+					console.warn('Not implement color:' + n, v);
+					continue;
+				}
+			}
+			break;
+		}
+		return c || 'auto';
+	},
+	getStyle: function(o) {
+		let ar = [];
+		for (let p in o) {
+			switch (p) {
+			case 'value':
+			case 't':
+				continue;
+			case 'space':
+				// ar.push('white-space:pre');
+				break;
+			case 'rPr':
+				const rPr = o[p];
+				if (rPr && typeof rPr === 'object') {
+					let dec = [];
+					let bold;
+					for (let n in rPr) {
+						let v = rPr[n];
+						let st;
+						switch (n) {
+						case 'b':
+							if (v.val || Object.keys(v).length === 0) bold = 'bold';
+							break;
+						case 'i':
+							st = 'font-style:italic';
+							break;
+						case 'u':
+							dec.push('underline');
+							st = `text-decoration-style:${v.val}`;
+							break;
+						case 'strike':
+							dec.push('line-through');
+							break;
+						case 'charset':
+						case 'family':
+						case 'scheme':
+							break;
+						case 'rFont':
+							st = `font-family:${v.val}`;
+							break;
+						case 'sz':
+							st = `font-size:${v.val}pt`;
+							break;
+						case 'color':
+							st = `color:${this.getColor(v)}`;
+							break;
+						default:
+							console.warn('Not implement rPr:' + n, v);
+							continue;
+						}
+						if (st) ar.push(st)
+					}
+					ar.push(`font-weight:${bold || 'normal'}`);
+					if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
+				}
+				break;
+			default:
+				console.warn('Not implement style:' + p, o[p]);
+				continue;
+			}
+		}
+		return ar.length > 0 ? ar.join(';') : '';
+	},
+	getHtml: function(v) {
+		let s = '';
+		if (!v) return s;
+		if (!Array.isArray(v)) v = [v];
+		v.forEach(function(o) {
+			let t;
+			if (typeof o === 'object') {
+				t = this.getText(o.t || o);
+				let st = this.getStyle(o);
+				if (st) t = `<span style="${st}">${t}</span>`;
+			} else {
+				t = String(o);
+			}
+			s += t;
+		}, this);
+		return s;
+	},
+};
 
 // export core-K2 expansion
 var CK2 = {
@@ -11668,13 +11820,13 @@ function parse_si(x, opts) {
 /* 18.4 Shared String Table */
 var sstr1 = /<(?:\w+:)?(?:si|sstItem)>/g;
 var sstr2 = /<\/(?:\w+:)?(?:si|sstItem)>/;
-function parse_sst_xml(data, opts, themes, styles) {
+function parse_sst_xml(data, opts) {
 	var s = ([]), ss = "";
 	if(!data) return s;
 	let sst;
 	if (opts.ck2Ex) {
 		sst = parse_xml(data)
-		s = parseStringItem(sst.si, themes, styles);
+		s = parseStringItem(sst.si);
 	} else {
 		/* 18.4.9 sst CT_Sst */
 		sst = str_match_xml_ns(data, "sst");
@@ -11694,157 +11846,13 @@ function parse_sst_xml(data, opts, themes, styles) {
 	return s;
 }
 
-function parseStringItem(si, themes, styles) {
+function parseStringItem(si) {
 	let sis = [];
 	if (Array.isArray(si)) {
-		const getAsArray = v => {
-			if (!v) return null;
-			if (!Array.isArray(v)) v = [v];
-			return v;
-		};
-		const getText = v => {
-			if (!v) return '';
-			switch (typeof v) {
-			case 'string': return v;
-			case 'object':
-				if (Array.isArray(v)) {
-					let ar = [];
-					v.forEach(o => ar.push(getText(o)));
-					return ar.join("");
-				}
-				if (v.hasOwnProperty('value')) return v.value;
-				if (v.t) return getText(v.t);
-				return '';
-			}
-			return String(v);
-		};
-		const getRgbColor = c => {
-			const m = /^[a-f0-9]+$/i.exec(c);
-			if (m) {
-				const a = c.length > 6 ? c.substring(0, 2) : '';
-				return '#' + c.slice(-6) + a;
-			}
-			return c;
-		};
-		const getColor = o => {
-			let c;
-			switch (typeof o) {
-			case 'string':
-				return o;
-			case 'object':
-				for (let n in o) {
-					let v = o[n];
-					switch (n) {
-					case 'rgb':
-						return getRgbColor(v);
-					case 'indexed':
-						c = getRgbColor(themes?.indexedColors?.[v % 8]);
-						break;
-					case 'theme':
-						const th = themes?.themeElements?.clrScheme;
-						if (th) {
-							let t;
-							if (isNaN(v)) {
-								t = th.find(t.name === v);
-							} else {
-								t = th[v];
-							}
-							if (t) c = getRgbColor(t.rgb);
-						}
-						break;
-					default:
-						console.warn('Not implement color:' + n, v);
-						continue;
-					}
-				}
-				break;
-			}
-			return c || 'auto';
-		};
-		const getStyle = o => {
-			let ar = [];
-			for (let p in o) {
-				switch (p) {
-				case 'value':
-				case 't':
-					continue;
-				case 'space':
-					// ar.push('white-space:pre');
-					break;
-				case 'rPr':
-					const rPr = o[p];
-					if (rPr && typeof rPr === 'object') {
-						let dec = [];
-						let bold;
-						for (let n in rPr) {
-							let v = rPr[n];
-							let st;
-							switch (n) {
-							case 'b':
-								if (v.val || Object.keys(v).length === 0) bold = 'bold';
-								break;
-							case 'i':
-								st = 'font-style:italic';
-								break;
-							case 'u':
-								dec.push('underline');
-								st = `text-decoration-style:${v.val}`;
-								break;
-							case 'strike':
-								dec.push('line-through');
-								break;
-							case 'charset':
-							case 'family':
-							case 'scheme':
-								break;
-							case 'rFont':
-								st = `font-family:${v.val}`;
-								break;
-							case 'sz':
-								st = `font-size:${v.val}pt`;
-								break;
-							case 'color':
-								st = `color:${getColor(v)}`;
-								break;
-							default:
-								console.warn('Not implement rPr:' + n, v);
-								continue;
-							}
-							if (st) ar.push(st)
-						}
-						ar.push(`font-weight:${bold || 'normal'}`);
-						if (dec.length > 0) ar.push(`text-decoration:${dec.join(' ')}`);
-					}
-					break;
-				default:
-					console.warn('Not implement style:' + p, o[p]);
-					continue;
-				}
-			}
-			return ar.length > 0 ? ar.join(';') : '';
-		};
-		const getHtml = v => {
-			let s = '';
-			if (!v) return s;
-			if (!Array.isArray(v)) v = [v];
-			v.forEach((o, i) => {
-				// if (i > 0) s += '\n';
-				let t;
-				if (typeof o === 'object') {
-					t = getText(o.t || o);
-					let st = getStyle(o);
-					if (st) t = `<span style="${st}">${t}</span>`;
-				} else {
-					t = String(o);
-				}
-				s += t;
-			});
-			return s;
-		};
 		si.forEach(s => {
-			let ar = getAsArray(s.r);
-			let t = getText(ar || s.t);
-			let h = getHtml(ar);
+			let ar = textParser.getAsArray(s.r);
+			let t = textParser.getText(ar || s.t);
+			let h = textParser.getHtml(ar);
 			// let r = JSON.stringify(s);
 			sis.push({t, h});
 		});
@@ -14737,6 +14745,9 @@ function sheet_insert_comments(sheet, comments, threaded, people) {
 }
 /* 18.7 Comments */
 function parse_comments_xml(data, opts) {
+	if (opts.ck2Ex) {
+		return parseComments(parse_xml(data));
+	}
 	/* 18.7.6 CT_Comments */
 	if(data.match(/<(?:\w+:)?comments *\/>/)) return [];
 	var authors = [];
@@ -14765,6 +14776,31 @@ function parse_comments_xml(data, opts) {
 		commentList.push(comment);
 	});
 	return commentList;
+}
+
+function parseComments(xml) {
+	let lst = xml?.commentList?.comment;
+	if (lst) {
+		if (!Array.isArray(lst)) lst = [lst];
+		let authors = xml.authors || '';
+		if (!Array.isArray(authors)) authors = [authors];
+		lst.forEach(l => {
+			const a = l.authorId;
+			const s = l.text;
+			if (a != null) {
+				l.author = authors[a]?.author || '';
+				delete l.authorId;
+			}
+			if (s != null) {
+				let ar = textParser.getAsArray(s.r);
+				l.t = textParser.getText(ar || s.t);
+				l.h = textParser.getHtml(ar);
+				l.r = s.r;
+				delete l.text;
+			}
+		});
+	}
+	return lst || [];
 }
 
 function write_comments_xml(data) {
@@ -20567,9 +20603,9 @@ function parse_sty(data, name, themes, opts) {
 	return parse_sty_xml((data), themes, opts);
 }
 
-function parse_sst(data, name, opts, themes, styles) {
+function parse_sst(data, name, opts) {
 	if(name.slice(-4)===".bin") return parse_sst_bin((data), opts);
-	return parse_sst_xml((data), opts, themes, styles);
+	return parse_sst_xml((data), opts);
 }
 
 function parse_cmnt(data, name, opts) {
@@ -26725,7 +26761,7 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control',
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control', 'annotation'
 ];
 function addDraws(drawings, draw, iCol, iRow) {
 	let ret = 0;
@@ -30216,6 +30252,7 @@ function safe_parse_sheet(zip, path, relsPath, sheet, idx, sheetRels, sheets, st
 				dfile = resolve_path(rel.Target, path);
 				comments = parse_cmnt(getzipdata(zip, dfile, true), dfile, opts);
 				if(!comments || !comments.length) return;
+				_ws['!comments'] = comments;
 				sheet_insert_comments(_ws, comments, false);
 				break;
 			case RELS.TCMNT:
@@ -30321,11 +30358,11 @@ function parse_zip(zip, opts) {
 	var styles = ({});
 	if(!opts.bookSheets && !opts.bookProps) {
 		strs = [];
-		if(opts.cellStyles && dir.themes.length) themes = parse_theme_xml(getzipstr(zip, dir.themes[0].replace(/^\//,''), true)||"", opts);
+		if(opts.cellStyles && dir.themes.length) textParser.themes = themes = parse_theme_xml(getzipstr(zip, dir.themes[0].replace(/^\//,''), true)||"", opts);
 
 		if(dir.style) styles = parse_sty(getzipdata(zip, strip_front_slash(dir.style)), dir.style, themes, opts);
 
-		if(dir.sst) try { strs=parse_sst(getzipdata(zip, strip_front_slash(dir.sst)), dir.sst, opts, themes, styles); } catch(e) { if(opts.WTF) throw e; }
+		if(dir.sst) try { strs=parse_sst(getzipdata(zip, strip_front_slash(dir.sst)), dir.sst, opts); } catch(e) { if(opts.WTF) throw e; }
 	}
 
 	/*var externbooks = */dir.links.map(function(link) {
