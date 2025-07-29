@@ -229,11 +229,14 @@ function analyzeVmlDrawing(ws) {
 		if (!style) return;
 		const ar = style.split(';');
 		const xfrm = d.sp.spPr.xfrm;
+		const $st = d.$style = {};
 		ar.forEach(s => {
 			const nv = s.split(':');
 			if (nv.length !== 2) return;
-			let v = nv[1].trim();
-			switch (nv[0].trim()) {
+			const n = nv[0].trim();
+			const v = nv[1].trim();
+			$st[n] = v;
+			switch (n) {
 			case 'margin-left': xfrm.off.x = toTwip(v); break;
 			case 'margin-top': xfrm.off.y = toTwip(v); break;
 			case 'width': xfrm.ext.cx = toTwip(v); break;
