@@ -155,7 +155,7 @@ function analyzeVmlDrawing(ws) {
 			}
 		}
 	};
-	const setFromTo = (d, clid) => {
+	const setCellPosition = (d, clid) => {
 		const anchor = clid?.Anchor;
 		if (!anchor) return false;
 		const ar = anchor.trim().split(',');
@@ -163,13 +163,13 @@ function analyzeVmlDrawing(ws) {
 		setCell(d.to, ar, 4);
 		let c = clid.Column, r = clid.Row;
 		if (c != null && r != null) {
-			d.from.col = d.to.col = c;
-			d.from.row = d.to.row = r;
+			d.link = {col: c, row:r};
 		}
 		return true;
 	};
 	const addDraw = (draws, d, chk) => {
-		const cn = encode_col(d.from.col) + (d.from.row + 1);
+		const pos = d.link || d.from;
+		const cn = encode_col(pos.col) + (pos.row + 1);
 		let draw = draws[cn];
 		if (!draw) {
 			draws[cn] = d;
@@ -207,7 +207,7 @@ function analyzeVmlDrawing(ws) {
 				if (isTop) {
 					const from = d.from, to = d.to;
 					if (!from || !to || from.col || from.colOff || from.row || from.rowOff || to.col || to.colOff || to.row || to.rowOff) return;
-					if (!setFromTo(d, vml.ClientData)) return;
+					if (!setCellPosition(d, vml.ClientData)) return;
 					move.push(i);
 				}
 			}
@@ -353,7 +353,7 @@ function analyzeVmlDrawing(ws) {
 				},
 			},
 		};
-		if (!setFromTo(d, vml.ClientData)) return;
+		if (!setCellPosition(d, vml.ClientData)) return;
 		analyzeStyle(d, vml.style);
 		if (!addDraw(draws, d, chkDraw)) return;
 		analyzeText(d, vml.textbox);
