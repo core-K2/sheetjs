@@ -136,7 +136,7 @@ function binaryStringToBase64(bstr) {
 }
 
 function analyzeVmlDrawing(ws) {
-	const vml = ws['!vml'][ws['!legrel']];
+	const vml = ws['!vml']?.[ws['!legrel']];
 	let shape;
 	if (!vml || !(shape = vml.shape)) return;
 	let draws = ws['!drawings'];
@@ -154,6 +154,19 @@ function analyzeVmlDrawing(ws) {
 			case 3:	obj.rowOff = pixelToEmu(v);	break;
 			}
 		}
+	};
+	const setFromTo = (d, clid) => {
+		const anchor = clid?.Anchor;
+		if (!anchor) return false;
+		const ar = anchor.trim().split(',');
+		setCell(d.from, ar, 0);
+		setCell(d.to, ar, 4);
+		let c = clid.Column, r = clid.Row;
+		if (c != null && r != null) {
+			d.from.col = d.to.col = c;
+			d.from.row = d.to.row = r;
+		}
+		return true;
 	};
 	const addDraw = (draws, d, chk) => {
 		const cn = encode_col(d.from.col) + (d.from.row + 1);
@@ -194,11 +207,7 @@ function analyzeVmlDrawing(ws) {
 				if (isTop) {
 					const from = d.from, to = d.to;
 					if (!from || !to || from.col || from.colOff || from.row || from.rowOff || to.col || to.colOff || to.row || to.rowOff) return;
-					const anchor = vml.ClientData?.Anchor;
-					if (!anchor) return;
-					const ar = anchor.split(',');
-					setCell(from, ar, 0);
-					setCell(to, ar, 4);
+					if (!setFromTo(d, vml.ClientData)) return;
 					move.push(i);
 				}
 			}
@@ -331,9 +340,6 @@ function analyzeVmlDrawing(ws) {
 	};
 	shape.forEach(vml => {
 		if (vml.$found) return;
-		const anchor = vml.ClientData?.Anchor;
-		if (!anchor) return;
-		const ar = anchor.split(',');
 		let d = {
 			_vml: vml,
 			from: {},
@@ -347,8 +353,7 @@ function analyzeVmlDrawing(ws) {
 				},
 			},
 		};
-		setCell(d.from, ar, 0);
-		setCell(d.to, ar, 4);
+		if (!setFromTo(d, vml.ClientData)) return;
 		analyzeStyle(d, vml.style);
 		if (!addDraw(draws, d, chkDraw)) return;
 		analyzeText(d, vml.textbox);
