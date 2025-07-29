@@ -1548,6 +1548,7 @@ var textParser = {
 // export core-K2 expansion
 var CK2 = {
 	Xml: Xml,
+	textParser: textParser,
 	parseDateJp: parseDateJp,
 	toTimeString: toTimeString,
 	toDateTimeString: toDateTimeString,
