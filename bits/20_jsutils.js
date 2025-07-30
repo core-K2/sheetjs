@@ -1429,6 +1429,41 @@ var textParser = {
 		}
 		return c;
 	},
+	getIndexColor: function(v) {
+		let c;
+		const idx = Number(v);
+		if (!isNaN(idx)) {
+			if (idx < 64) {
+				const colors = this.themes?.indexedColors;
+				if (Array.isArray(colors) && idx < colors.length) {
+					c = colors[idx];
+				}
+			} else {
+				const th = this.themes?.themeElements?.clrScheme;
+				if (Array.isArray(th)) {
+					let i = -1;
+					switch (idx) {
+					case 64: case 65:	// dk1,lt1
+						i = idx - 64;
+						break;
+					case 80: case 81:	// dk2,lt2
+						i = idx - 80 + 2;
+						break;
+					case 72: case 73:	// hlink,folHlink
+						i = idx - 72 + 10;
+						break;
+					default:	// accent1～6
+						i = idx - 66 + 4;
+						break;
+					}
+					if (i >= 0 && i < th.length) {
+						c = th[i].rgb;
+					}
+				}
+			}
+		}
+		return c && this.getRgbColor(c);
+	},
 	getColor: function(o) {
 		let c;
 		switch (typeof o) {
@@ -1439,9 +1474,11 @@ var textParser = {
 				let v = o[n];
 				switch (n) {
 				case 'rgb':
-					return this.getRgbColor(v);
+					c = this.getRgbColor(v);
+					break;
+				case 'index':
 				case 'indexed':
-					c = this.getRgbColor(this.themes?.indexedColors?.[v % 8]);
+					c = this.getIndexColor(v);
 					break;
 				case 'theme':
 					const th = this.themes?.themeElements?.clrScheme;
@@ -1459,7 +1496,11 @@ var textParser = {
 					console.warn('Not implement color:' + n, v);
 					continue;
 				}
+				if (c) break;
 			}
+			break;
+		default:
+			console.warn('Not implement color type:' + typeof o, o);
 			break;
 		}
 		return c || 'auto';

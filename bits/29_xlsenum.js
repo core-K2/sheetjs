@@ -181,11 +181,9 @@ var XLSFillPattern = [
 	'gray0625'
 ];
 
-function rgbify(arr/*:Array<number>*/)/*:Array<[number, number, number]>*/ { return arr.map(function(x) { return [(x>>16)&255,(x>>8)&255,x&255]; }); }
-
 /* [MS-XLS] 2.5.161 */
 /* [MS-XLSB] 2.5.75 Icv */
-var _XLSIcv = /*#__PURE__*/ rgbify([
+var _XLSRgb = [
 	/* Color Constants */
 	0x000000,
 	0xFFFFFF,
@@ -276,8 +274,11 @@ var _XLSIcv = /*#__PURE__*/ rgbify([
 	0x000000, /* 0x4F icvCtlNeutral */
 	0x000000, /* 0x50 icvInfoBk ?? */
 	0x000000 /* 0x51 icvInfoText ?? */
-]);
-var XLSIcv = /*#__PURE__*/dup(_XLSIcv);
+];
+function rgbify(arr/*:Array<number>*/)/*:Array<[number, number, number]>*/ { return arr.map(function(x) { return [(x>>16)&255,(x>>8)&255,x&255]; }); }
+function rgbHex(arr/*:Array<number>*/)/*:Array<string>*/ { return arr.map(function(x) { return x.toString(16).padStart(6, '0'); }); }
+var XLSIcv = /*#__PURE__*/rgbify(_XLSRgb);
+var XLSIndexedColors = rgbHex(_XLSRgb);
 
 /* [MS-XLSB] 2.5.97.2 */
 var BErr = {
@@ -319,63 +320,4 @@ var XLSLblBuiltIn = [
 	"_xlnm.Auto_Deactivate",
 	"_xlnm.Sheet_Title",
 	"_xlnm._FilterDatabase"
-];
-
-var XLSIndexedColors = [
-    "000000",  // Black
-    "FFFFFF",  // White
-    "FF0000",  // Red
-    "00FF00",  // Green
-    "0000FF",  // Blue
-    "FFFF00",  // Yellow
-    "00FFFF",  // Cyan
-    "FF00FF",  // Magenta
-    "808080",  // Gray 50%
-    "800000",  // Maroon
-    "008000",  // Green 50%
-    "000080",  // Navy
-    "808000",  // Olive
-    "008080",  // Teal
-    "800080",  // Purple 50%
-    "C0C0C0",  // Silver
-    "999999",  // Gray 40%
-    "CCCCCC",  // Gray 30%
-    "E5E5E5",  // Gray 20%
-    "F2F2F2",  // Gray 10%
-    "800000",  // Dark Red
-    "008000",  // Dark Green
-    "000080",  // Dark Blue
-    "556B2F",  // Dark Olive
-    "800000",  // Dark Maroon
-    "663399",  // Dark Purple
-    "4B0082",  // Indigo
-    "4B0082",  // Indigo
-    "006400",  // Dark Green
-    "8B0000",  // Dark Red
-    "FF8C00",  // Dark Orange
-    "B8860B",  // Dark Goldenrod
-    "DC143C",  // Crimson
-    "FF6347",  // Tomato
-    "FF7F50",  // Coral
-    "E9967A",  // Dark Salmon
-    "5F9EA0",  // Cadet Blue
-    "4682B4",  // Steel Blue
-    "1E90FF",  // Dodger Blue
-    "00BFFF",  // Deep Sky Blue
-    "6495ED",  // Cornflower Blue
-    "9400D3",  // Dark Violet
-    "9932CC",  // Dark Orchid
-    "B8860B",  // Dark Goldenrod
-    "6B8E23",  // Dark Khaki
-    "8FBC8F",  // Dark Sea Green
-    "483D8B",  // Dark Slate Blue
-    "2F4F4F",  // Dark Slate Gray
-    "00CED1",  // Dark Turquoise
-    "9932CC",  // Dark Orchid
-    "9400D3",  // Dark Violet
-    "8B0000",  // Dark Red
-    "FF8C00",  // Dark Orange
-    "E9967A",  // Dark Salmon
-    "8FBC8F",  // Dark Sea Green
-    "A9A9A9",   // Dark Gray
 ];
