@@ -1429,14 +1429,25 @@ var XlsxTextParser = {
 		}
 		return c;
 	},
-	getThemeColor: function(v) {
+	transparentColor: function(c, tp) {
+		if (/^#[a-f0-9]{6}$/i.test(c)) {
+			let n = Math.floor(tp * 255) % 256;
+			return c + n.toString(16).padStart(2, '0');
+		}
+		return c;
+	},
+	getThemeColor: function(v, fore) {
 		const th = this.themes?.themeElements?.clrScheme;
 		if (Array.isArray(th)) {
 			let t;
 			if (isNaN(v)) {
 				t = th.find(t => t.name === v);
 			} else {
-				t = th[v];
+				let i = Number(v);
+				if (fore) {
+					if (i === 1) i = 0;
+				}
+				t = th[i];
 			}
 			if (t) return this.getRgbColor(t.rgb);
 		}
@@ -1476,33 +1487,38 @@ var XlsxTextParser = {
 		}
 		return c && this.getRgbColor(c);
 	},
-	getColor: function(o, def) {
+	getColor: function(o, def, fore) {
 		switch (typeof o) {
 		case 'string':
 			return o;
 		case 'object':
-			let c;
+			let c, tp = 0;
+			if (o.hasOwnProperty('rgb')) {
+				c = this.getRgbColor(o.rgb);
+			}
 			for (let n in o) {
 				let v = o[n];
 				switch (n) {
+				case 'auto':
 				case 'rgb':
-					c = this.getRgbColor(v);
 					break;
 				case 'index':
 				case 'indexed':
-					c = this.getIndexColor(v);
+					if (!c) c = this.getIndexColor(v);
 					break;
 				case 'theme':
-					c = this.getThemeColor(v);
+					if (!c) c = this.getThemeColor(v, fore);
 					break;
-				case 'auto':
-					if (v) c = 'auto';
+				case 'tint':
+					tp = parseFloat(v);
 					break;
 				default:
 					console.warn('Not implement color:' + n, v);
 					continue;
 				}
-				if (c) return c;
+			}
+			if (c) {
+				return tp ? this.transparentColor(c, tp) : c;
 			}
 			break;
 		default:
@@ -1554,7 +1570,7 @@ var XlsxTextParser = {
 							st = `font-size:${v.val}pt`;
 							break;
 						case 'color':
-							st = `color:${this.getColor(v)}`;
+							st = `color:${this.getColor(v, 'auto', true)}`;
 							break;
 						default:
 							console.warn('Not implement rPr:' + n, v);

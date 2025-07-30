@@ -694,27 +694,27 @@ function makeXfs(v, bv, themes) {
 	return ar;
 }
 function adjustColor(o, themes, avoidIndexes) {
-	if (o.rgb === undefined) {
-		if (o.theme !== undefined) {
-			o.rgb = getTheme(o.theme, themes).rgb;
-		} else {
-			let i = o.indexed;
-			if (i !== undefined) {
-				if (Array.isArray(avoidIndexes) && avoidIndexes.indexOf(i) >= 0) {
-					// avoid setting color
-				} else {
-					let colors = themes.indexedColors;
-					if (i < colors.length) {
-						o.rgb = colors[i];
-					} else {
-						o.rgb = '#80' + colors[i % colors.length];
-					}
-				}
-			}
-		} 
-	}
+	// if (o.rgb === undefined) {
+	// 	if (o.theme !== undefined) {
+	// 		o.rgb = getTheme(o.theme, themes).rgb;
+	// 	} else {
+	// 		let i = o.indexed;
+	// 		if (i !== undefined) {
+	// 			if (Array.isArray(avoidIndexes) && avoidIndexes.indexOf(i) >= 0) {
+	// 				// avoid setting color
+	// 			} else {
+	// 				let colors = themes.indexedColors;
+	// 				if (i < colors.length) {
+	// 					o.rgb = colors[i];
+	// 				} else {
+	// 					o.rgb = '#80' + colors[i % colors.length];
+	// 				}
+	// 			}
+	// 		}
+	// 	} 
+	// }
 	return o;
 }
 function getTheme(n, themes) {
-	return isNaN(n) ? {} : themes.themeElements.clrScheme[Number(n)];
+	return isNaN(n) ? themes.themeElements.clrScheme.find(o.name === n) : themes.themeElements.clrScheme[Number(n)];
 }
