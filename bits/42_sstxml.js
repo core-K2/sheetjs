@@ -224,9 +224,9 @@ function parseStringItem(si) {
 	let sis = [];
 	if (Array.isArray(si)) {
 		si.forEach(s => {
-			let ar = textParser.getAsArray(s.r);
-			let t = textParser.getText(ar || s.t);
-			let h = textParser.getHtml(ar);
+			let ar = XlsxTextParser.getAsArray(s.r);
+			let t = XlsxTextParser.getText(ar || s.t);
+			let h = XlsxTextParser.getHtml(ar);
 			// let r = JSON.stringify(s);
 			sis.push({t, h});
 		});

@@ -47,9 +47,9 @@ function parseComments(xml) {
 				delete l.authorId;
 			}
 			if (s != null) {
-				let ar = textParser.getAsArray(s.r);
-				l.t = textParser.getText(ar || s.t);
-				l.h = textParser.getHtml(ar);
+				let ar = XlsxTextParser.getAsArray(s.r);
+				l.t = XlsxTextParser.getText(ar || s.t);
+				l.h = XlsxTextParser.getHtml(ar);
 				l.r = s.r;
 				delete l.text;
 			}

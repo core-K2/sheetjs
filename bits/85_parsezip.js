@@ -159,7 +159,7 @@ function parse_zip(zip/*:ZIP*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	var styles = ({}/*:any*/);
 	if(!opts.bookSheets && !opts.bookProps) {
 		strs = [];
-		if(opts.cellStyles && dir.themes.length) textParser.themes = themes = parse_theme_xml(getzipstr(zip, dir.themes[0].replace(/^\//,''), true)||"", opts);
+		if(opts.cellStyles && dir.themes.length) XlsxTextParser.themes = themes = parse_theme_xml(getzipstr(zip, dir.themes[0].replace(/^\//,''), true)||"", opts);
 
 		if(dir.style) styles = parse_sty(getzipdata(zip, strip_front_slash(dir.style)), dir.style, themes, opts);
 

@@ -1394,9 +1394,9 @@ function analyzeImageData(bstr) {
 }
 
 /**
- * text parser contain rPr
+ * XLSX text parser contain rPr
  */
-var textParser = {
+var XlsxTextParser = {
 	themes: {},
 	getAsArray: function(v) {
 		if (!v) return null;
@@ -1428,6 +1428,18 @@ var textParser = {
 			return '#' + c.slice(-6) + a;
 		}
 		return c;
+	},
+	getThemeColor: function(v) {
+		const th = this.themes?.themeElements?.clrScheme;
+		if (Array.isArray(th)) {
+			let t;
+			if (isNaN(v)) {
+				t = th.find(t => t.name === v);
+			} else {
+				t = th[v];
+			}
+			if (t) return this.getRgbColor(t.rgb);
+		}
 	},
 	getIndexColor: function(v) {
 		let c;
@@ -1464,12 +1476,12 @@ var textParser = {
 		}
 		return c && this.getRgbColor(c);
 	},
-	getColor: function(o) {
-		let c;
+	getColor: function(o, def) {
 		switch (typeof o) {
 		case 'string':
 			return o;
 		case 'object':
+			let c;
 			for (let n in o) {
 				let v = o[n];
 				switch (n) {
@@ -1481,29 +1493,23 @@ var textParser = {
 					c = this.getIndexColor(v);
 					break;
 				case 'theme':
-					const th = this.themes?.themeElements?.clrScheme;
-					if (th) {
-						let t;
-						if (isNaN(v)) {
-							t = th.find(t => t.name === v);
-						} else {
-							t = th[v];
-						}
-						if (t) c = this.getRgbColor(t.rgb);
-					}
+					c = this.getThemeColor(v);
+					break;
+				case 'auto':
+					if (v) c = 'auto';
 					break;
 				default:
 					console.warn('Not implement color:' + n, v);
 					continue;
 				}
-				if (c) break;
+				if (c) return c;
 			}
 			break;
 		default:
 			console.warn('Not implement color type:' + typeof o, o);
 			break;
 		}
-		return c || 'auto';
+		return def !== undefined ? def : 'initial';
 	},
 	getStyle: function(o) {
 		let ar = [];
@@ -1589,7 +1595,7 @@ var textParser = {
 // export core-K2 expansion
 var CK2 = {
 	Xml: Xml,
-	textParser: textParser,
+	XlsxTextParser: XlsxTextParser,
 	parseDateJp: parseDateJp,
 	toTimeString: toTimeString,
 	toDateTimeString: toDateTimeString,

@@ -1,6 +1,6 @@
 /* Even though theme layout is dk1 lt1 dk2 lt2, true order is lt1 dk1 lt2 dk2 */
 var XLSXThemeClrScheme = [
-	'</a:lt1>', '</a:dk1>', '</a:lt2>', '</a:dk2>',
+	'</a:dk1>', '</a:lt1>', '</a:dk2>', '</a:lt2>',
 	'</a:accent1>', '</a:accent2>', '</a:accent3>',
 	'</a:accent4>', '</a:accent5>', '</a:accent6>',
 	'</a:hlink>', '</a:folHlink>'
@@ -278,5 +278,7 @@ function write_theme(Themes, opts)/*:string*/ {
 }
 
 function parseThemeXml(data, opts) {
-	return parse_xml(data);
+	return parse_xml(data, {
+		asSeqArray: [/^a:clrScheme$/]
+	});
 }
