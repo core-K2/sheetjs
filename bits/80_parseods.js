@@ -1055,7 +1055,7 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 				let c = decode_cell(n);
 				if (iRowMax <= c.r) iRowMax = c.r + 1;
 				if (iColMax < c.c) iColMax = c.c;
-				drawing2SVG(drawings[n], ass, dss, wb, sh, zip, styles);
+				drawing2SVG(drawings[n], ass, dss, wb, sh, zip, styles, fonts);
 			}
 		}
 		sh['!sn'] = sheet['style-name'];
@@ -1787,7 +1787,7 @@ function addDraw(drawings, draw, iCol, iRow, type) {
 	if (ret) drawings[cn] = ar;
 	return ret;
 }
-function getDrawStyle(name, st, styles, ass) {
+function getDrawStyle(name, st, styles, ass, fonts) {
 	let o = st && st[name];
 	if (typeof o === 'string') {
 		o = ass?.[o] || styles?.[o];
@@ -1796,11 +1796,18 @@ function getDrawStyle(name, st, styles, ass) {
 	if (styles && o?.['parent-style-name'] === 'Default') {
 		applyObject(obj, getDefaultStyle(styles, o.family), true);
 	}
+	let tp;
+	if (fonts && (tp = obj?.['text-properties'])) {
+		['font-name-asian', 'font-name'].forEach(n => {
+			let ff = fonts.find(f => f.name === tp[n]);
+			if (ff) tp[n] = ff['font-family'];
+		});
+	}
 	return obj;
 }
-function makeDrawStyle(draw, ass, dss, styles) {
+function makeDrawStyle(draw, ass, dss, styles, fonts) {
 	['style-name', 'text-style-name'].forEach((n, i) => {
-		let style = getDrawStyle(n, draw, styles, ass);
+		let style = getDrawStyle(n, draw, styles, ass, fonts);
 		if (!style) return;
 		delete draw[n];
 		if (Object.keys(style).length) {
@@ -1829,20 +1836,20 @@ function makeDrawImage(img, wb, zip, key) {
 	}
 	return null;
 }
-function drawing2SVG(draws, ass, dss, wb, ws, zip, styles) {
+function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	if (!draws) return;
 	if (!Array.isArray(draws)) draws = [draws];
 	draws.forEach(draw => {
 		DRAW_SHAPES.forEach(n => {
 			const d = draw[n];
-			if (d) drawing2SVG(d, ass, dss, wb, ws, zip, styles);
+			if (d) drawing2SVG(d, ass, dss, wb, ws, zip, styles, fonts);
 		});
 		['width', 'height', 'x', 'y', 'end-x', 'end-y'].forEach(p => {
 			if (draw.hasOwnProperty(p)) {
 				draw[p] = Number(getPixelSize(draw[p]));
 			}
 		});
-		makeDrawStyle(draw, ass, dss, styles);
+		makeDrawStyle(draw, ass, dss, styles, fonts);
 		let p = draw.p;
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
@@ -1856,12 +1863,12 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles) {
 		}
 		if (p) {
 			p.forEach(p => {
-				makeDrawStyle(p, ass, dss);
+				makeDrawStyle(p, ass, dss, null, fonts);
 				let span = p.span;
 				if (span) {
 					if (!Array.isArray(span)) span = [span];
 					span.forEach(s => {
-						makeDrawStyle(s, ass, dss);
+						makeDrawStyle(s, ass, dss, null, fonts);
 					});
 				}
 			});
