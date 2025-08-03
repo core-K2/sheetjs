@@ -821,17 +821,20 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 			asText: ['text:p', 'number:text'],
 			tagTrap: {
 				'text:p': function(xmlNode, parent, bSeqParent) {
+					const obj = this.parseNode(xmlNode, parent, bSeqParent);
+					if (typeof obj !== 'object') return;
 					let pn = xmlNode.parentNode?.nodeName;
 					if (pn) {
-						if (pn === 'table:table-cell') {
-							let obj = this.parseNode(xmlNode, parent, bSeqParent);
-							if (typeof obj === 'object' && obj.a || obj.span) return obj;
-						} else if (pn.startsWith('draw:')) {
-							let obj = this.parseNode(xmlNode, parent, bSeqParent);
-							if (typeof obj === 'object') {
-								obj.text = this.getAsText(xmlNode);
-								return obj;
-							}
+						const pre = pn.split(':');
+						switch (pre[0]) {
+						case 'table':
+							if (pre[1] === 'table-cell' && obj.a || obj.span) return obj;
+							break;
+						case 'draw':
+							obj.text = this.getAsText(xmlNode);
+							return obj;
+						case 'office':
+							return obj;
 						}
 					}
 				},
