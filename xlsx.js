@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250802';
+XLSX.version = '0.20.3.20250805';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -17874,7 +17874,7 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
 
 	// core-K2 expansion(copy parse xml object properties)
 	let obj = Xml.xmlStrToObject(data);
-	['sheetFormatPr', 'AlternateContent'].forEach(n => {
+	['sheetViews', 'sheetFormatPr', 'AlternateContent'].forEach(n => {
 		let o = obj[n];
 		if (o) s['$' + n] = o;
 	});
@@ -25861,17 +25861,20 @@ function parse_ods(zip, opts) {
 			asText: ['text:p', 'number:text'],
 			tagTrap: {
 				'text:p': function(xmlNode, parent, bSeqParent) {
+					const obj = this.parseNode(xmlNode, parent, bSeqParent);
+					if (typeof obj !== 'object') return;
 					let pn = xmlNode.parentNode?.nodeName;
 					if (pn) {
-						if (pn === 'table:table-cell') {
-							let obj = this.parseNode(xmlNode, parent, bSeqParent);
-							if (typeof obj === 'object' && obj.a || obj.span) return obj;
-						} else if (pn.startsWith('draw:')) {
-							let obj = this.parseNode(xmlNode, parent, bSeqParent);
-							if (typeof obj === 'object') {
-								obj.text = this.getAsText(xmlNode);
-								return obj;
-							}
+						const pre = pn.split(':');
+						switch (pre[0]) {
+						case 'table':
+							if (pre[1] === 'table-cell' && obj.a || obj.span) return obj;
+							break;
+						case 'draw':
+							obj.text = this.getAsText(xmlNode);
+							return obj;
+						case 'office':
+							return obj;
 						}
 					}
 				},
@@ -25961,7 +25964,7 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 	return wb;
 }
 
-function convert_content(wb, content, styles, opts, zip, setting) {
+function convert_content(wb, content, styles, opts, zip, settings) {
 	let Styles = wb.Styles;
 	let body = content.body;
 	let fonts = content['font-face-decls']?.['font-face'];
@@ -26135,6 +26138,40 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			}
 		}
 	});
+	if (settings) {
+		let view = {}, conf;
+		const config = settings['config-item-set'];
+		if (Array.isArray(config)) {
+			const getSheetIndex = n => wb.SheetNames?.indexOf(n);
+			config.forEach(c => {
+				switch (c.name) {
+				case 'ooo:view-settings':
+					const map = c['config-item-map-indexed']?.['config-item-map-entry'];
+					if (map) {
+						let v;
+						if ((v = map.ActiveTable)) view.activeTab = getSheetIndex(v);
+						if ((v = map['config-item-map-named']?.['config-item-map-entry'])) {
+							if (!Array.isArray(v)) v = [v];
+							v.forEach(o => {
+								let sv = {};
+								if (o.ZoomValue) sv.zoomScale = o.ZoomValue;
+								if (!isEmpty(sv)) {
+									wb.Sheets[o.name].$sheetViews = {
+										sheetView: sv
+									};
+								}
+							});
+						}
+					}
+					break;
+				case 'ooo:configuration-settings':
+					conf = c;
+					break;
+				}
+			});
+		}
+		wb.Workbook.WBView.push(view, conf);
+	}
 }
 function getDataRange(rows, maxNoData) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
