@@ -23,7 +23,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 
 	// core-K2 expansion(copy parse xml object properties)
 	let obj = Xml.xmlStrToObject(data);
-	['sheetFormatPr', 'AlternateContent'].forEach(n => {
+	['sheetViews', 'sheetFormatPr', 'AlternateContent'].forEach(n => {
 		let o = obj[n];
 		if (o) s['$' + n] = o;
 	});

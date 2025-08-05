@@ -924,7 +924,7 @@ function to_excel_workbook(content, styles, settings, meta, opts, zip) {
 	return wb;
 }
 
-function convert_content(wb, content, styles, opts, zip, setting) {
+function convert_content(wb, content, styles, opts, zip, settings) {
 	let Styles = wb.Styles;
 	let body = content.body;
 	let fonts = content['font-face-decls']?.['font-face'];
@@ -1098,6 +1098,40 @@ function convert_content(wb, content, styles, opts, zip, setting) {
 			}
 		}
 	});
+	if (settings) {
+		let view = {}, conf;
+		const config = settings['config-item-set'];
+		if (Array.isArray(config)) {
+			const getSheetIndex = n => wb.SheetNames?.indexOf(n);
+			config.forEach(c => {
+				switch (c.name) {
+				case 'ooo:view-settings':
+					const map = c['config-item-map-indexed']?.['config-item-map-entry'];
+					if (map) {
+						let v;
+						if ((v = map.ActiveTable)) view.activeTab = getSheetIndex(v);
+						if ((v = map['config-item-map-named']?.['config-item-map-entry'])) {
+							if (!Array.isArray(v)) v = [v];
+							v.forEach(o => {
+								let sv = {};
+								if (o.ZoomValue) sv.zoomScale = o.ZoomValue;
+								if (!isEmpty(sv)) {
+									wb.Sheets[o.name].$sheetViews = {
+										sheetView: sv
+									};
+								}
+							});
+						}
+					}
+					break;
+				case 'ooo:configuration-settings':
+					conf = c;
+					break;
+				}
+			});
+		}
+		wb.Workbook.WBView.push(view, conf);
+	}
 }
 function getDataRange(rows, maxNoData) {
 	range = {s: {r:1000000, c:10000000}, e: {r:0, c:0}};
