@@ -1074,6 +1074,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 		Styles.Markers = markers = [];
 		Styles.Strokes = strokes = [];
 	}
+	Styles.Styles = [];
 	styles.forEach(s => {
 		for (let k in s) {
 			switch (k) {
@@ -1095,6 +1096,12 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 			case 'stroke-dash':
 				if (strokes) strokes.push(s[k]);
 				break;
+			case 'style':
+				Styles.Styles.push(s[k]);
+				break;
+			// default:
+			// 	console.log(k, s[k]?.name, s[k]);
+			// 	break;
 			}
 		}
 	});
