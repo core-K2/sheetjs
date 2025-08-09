@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250805';
+XLSX.version = '0.20.3.20250809';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -14802,18 +14802,18 @@ function parseComments(xml) {
 		if (!Array.isArray(authors)) authors = [authors];
 		lst.forEach(l => {
 			const a = l.authorId;
-			const s = l.text;
+			// const s = l.text;
 			if (a != null) {
 				l.author = authors[a]?.author || '';
-				delete l.authorId;
+				// delete l.authorId;
 			}
-			if (s != null) {
-				let ar = XlsxTextParser.getAsArray(s.r);
-				l.t = XlsxTextParser.getText(ar || s.t);
-				l.h = XlsxTextParser.getHtml(ar);
-				l.r = s.r;
-				delete l.text;
-			}
+			// if (s != null) {
+				// let ar = XlsxTextParser.getAsArray(s.r);
+				// l.t = XlsxTextParser.getText(ar || s.t);
+				// l.h = XlsxTextParser.getHtml(ar);
+				// l.r = s.r;
+				// delete l.text;
+			// }
 		});
 	}
 	return lst || [];
@@ -26114,6 +26114,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 		Styles.Markers = markers = [];
 		Styles.Strokes = strokes = [];
 	}
+	Styles.Styles = [];
 	styles.forEach(s => {
 		for (let k in s) {
 			switch (k) {
@@ -26135,6 +26136,12 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 			case 'stroke-dash':
 				if (strokes) strokes.push(s[k]);
 				break;
+			case 'style':
+				Styles.Styles.push(s[k]);
+				break;
+			// default:
+			// 	console.log(k, s[k]?.name, s[k]);
+			// 	break;
 			}
 		}
 	});
