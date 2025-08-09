@@ -41,18 +41,18 @@ function parseComments(xml) {
 		if (!Array.isArray(authors)) authors = [authors];
 		lst.forEach(l => {
 			const a = l.authorId;
-			const s = l.text;
+			// const s = l.text;
 			if (a != null) {
 				l.author = authors[a]?.author || '';
-				delete l.authorId;
+				// delete l.authorId;
 			}
-			if (s != null) {
-				let ar = XlsxTextParser.getAsArray(s.r);
-				l.t = XlsxTextParser.getText(ar || s.t);
-				l.h = XlsxTextParser.getHtml(ar);
-				l.r = s.r;
-				delete l.text;
-			}
+			// if (s != null) {
+				// let ar = XlsxTextParser.getAsArray(s.r);
+				// l.t = XlsxTextParser.getText(ar || s.t);
+				// l.h = XlsxTextParser.getHtml(ar);
+				// l.r = s.r;
+				// delete l.text;
+			// }
 		});
 	}
 	return lst || [];
