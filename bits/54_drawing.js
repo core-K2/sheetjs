@@ -127,13 +127,6 @@ function getMedia(zip, wb, rel) {
 	}
 	return m;
 }
-function binaryStringToBase64(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
-	}
-	return btoa(String.fromCharCode.apply(null, bytes));
-}
 
 function analyzeVmlDrawing(ws) {
 	const vml = ws['!vml']?.[ws['!legrel']];

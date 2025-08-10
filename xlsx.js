@@ -4683,8 +4683,24 @@ function analyzeImageData(bstr) {
 		type: t,
 		w: w,
 		h: h,
-		b64: btoa(String.fromCharCode.apply(null, bytes))
+		b64: bytesToBase64(bytes)
 	};
+}
+function bytesToBase64(bytes) {
+  const chunkSize = 8192;
+  let result = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
+    result += String.fromCharCode(...chunk);
+  }
+  return btoa(result);
+}
+function binaryStringToBase64(bstr) {
+	const bytes = new Uint8Array(bstr.length);
+	for (let i = 0; i < bstr.length; i++) {
+		bytes[i] = bstr.charCodeAt(i);
+	}
+	return bytesToBase64(bytes);
 }
 
 /**
@@ -14391,13 +14407,6 @@ function getMedia(zip, wb, rel) {
 		media[t] = m;
 	}
 	return m;
-}
-function binaryStringToBase64(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
-	}
-	return btoa(String.fromCharCode.apply(null, bytes));
 }
 
 function analyzeVmlDrawing(ws) {
