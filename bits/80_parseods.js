@@ -1124,7 +1124,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 								const zoom1 = o.ZoomValue;
 								const zoom2 = o.PageViewZoomValue;
 								if (zoom1 || zoom2) {
-									sv.zoomScale = zoom1 != 100 ? zoom1 : zoom2 || zoom1;
+									sv.zoomScale = zoom1 != 100 ? zoom1 : zoom2 != 60 ? zoom2 || zoom1 : zoom1;
 								}
 								const xSplit = o.HorizontalSplitPosition;
 								const ySplit = o.VerticalSplitPosition;

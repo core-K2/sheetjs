@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250809';
+XLSX.version = '0.20.3.20250810';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -26161,7 +26161,19 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 							if (!Array.isArray(v)) v = [v];
 							v.forEach(o => {
 								let sv = {};
-								if (o.ZoomValue) sv.zoomScale = o.ZoomValue;
+								const zoom1 = o.ZoomValue;
+								const zoom2 = o.PageViewZoomValue;
+								if (zoom1 || zoom2) {
+									sv.zoomScale = zoom1 != 100 ? zoom1 : zoom2 != 60 ? zoom2 || zoom1 : zoom1;
+								}
+								const xSplit = o.HorizontalSplitPosition;
+								const ySplit = o.VerticalSplitPosition;
+								if (xSplit || ySplit) {
+									sv.pane = {
+										xSplit: xSplit,
+										ySplit: ySplit,
+									};
+								}
 								if (!isEmpty(sv)) {
 									wb.Sheets[o.name].$sheetViews = {
 										sheetView: sv
