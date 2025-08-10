@@ -1121,7 +1121,8 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 							if (!Array.isArray(v)) v = [v];
 							v.forEach(o => {
 								let sv = {};
-								if (o.ZoomValue) sv.zoomScale = o.ZoomValue;
+								const zoom = o.PageViewZoomValue || o.ZoomValue;
+								if (zoom) sv.zoomScale = zoom;
 								if (!isEmpty(sv)) {
 									wb.Sheets[o.name].$sheetViews = {
 										sheetView: sv
