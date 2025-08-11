@@ -1393,20 +1393,13 @@ function analyzeImageData(bstr) {
 	};
 }
 function bytesToBase64(bytes, chunkSize) {
-	chunkSize = chunkSize > 0 ? Math.ceil(chunkSize / 3) * 3 : 16384 * 3;
+	chunkSize = chunkSize > 0 ? Math.ceil(chunkSize / 3) * 3 : 65535;
 	let result = '';
 	for (let i = 0; i < bytes.length; i += chunkSize) {
 		const chunk = bytes.slice(i, i + chunkSize);
 		result += String.fromCharCode(...chunk);
 	}
 	return btoa(result);
-}
-function binaryStringToBase64(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
-	}
-	return bytesToBase64(bytes);
 }
 
 /**

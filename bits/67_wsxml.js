@@ -373,6 +373,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 	if (!iChkCol) iChkCol = Number.MAX_SAFE_INTEGER;
 	let iMaxRow = 0;
 	let iMaxCol = 0;
+	const maxNoData = opts.maxNoData;
 	for(var marr = sdata.split(rowregex), mt = 0, marrlen = marr.length; mt != marrlen; ++mt) {
 		x = marr[mt].trim();
 		var xlen = x.length;
@@ -406,13 +407,14 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 			if(guess.e.r < tagr - 1) guess.e.r = tagr - 1;
 		}
 
-		if(opts && opts.cellStyles) {
+		if(opts.cellStyles) {
 			rowobj = {}; rowrite = false;
 			if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 			if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
 			if(tag.outlineLevel != null) { rowrite = true; rowobj.level = +tag.outlineLevel; }
 			if(rowrite) rows[tagr-1] = rowobj;
 		}
+		if (!rowrite && maxNoData > 0) rows[tagr-1] = rowobj;
 
 		/* 18.3.1.4 c CT_Cell */
 		cells = x.slice(ri).split(cellregex);
@@ -574,8 +576,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
 	if(rows.length > 0) {
-		let maxNoData;
-		if ((maxNoData = opts.maxNoData) > 0) {
+		if (maxNoData > 0) {
 			const adjustCellRow = (idx, del) => {
 				rows.splice(idx, del);
 				endCell.r = rows.length;

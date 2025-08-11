@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250810';
+XLSX.version = '0.20.3.20250811';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4686,21 +4686,14 @@ function analyzeImageData(bstr) {
 		b64: bytesToBase64(bytes)
 	};
 }
-function bytesToBase64(bytes) {
-  const chunkSize = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.slice(i, i + chunkSize);
-    result += String.fromCharCode(...chunk);
-  }
-  return btoa(result);
-}
-function binaryStringToBase64(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
+function bytesToBase64(bytes, chunkSize) {
+	chunkSize = chunkSize > 0 ? Math.ceil(chunkSize / 3) * 3 : 65535;
+	let result = '';
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.slice(i, i + chunkSize);
+		result += String.fromCharCode(...chunk);
 	}
-	return bytesToBase64(bytes);
+	return btoa(result);
 }
 
 /**
@@ -18233,6 +18226,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 	if (!iChkCol) iChkCol = Number.MAX_SAFE_INTEGER;
 	let iMaxRow = 0;
 	let iMaxCol = 0;
+	const maxNoData = opts.maxNoData;
 	for(var marr = sdata.split(rowregex), mt = 0, marrlen = marr.length; mt != marrlen; ++mt) {
 		x = marr[mt].trim();
 		var xlen = x.length;
@@ -18266,13 +18260,14 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 			if(guess.e.r < tagr - 1) guess.e.r = tagr - 1;
 		}
 
-		if(opts && opts.cellStyles) {
+		if(opts.cellStyles) {
 			rowobj = {}; rowrite = false;
 			if(tag.ht) { rowrite = true; rowobj.hpt = parseFloat(tag.ht); rowobj.hpx = pt2px(rowobj.hpt); }
 			if(tag.hidden && parsexmlbool(tag.hidden)) { rowrite = true; rowobj.hidden = true; }
 			if(tag.outlineLevel != null) { rowrite = true; rowobj.level = +tag.outlineLevel; }
 			if(rowrite) rows[tagr-1] = rowobj;
 		}
+		if (!rowrite && maxNoData > 0) rows[tagr-1] = rowobj;
 
 		/* 18.3.1.4 c CT_Cell */
 		cells = x.slice(ri).split(cellregex);
@@ -18434,8 +18429,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
 	if(rows.length > 0) {
-		let maxNoData;
-		if ((maxNoData = opts.maxNoData) > 0) {
+		if (maxNoData > 0) {
 			const adjustCellRow = (idx, del) => {
 				rows.splice(idx, del);
 				endCell.r = rows.length;
