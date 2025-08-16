@@ -326,29 +326,21 @@ function decrypt(einfo, data, password, opts) {
 	const verifierHash = v.VerifierHash;
 	const keySize = h.KeySize / 8; // bits to bytes
 
-	// 1. パスワードをUTF-16LEでエンコード
+	// パスワードをUTF-16LEでエンコード
 	const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-	// 2. パスワードベリファイアのキー導出
+
+	// パスワードベリファイアのキー導出（PBKDF2を使用）
 	const saltW = CryptoJS.lib.WordArray.create(salt);
+	const pwVerifierKey = CryptoJS.PBKDF2(passwordW, saltW, {
+		keySize: keySize / 4, // words
+		iterations: 50000,
+		hasher: CryptoJS.algo.SHA1
+	});
 
-	let pHash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
-
-	// 50,000回の反復ハッシュ処理
-	for (let i = 0; i < 50000; i++) {
-		// 反復カウンタを4バイトのリトルエンディアン形式で作成
-		const iBytes = [(i >>> 0) & 0xff, (i >>> 8) & 0xff, (i >>> 16) & 0xff, (i >>> 24) & 0xff];
-		const iW = CryptoJS.lib.WordArray.create(iBytes);
-		pHash = CryptoJS.algo.SHA1.create().update(iW).update(pHash).finalize();
-	}
-	pHash.sigBytes = 20;
-
-	const pwVerifierKey = pHash.clone();
-	pwVerifierKey.sigBytes = keySize;
-
-	const pwVerifierIV = pHash.clone();
+	// ベリファイアの復号と検証
+	const pwVerifierIV = pwVerifierKey.clone();
 	pwVerifierIV.sigBytes = 16;
 
-	// 3. ベリファイアの復号と検証
 	const verifierW = CryptoJS.lib.WordArray.create(verifier);
 	const decryptedVerifierW = CryptoJS.AES.decrypt(
 		{ ciphertext: verifierW },
@@ -361,6 +353,7 @@ function decrypt(einfo, data, password, opts) {
 	);
 	const decryptedVerifierBytes = decryptedVerifierW.words.map(w => w & 0xff);
 	const checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+
 	// VerifierHashの最初の20バイトのみを使用
 	const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
 	console.log('checkHash:' + checkHash.toString(), 'verifierHashW:' + verifierHashW.toString());
@@ -370,26 +363,19 @@ function decrypt(einfo, data, password, opts) {
 		console.warn('Password verification failed');
 	}
 
-	// 4. コンテンツキーの導出
+	// コンテンツキーの導出
 	const blockKey = CryptoJS.lib.WordArray.create([0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]);
-	let contentP1 = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).update(blockKey).finalize();
+    const contentKey = CryptoJS.PBKDF2(passwordW.concat(blockKey), saltW, {
+        keySize: keySize / 4,
+        iterations: 50000,
+        hasher: CryptoJS.algo.SHA1
+    });
 
-    // 50,000回の反復ハッシュ処理を修正
-    for (let i = 0; i < 50000; i++) {
-        const iBytes = [(i >>> 0) & 0xff, (i >>> 8) & 0xff, (i >>> 16) & 0xff, (i >>> 24) & 0xff];
-        const iW = CryptoJS.lib.WordArray.create(iBytes);
-        contentP1 = CryptoJS.algo.SHA1.create().update(iW).update(contentP1).finalize();
-    }
-	contentP1.sigBytes = 20;
+    const contentIV = contentKey.clone();
+    contentIV.sigBytes = 16;
 
-	const contentKey = contentP1.clone();
-	contentKey.sigBytes = keySize;
-
-	const contentIV = contentP1.clone();
-	contentIV.sigBytes = 16;
-
-	// 5. コンテンツの復号
-	const contentW = CryptoJS.lib.WordArray.create(data.content);
+	// コンテンツの復号
+	const contentW = CryptoJS.lib.WordArray.create(new Uint8Array(data.content));
 	const decryptedContentW = CryptoJS.AES.decrypt(
 		{ ciphertext: contentW },
 		contentKey,
