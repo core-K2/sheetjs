@@ -313,4 +313,107 @@ function parse_FilePass(blob, length/*:number*/, opts) {
 	return o;
 }
 
+// decrypt password (Need CryptoJS)
+function decrypt(einfo, data, password, opts) {
+	// 暗号化情報
+	const encinf = einfo?.[1];
+	// 復号化データ
+	const content = data?.content;
+	if (!encinf || !Array.isArray(content) || content.length < 24)
+		throw new Error("decrypt: Ivalid parameters");
+	console.log(einfo, data, password, opts);
 
+	// ヘッダーの確認（デバッグ用）
+	const dataSize = content.read_shift(4);
+	console.log("Encrypted Data Size (from header):", dataSize);
+ 	if (dataSize < 0 || dataSize > content.length - 24)
+		console.warn('Invalid header size:', dataSize, content.length - 24, data.size);
+
+	// ソルト、Verifier、VerifierHash を WordArray に変換
+	const salt = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.Salt));
+	const verifier = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.Verifier));
+	const verifierHash = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.VerifierHash));
+	console.log("Salt:", encinf.v.Salt); // デバッグ
+	console.log("Verifier:", encinf.v.Verifier); // デバッグ
+	console.log("VerifierHash:", encinf.v.VerifierHash); // デバッグ
+	console.log(salt, verifier, verifierHash);
+
+	// キー生成（PBKDF2、SHA-1、50,000 回反復）
+	let hasher, keyParam;
+	if (einfo[0] == 'x') {
+		hasher = CryptoJS.SHA1;
+		keyParam = {
+			keySize: 128 / 32, // 128 ビット（4 words）
+			iterations: 50000, // LibreOffice Standard Encryption
+			hasher: CryptoJS.algo.SHA1
+		};
+	} else {
+		hasher = CryptoJS.SHA256;
+		keyParam = {
+			keySize: 256 / 32, // 256 ビット（8 words）
+			iterations: 100000, // Agile Encryption
+			hasher: CryptoJS.algo.SHA256
+		};
+	}
+	const key = CryptoJS.PBKDF2(password, salt, keyParam);
+	console.log("Generated Key:", key.toString(CryptoJS.enc.Hex));
+
+	// Verifier の復号
+	const ivZero = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Verifier 用ゼロIV
+	const decryptedVerifier = CryptoJS.AES.decrypt(
+		{ ciphertext: verifier },
+		key,
+		{ iv: ivZero, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+	);
+	console.log("Decrypted Verifier (Hex):", decryptedVerifier.toString(CryptoJS.enc.Hex)); // デバッグ
+	console.log(decryptedVerifier);
+
+	// Verifier のハッシュ計算
+	const calculatedHash = hasher(decryptedVerifier);
+	console.log("Calculated Verifier Hash:", calculatedHash.toString(CryptoJS.enc.Hex)); // デバッグ
+	console.log("Expected Verifier Hash:", verifierHash.toString(CryptoJS.enc.Hex)); // デバッグ
+
+	// パスワードが正しいか
+	console.log('passcheck', calculatedHash.toString(CryptoJS.enc.Hex) === verifierHash.toString(CryptoJS.enc.Hex),
+		calculatedHash.toString(CryptoJS.enc.Hex), verifierHash.toString(CryptoJS.enc.Hex),
+		calculatedHash, verifierHash);
+
+	// content を WordArray に変換
+	const uint8 = new Uint8Array(content);
+	const contentIV = CryptoJS.lib.WordArray.create(uint8.slice(8, 24)); // 16 バイト
+	const ciphertext = CryptoJS.lib.WordArray.create(uint8.slice(24)); // 残り
+	console.log("IV:", uint8.slice(8, 24), contentIV, ciphertext); // デバッグ
+
+	// コンテンツの復号
+	try {
+		const decryptedContent = CryptoJS.AES.decrypt(
+			{ ciphertext: ciphertext },
+			key,
+			{ iv: contentIV, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+		);
+		// 復号結果をバイナリ（または文字列）として取得
+		// const decryptedBytes = decryptedContent.toString(CryptoJS.enc.Hex);
+		// console.log("Decrypted Content (Hex):", decryptedBytes);
+		// XLSX の場合、復号データは ZIP アーカイブなので、テキスト変換は適切でない場合あり
+		// console.log("Decrypted Content (UTF-8):", decryptedContent.toString(CryptoJS.enc.Utf8));
+		const decryptedBytes = decryptedContent.toString(CryptoJS.enc.Hex);
+		console.log("Decrypted Content (first 8 bytes, Hex):", decryptedBytes.slice(0, 16)); // デバッグ: 
+		const result = wordArrayToUint8Array(decryptedContent);
+		console.log(decryptedContent, result);
+		return result;
+	} catch (e) {
+		console.error("Decryption failed:", e.message);
+	}
+	return content;
+}
+
+// WordArray を Uint8Array に変換する関数
+function wordArrayToUint8Array(wa) {
+	const size = wa.sigBytes;
+	const words = wa.words;
+	const ret = new Uint8Array(size);
+	for (let i = 0; i < size; i++) {
+		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+	}
+	return ret;
+}
