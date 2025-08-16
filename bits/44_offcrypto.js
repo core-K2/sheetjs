@@ -315,109 +315,90 @@ function parse_FilePass(blob, length/*:number*/, opts) {
 
 // decrypt password (Need CryptoJS)
 function decrypt(einfo, data, password, opts) {
-    if (einfo[0] !== 0x02) {
-        throw new Error("Unsupported encryption type");
-    }
+	if (einfo[0] !== 0x02) {
+		throw new Error("Unsupported encryption type");
+	}
 
-    const v = einfo[1].v;
-    const h = einfo[1].h;
-    const salt = v.Salt;
-    const verifier = v.Verifier;
-    const verifierHash = v.VerifierHash;
-    const keySize = h.KeySize / 8; // bits to bytes
+	const v = einfo[1].v;
+	const h = einfo[1].h;
+	const salt = v.Salt;
+	const verifier = v.Verifier;
+	const verifierHash = v.VerifierHash;
+	const keySize = h.KeySize / 8; // bits to bytes
 
-    const passwordBytes = [];
-    for (let i = 0; i < password.length; ++i) {
-        const charCode = password.charCodeAt(i);
-        if (charCode >= 0 && charCode <= 0x7f) {
-            passwordBytes.push(charCode);
-        } else {
-            passwordBytes.push(charCode & 0xff);
-            passwordBytes.push((charCode >> 8) & 0xff);
-        }
-    }
+	// 1. パスワードをUTF-16LEでエンコード
+	const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+	// 2. パスワードベリファイアのキー導出
+	const saltW = CryptoJS.lib.WordArray.create(salt);
 
-    const saltW = CryptoJS.lib.WordArray.create(salt);
-    const passW = CryptoJS.lib.WordArray.create(passwordBytes);
+	let pHash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
 
-    // 1. Password verifier key derivation
-    const hash = CryptoJS.algo.SHA1.create();
-    hash.update(saltW);
-    hash.update(passW);
-    const p1 = hash.finalize();
+	// 50,000回の反復ハッシュ処理
+	for (let i = 0; i < 50000; i++) {
+		// 反復カウンタを4バイトのリトルエンディアン形式で作成
+		const iBytes = [(i >>> 0) & 0xff, (i >>> 8) & 0xff, (i >>> 16) & 0xff, (i >>> 24) & 0xff];
+		const iW = CryptoJS.lib.WordArray.create(iBytes);
+		pHash = CryptoJS.algo.SHA1.create().update(iW).update(pHash).finalize();
+	}
+	pHash.sigBytes = 20;
 
-    let pHash = p1.clone();
-    let temp = p1.clone();
-    for (let i = 0; i < 20; ++i) {
-        temp = CryptoJS.algo.SHA1.create().update(temp).finalize();
-        pHash.words = pHash.words.map((word, index) => word ^ temp.words[index]);
-    }
-    pHash.sigBytes = 20;
+	const pwVerifierKey = pHash.clone();
+	pwVerifierKey.sigBytes = keySize;
 
-    const pwVerifierKey = pHash.clone();
-    pwVerifierKey.sigBytes = keySize;
+	const pwVerifierIV = pHash.clone();
+	pwVerifierIV.sigBytes = 16;
 
-    const pwVerifierIV = pHash.clone();
-    pwVerifierIV.sigBytes = 16;
-
-    // 2. Decrypt and verify the verifier
-    const verifierW = CryptoJS.lib.WordArray.create(verifier);
-    const decryptedVerifierW = CryptoJS.AES.decrypt(
-        { ciphertext: verifierW },
-        pwVerifierKey,
-        {
-            iv: pwVerifierIV,
-            mode: CryptoJS.mode.ECB,
-            padding: CryptoJS.pad.NoPadding
-        }
-    );
-
-    const decryptedVerifierBytes = decryptedVerifierW.words.map(w => w & 0xff);
-
-    const checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
-    const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+	// 3. ベリファイアの復号と検証
+	const verifierW = CryptoJS.lib.WordArray.create(verifier);
+	const decryptedVerifierW = CryptoJS.AES.decrypt(
+		{ ciphertext: verifierW },
+		pwVerifierKey,
+		{
+			iv: pwVerifierIV,
+			mode: CryptoJS.mode.ECB,
+			padding: CryptoJS.pad.NoPadding
+		}
+	);
+	const decryptedVerifierBytes = decryptedVerifierW.words.map(w => w & 0xff);
+	const checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+	// VerifierHashの最初の20バイトのみを使用
+	const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
 	console.log('checkHash:' + checkHash.toString(), 'verifierHashW:' + verifierHashW.toString());
 
-    if (checkHash.toString() !== verifierHashW.toString()) {
-        // throw new Error("Password verification failed");
+	if (checkHash.toString() !== verifierHashW.toString()) {
+		// throw new Error("Password verification failed");
 		console.warn('Password verification failed');
+	}
+
+	// 4. コンテンツキーの導出
+	const blockKey = CryptoJS.lib.WordArray.create([0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]);
+	let contentP1 = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).update(blockKey).finalize();
+
+    // 50,000回の反復ハッシュ処理を修正
+    for (let i = 0; i < 50000; i++) {
+        const iBytes = [(i >>> 0) & 0xff, (i >>> 8) & 0xff, (i >>> 16) & 0xff, (i >>> 24) & 0xff];
+        const iW = CryptoJS.lib.WordArray.create(iBytes);
+        contentP1 = CryptoJS.algo.SHA1.create().update(iW).update(contentP1).finalize();
     }
+	contentP1.sigBytes = 20;
 
-    // 3. Content key derivation
-    const blockKey = CryptoJS.lib.WordArray.create([0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]); // OLECFB block key
+	const contentKey = contentP1.clone();
+	contentKey.sigBytes = keySize;
 
-    const contentHash = CryptoJS.algo.SHA1.create();
-    contentHash.update(saltW);
-    contentHash.update(passW);
-    contentHash.update(blockKey);
-    const contentP1 = contentHash.finalize();
+	const contentIV = contentP1.clone();
+	contentIV.sigBytes = 16;
 
-    pHash = contentP1.clone();
-    temp = contentP1.clone();
-    for (let i = 0; i < 20; ++i) {
-        temp = CryptoJS.algo.SHA1.create().update(temp).finalize();
-        pHash.words = pHash.words.map((word, index) => word ^ temp.words[index]);
-    }
-    pHash.sigBytes = 20;
-
-    const contentKey = pHash.clone();
-    contentKey.sigBytes = keySize;
-
-    const contentIV = pHash.clone();
-    contentIV.sigBytes = 16;
-
-    // 4. Decrypt the content
-	const uint8 = new Uint8Array(data.content);
-    const contentW = CryptoJS.lib.WordArray.create(uint8);
-    const decryptedContentW = CryptoJS.AES.decrypt(
-        { ciphertext: contentW },
-        contentKey,
-        {
-            iv: contentIV,
-            mode: CryptoJS.mode.ECB,
-            padding: CryptoJS.pad.NoPadding
-        }
-    );
+	// 5. コンテンツの復号
+	const contentW = CryptoJS.lib.WordArray.create(data.content);
+	const decryptedContentW = CryptoJS.AES.decrypt(
+		{ ciphertext: contentW },
+		contentKey,
+		{
+			iv: contentIV,
+			mode: CryptoJS.mode.ECB,
+			padding: CryptoJS.pad.NoPadding
+		}
+	);
 
 	const result = wordArrayToUint8Array(decryptedContentW);
 	console.log(decryptedContentW, result);
