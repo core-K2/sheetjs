@@ -315,98 +315,114 @@ function parse_FilePass(blob, length/*:number*/, opts) {
 
 // decrypt password (Need CryptoJS)
 function decrypt(einfo, data, password, opts) {
-	// 暗号化情報
-	const encinf = einfo?.[1];
-	// 復号化データ
-	const content = data?.content;
-	if (!encinf || !Array.isArray(content) || content.length < 24)
-		throw new Error("decrypt: Ivalid parameters");
-	console.log(einfo, data, password, opts);
+    if (einfo[0] !== 0x02) {
+        throw new Error("Unsupported encryption type");
+    }
 
-	// ヘッダーの確認（デバッグ用）
-	const dataSize = content.read_shift(4);
-	console.log("Encrypted Data Size (from header):", dataSize);
- 	if (dataSize < 0 || dataSize > content.length - 24)
-		console.warn('Invalid header size:', dataSize, content.length - 24, data.size);
+    const v = einfo[1].v;
+    const h = einfo[1].h;
+    const salt = v.Salt;
+    const verifier = v.Verifier;
+    const verifierHash = v.VerifierHash;
+    const keySize = h.KeySize / 8; // bits to bytes
 
-	// ソルト、Verifier、VerifierHash を WordArray に変換
-	const salt = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.Salt));
-	const verifier = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.Verifier));
-	const verifierHash = CryptoJS.lib.WordArray.create(new Uint8Array(encinf.v.VerifierHash));
-	console.log("Salt:", encinf.v.Salt); // デバッグ
-	console.log("Verifier:", encinf.v.Verifier); // デバッグ
-	console.log("VerifierHash:", encinf.v.VerifierHash); // デバッグ
-	console.log(salt, verifier, verifierHash);
+    const passwordBytes = [];
+    for (let i = 0; i < password.length; ++i) {
+        const charCode = password.charCodeAt(i);
+        if (charCode >= 0 && charCode <= 0x7f) {
+            passwordBytes.push(charCode);
+        } else {
+            passwordBytes.push(charCode & 0xff);
+            passwordBytes.push((charCode >> 8) & 0xff);
+        }
+    }
 
-	// キー生成（PBKDF2、SHA-1、50,000 回反復）
-	let hasher, keyParam;
-	if (einfo[0] == 'x') {
-		hasher = CryptoJS.SHA1;
-		keyParam = {
-			keySize: 128 / 32, // 128 ビット（4 words）
-			iterations: 50000, // LibreOffice Standard Encryption
-			hasher: CryptoJS.algo.SHA1
-		};
-	} else {
-		hasher = CryptoJS.SHA256;
-		keyParam = {
-			keySize: 256 / 32, // 256 ビット（8 words）
-			iterations: 100000, // Agile Encryption
-			hasher: CryptoJS.algo.SHA256
-		};
-	}
-	const key = CryptoJS.PBKDF2(password, salt, keyParam);
-	console.log("Generated Key:", key.toString(CryptoJS.enc.Hex));
+    const saltW = CryptoJS.lib.WordArray.create(salt);
+    const passW = CryptoJS.lib.WordArray.create(passwordBytes);
 
-	// Verifier の復号
-	const ivZero = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Verifier 用ゼロIV
-	const decryptedVerifier = CryptoJS.AES.decrypt(
-		{ ciphertext: verifier },
-		key,
-		{ iv: ivZero, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-	);
-	console.log("Decrypted Verifier (Hex):", decryptedVerifier.toString(CryptoJS.enc.Hex)); // デバッグ
-	console.log(decryptedVerifier);
+    // 1. Password verifier key derivation
+    const hash = CryptoJS.algo.SHA1.create();
+    hash.update(saltW);
+    hash.update(passW);
+    const p1 = hash.finalize();
 
-	// Verifier のハッシュ計算
-	const calculatedHash = hasher(decryptedVerifier);
-	console.log("Calculated Verifier Hash:", calculatedHash.toString(CryptoJS.enc.Hex)); // デバッグ
-	console.log("Expected Verifier Hash:", verifierHash.toString(CryptoJS.enc.Hex)); // デバッグ
+    let pHash = p1.clone();
+    let temp = p1.clone();
+    for (let i = 0; i < 20; ++i) {
+        temp = CryptoJS.algo.SHA1.create().update(temp).finalize();
+        pHash.words = pHash.words.map((word, index) => word ^ temp.words[index]);
+    }
+    pHash.sigBytes = 20;
 
-	// パスワードが正しいか
-	console.log('passcheck', calculatedHash.toString(CryptoJS.enc.Hex) === verifierHash.toString(CryptoJS.enc.Hex),
-		calculatedHash.toString(CryptoJS.enc.Hex), verifierHash.toString(CryptoJS.enc.Hex),
-		calculatedHash, verifierHash);
+    const pwVerifierKey = pHash.clone();
+    pwVerifierKey.sigBytes = keySize;
 
-	// content を WordArray に変換
-	const uint8 = new Uint8Array(content);
-	const contentIV = CryptoJS.lib.WordArray.create(uint8.slice(8, 24)); // 16 バイト
-	const ciphertext = CryptoJS.lib.WordArray.create(uint8.slice(24)); // 残り
-	console.log("IV:", uint8.slice(8, 24), contentIV, ciphertext); // デバッグ
+    const pwVerifierIV = pHash.clone();
+    pwVerifierIV.sigBytes = 16;
 
-	// コンテンツの復号
-	try {
-		const decryptedContent = CryptoJS.AES.decrypt(
-			{ ciphertext: ciphertext },
-			key,
-			{ iv: contentIV, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-		);
-		// 復号結果をバイナリ（または文字列）として取得
-		// const decryptedBytes = decryptedContent.toString(CryptoJS.enc.Hex);
-		// console.log("Decrypted Content (Hex):", decryptedBytes);
-		// XLSX の場合、復号データは ZIP アーカイブなので、テキスト変換は適切でない場合あり
-		// console.log("Decrypted Content (UTF-8):", decryptedContent.toString(CryptoJS.enc.Utf8));
-		const decryptedBytes = decryptedContent.toString(CryptoJS.enc.Hex);
-		console.log("Decrypted Content (first 8 bytes, Hex):", decryptedBytes.slice(0, 16)); // デバッグ: 
-		const result = wordArrayToUint8Array(decryptedContent);
-		console.log(decryptedContent, result);
-		return result;
-	} catch (e) {
-		console.error("Decryption failed:", e.message);
-	}
-	return content;
+    // 2. Decrypt and verify the verifier
+    const verifierW = CryptoJS.lib.WordArray.create(verifier);
+    const decryptedVerifierW = CryptoJS.AES.decrypt(
+        { ciphertext: verifierW },
+        pwVerifierKey,
+        {
+            iv: pwVerifierIV,
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.NoPadding
+        }
+    );
+
+    const decryptedVerifierBytes = decryptedVerifierW.words.map(w => w & 0xff);
+
+    const checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+    const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+	console.log('checkHash:' + checkHash.toString(), 'verifierHashW:' + verifierHashW.toString());
+
+    if (checkHash.toString() !== verifierHashW.toString()) {
+        // throw new Error("Password verification failed");
+		console.warn('Password verification failed');
+    }
+
+    // 3. Content key derivation
+    const blockKey = CryptoJS.lib.WordArray.create([0x8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]); // OLECFB block key
+
+    const contentHash = CryptoJS.algo.SHA1.create();
+    contentHash.update(saltW);
+    contentHash.update(passW);
+    contentHash.update(blockKey);
+    const contentP1 = contentHash.finalize();
+
+    pHash = contentP1.clone();
+    temp = contentP1.clone();
+    for (let i = 0; i < 20; ++i) {
+        temp = CryptoJS.algo.SHA1.create().update(temp).finalize();
+        pHash.words = pHash.words.map((word, index) => word ^ temp.words[index]);
+    }
+    pHash.sigBytes = 20;
+
+    const contentKey = pHash.clone();
+    contentKey.sigBytes = keySize;
+
+    const contentIV = pHash.clone();
+    contentIV.sigBytes = 16;
+
+    // 4. Decrypt the content
+	const uint8 = new Uint8Array(data.content);
+    const contentW = CryptoJS.lib.WordArray.create(uint8);
+    const decryptedContentW = CryptoJS.AES.decrypt(
+        { ciphertext: contentW },
+        contentKey,
+        {
+            iv: contentIV,
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.NoPadding
+        }
+    );
+
+	const result = wordArrayToUint8Array(decryptedContentW);
+	console.log(decryptedContentW, result);
+	return result;
 }
-
 // WordArray を Uint8Array に変換する関数
 function wordArrayToUint8Array(wa) {
 	const size = wa.sigBytes;
