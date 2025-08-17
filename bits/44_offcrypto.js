@@ -331,28 +331,48 @@ function decrypt(einfo, data, password, opts) {
     console.log("Password (UTF-16LE):", passwordW.toString());
 
     const saltW = CryptoJS.lib.WordArray.create(salt);
-    let pHash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
-    console.log("Initial pHash:", pHash.toString());
 
-    for (let i = 0; i < 100000; i++) {
+    // 鍵導出: salt + password, 50000 iterations
+    let pHash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
+    console.log("Initial pHash (salt + password, 50000):", pHash.toString());
+
+    for (let i = 0; i < 50000; i++) {
         const iBytes = new Uint8Array(4);
         iBytes[0] = i & 0xff;
         iBytes[1] = (i >>> 8) & 0xff;
         iBytes[2] = (i >>> 16) & 0xff;
         iBytes[3] = (i >>> 24) & 0xff;
         const iW = CryptoJS.lib.WordArray.create(iBytes);
-        pHash = CryptoJS.algo.SHA1.create().update(iW).update(pHash).finalize();
+        const hashW = CryptoJS.lib.WordArray.create(pHash.words, 20);
+        pHash = CryptoJS.algo.SHA1.create().update(iW).update(hashW).finalize();
     }
-    pHash.sigBytes = 20;
-    console.log("Final pHash:", pHash.toString());
+    console.log("Final pHash after 50000 iterations:", pHash.toString());
 
-    const pwVerifierKey = pHash.clone();
+    // data = hash + zeros
+    const dataArray = new Uint8Array(24);
+    for (let i = 0; i < 20; i++) {
+        dataArray[i] = (pHash.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    }
+    const dataW = CryptoJS.lib.WordArray.create(dataArray);
+    pHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
+    console.log("pHash after final hash:", pHash.toString());
+
+    // Derive key: XOR with 0x36 buffer
+    const buffer = new Uint8Array(64).fill(0x36);
+    for (let i = 0; i < pHash.sigBytes; i++) {
+        buffer[i] ^= (pHash.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    }
+    const bufferW = CryptoJS.lib.WordArray.create(buffer);
+    const finalKey = CryptoJS.algo.SHA1.create().update(bufferW).finalize();
+    console.log("Final Key (after XOR and SHA1):", finalKey.toString());
+
+    let pwVerifierKey = finalKey.clone();
     pwVerifierKey.sigBytes = keySize;
     const pwVerifierIV = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // ゼロ埋めIV
     console.log("Verifier Key:", pwVerifierKey.toString(), "Verifier IV:", pwVerifierIV.toString());
 
     const verifierW = CryptoJS.lib.WordArray.create(verifier);
-    const decryptedVerifierW = CryptoJS.AES.decrypt(
+    let decryptedVerifierW = CryptoJS.AES.decrypt(
         { ciphertext: verifierW },
         pwVerifierKey,
         {
@@ -361,21 +381,33 @@ function decrypt(einfo, data, password, opts) {
             padding: CryptoJS.pad.NoPadding
         }
     );
-    const decryptedVerifierBytes = wordArrayToUint8Array(decryptedVerifierW);
+    let decryptedVerifierBytes = wordArrayToUint8Array(decryptedVerifierW);
     console.log("Decrypted Verifier Bytes:", Array.from(decryptedVerifierBytes));
 
-    const checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
-    const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
-    console.log("checkHash:", checkHash.toString(), "verifierHashW:", verifierHashW.toString());
+    let checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+    let verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
+    console.log("SHA1 checkHash:", checkHash.toString(), "verifierHashW:", verifierHashW.toString());
 
     if (checkHash.toString() !== verifierHashW.toString()) {
-        throw new Error(`パスワード検証に失敗しました。checkHash: ${checkHash.toString()}, verifierHashW: ${verifierHashW.toString()}`);
+        // VerifierHashをSHA-256でテスト
+        console.log("Trying SHA-256 for VerifierHash...");
+        checkHash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+        verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 32));
+        console.log("SHA256 checkHash:", checkHash.toString(), "verifierHashW (32 bytes):", verifierHashW.toString());
+
+        if (checkHash.toString() !== verifierHashW.toString()) {
+            throw new Error(`パスワード検証に失敗しました。\n` +
+                            `SHA1 checkHash: ${checkHash.toString()}\n` +
+                            `SHA256 checkHash: ${checkHash.toString()}\n` +
+                            `verifierHashW: ${verifierHashW.toString()}`);
+        }
     }
 
+    // コンテンツ復号用の鍵（blockKey 0x08）
     const contentBlockKey = CryptoJS.lib.WordArray.create([0x08, 0x00, 0x00, 0x00]);
     let contentKey = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).update(contentBlockKey).finalize();
 
-    for (let i = 0; i < 100000; i++) {
+    for (let i = 0; i < 50000; i++) {
         const iBytes = new Uint8Array(4);
         iBytes[0] = i & 0xff;
         iBytes[1] = (i >>> 8) & 0xff;
@@ -414,3 +446,4 @@ function wordArrayToUint8Array(wa) {
     }
     return ret;
 }
+
