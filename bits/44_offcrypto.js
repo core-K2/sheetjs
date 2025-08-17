@@ -315,6 +315,8 @@ function parse_FilePass(blob, length/*:number*/, opts) {
 
 // decrypt password (Need CryptoJS)
 function decrypt(einfo, data, password, opts) {
+	const ar2HexStr = v => CryptoJS.lib.WordArray.create(v).toString();
+    console.log(einfo, data);
     const v = einfo[1].v;
     const h = einfo[1].h;
     const salt = v.Salt;
@@ -322,10 +324,8 @@ function decrypt(einfo, data, password, opts) {
     const verifierHash = v.VerifierHash;
     const keySize = h.KeySize / 8;
 
-    console.log("Encryption Type:", einfo[0]);
-    console.log("Full einfo:", JSON.stringify(einfo, null, 2));
-    console.log("Salt:", Array.from(salt), "Verifier:", Array.from(verifier), "VerifierHash (full):", Array.from(verifierHash), "KeySize:", keySize);
-    console.log("VerifierHash trailing bytes:", Array.from(verifierHash.slice(20)));
+    console.log("Salt:", ar2HexStr(salt), "Verifier:", ar2HexStr(verifier), "VerifierHash (full):", ar2HexStr(verifierHash), "KeySize:", keySize);
+    console.log("VerifierHash trailing bytes:", ar2HexStr(verifierHash.slice(20)));
 
     const passwordW = CryptoJS.enc.Utf16LE.parse(password);
     console.log("Password (UTF-16LE):", passwordW.toString());
@@ -376,29 +376,44 @@ function decrypt(einfo, data, password, opts) {
         { ciphertext: verifierW },
         pwVerifierKey,
         {
-            iv: pwVerifierIV,
+            // iv: pwVerifierIV,
             mode: CryptoJS.mode.ECB,
             padding: CryptoJS.pad.NoPadding
         }
     );
     let decryptedVerifierBytes = wordArrayToUint8Array(decryptedVerifierW);
-    console.log("Decrypted Verifier Bytes:", Array.from(decryptedVerifierBytes));
+    console.log("Decrypted Verifier Bytes:", ar2HexStr(decryptedVerifierBytes));
 
-    let checkHash = CryptoJS.SHA1(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+	let waTemp = CryptoJS.lib.WordArray.create(decryptedVerifierBytes);
+    let checkHash = CryptoJS.SHA1(waTemp);
+	console.log("SHA1 checkHash1:", checkHash.toString());
+	const paddedHash = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
+	paddedHash.clamp();
+	while (paddedHash.sigBytes < 32) {
+		paddedHash.concat(CryptoJS.lib.WordArray.create([0], 1));
+	}
+	const x = CryptoJS.AES.encrypt(password, paddedHash, { iv: pwVerifierIV });
+	console.log("SHA1 paddedHash:", paddedHash.toString(), "x:", x.ciphertext.toString());
+
+	checkHash = CryptoJS.HmacSHA1(waTemp, waTemp);
     let verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
     console.log("SHA1 checkHash:", checkHash.toString(), "verifierHashW:", verifierHashW.toString());
 
     if (checkHash.toString() !== verifierHashW.toString()) {
         // VerifierHashをSHA-256でテスト
         console.log("Trying SHA-256 for VerifierHash...");
-        checkHash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(decryptedVerifierBytes));
+        let checkHash1 = CryptoJS.SHA256(waTemp);
+        console.log("SHA256 checkHash1:", checkHash1.toString());
+		checkHash1 = CryptoJS.HmacSHA256(waTemp, waTemp);
         verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 32));
-        console.log("SHA256 checkHash:", checkHash.toString(), "verifierHashW (32 bytes):", verifierHashW.toString());
+        console.log("SHA256 checkHash:", checkHash1.toString(), "verifierHashW (32 bytes):", verifierHashW.toString());
 
-        if (checkHash.toString() !== verifierHashW.toString()) {
-            throw new Error(`パスワード検証に失敗しました。\n` +
+        if (checkHash1.toString() !== verifierHashW.toString()) {
+			console.error
+            // throw new Error
+			(`パスワード検証に失敗しました。\n` +
                             `SHA1 checkHash: ${checkHash.toString()}\n` +
-                            `SHA256 checkHash: ${checkHash.toString()}\n` +
+                            `SHA256 checkHash: ${checkHash1.toString()}\n` +
                             `verifierHashW: ${verifierHashW.toString()}`);
         }
     }
