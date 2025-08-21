@@ -314,146 +314,28 @@ function parse_FilePass(blob, length/*:number*/, opts) {
 }
 
 // decrypt password (Need CryptoJS)
-function decrypt(einfo, data, password, opts) {
-	const ar2HexStr = v => CryptoJS.lib.WordArray.create(v).toString();
-    console.log(einfo, data);
-    const v = einfo[1].v;
-    const h = einfo[1].h;
-    const salt = v.Salt;
-    const verifier = v.Verifier;
-    const verifierHash = v.VerifierHash;
-    const keySize = h.KeySize / 8;
-
-    console.log("Salt:", ar2HexStr(salt), "Verifier:", ar2HexStr(verifier), "VerifierHash (full):", ar2HexStr(verifierHash), "KeySize:", keySize);
-    console.log("VerifierHash trailing bytes:", ar2HexStr(verifierHash.slice(20)));
-
-    const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-    console.log("Password (UTF-16LE):", passwordW.toString());
-
-    const saltW = CryptoJS.lib.WordArray.create(salt);
-
-    // 鍵導出: salt + password, 50000 iterations
-    let pHash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
-    console.log("Initial pHash (salt + password, 50000):", pHash.toString());
-
-    for (let i = 0; i < 50000; i++) {
-        const iBytes = new Uint8Array(4);
-        iBytes[0] = i & 0xff;
-        iBytes[1] = (i >>> 8) & 0xff;
-        iBytes[2] = (i >>> 16) & 0xff;
-        iBytes[3] = (i >>> 24) & 0xff;
-        const iW = CryptoJS.lib.WordArray.create(iBytes);
-        const hashW = CryptoJS.lib.WordArray.create(pHash.words, 20);
-        pHash = CryptoJS.algo.SHA1.create().update(iW).update(hashW).finalize();
-    }
-    console.log("Final pHash after 50000 iterations:", pHash.toString());
-
-    // data = hash + zeros
-    const dataArray = new Uint8Array(24);
-    for (let i = 0; i < 20; i++) {
-        dataArray[i] = (pHash.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    }
-    const dataW = CryptoJS.lib.WordArray.create(dataArray);
-    pHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
-    console.log("pHash after final hash:", pHash.toString());
-
-    // Derive key: XOR with 0x36 buffer
-    const buffer = new Uint8Array(64).fill(0x36);
-    for (let i = 0; i < pHash.sigBytes; i++) {
-        buffer[i] ^= (pHash.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    }
-    const bufferW = CryptoJS.lib.WordArray.create(buffer);
-    const finalKey = CryptoJS.algo.SHA1.create().update(bufferW).finalize();
-    console.log("Final Key (after XOR and SHA1):", finalKey.toString());
-
-    let pwVerifierKey = finalKey.clone();
-    pwVerifierKey.sigBytes = keySize;
-    const pwVerifierIV = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // ゼロ埋めIV
-    console.log("Verifier Key:", pwVerifierKey.toString(), "Verifier IV:", pwVerifierIV.toString());
-
-    const verifierW = CryptoJS.lib.WordArray.create(verifier);
-    let decryptedVerifierW = CryptoJS.AES.decrypt(
-        { ciphertext: verifierW },
-        pwVerifierKey,
-        {
-            // iv: pwVerifierIV,
-            mode: CryptoJS.mode.ECB,
-            padding: CryptoJS.pad.NoPadding
-        }
-    );
-    let decryptedVerifierBytes = wordArrayToUint8Array(decryptedVerifierW);
-    console.log("Decrypted Verifier Bytes:", ar2HexStr(decryptedVerifierBytes));
-
-	let waTemp = CryptoJS.lib.WordArray.create(decryptedVerifierBytes);
-    let checkHash = CryptoJS.SHA1(waTemp);
-	console.log("SHA1 checkHash1:", checkHash.toString());
-	const paddedHash = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
-	paddedHash.clamp();
-	while (paddedHash.sigBytes < 32) {
-		paddedHash.concat(CryptoJS.lib.WordArray.create([0], 1));
+function decrypt(einfo, data, cfb, opts) {
+	if (typeof CryptoJS === 'undefined')
+		throw new Error("CryptoJS is required for decryption");
+	if (Array.isArray(einfo) && einfo.length === 2) {
+		let type = einfo[0];
+		switch (type) {
+		case 2: // Standard Encryption
+			return Ecma376Standard.decrypt(einfo[1], data, opts);
+		case 3: // Extensible Encryption
+			return Ecma376Extensible.decrypt(einfo[1], data, opts);
+		case 4: // Agile Encryption
+			return Ecma376Agile.decrypt(einfo[1], data, opts);
+		default:
+			throw new Error("ECMA-376 Encrypted file unrecognized Version: " + type);
+		}
 	}
-	const x = CryptoJS.AES.encrypt(password, paddedHash, { iv: pwVerifierIV });
-	console.log("SHA1 paddedHash:", paddedHash.toString(), "x:", x.ciphertext.toString());
-
-	checkHash = CryptoJS.HmacSHA1(waTemp, waTemp);
-    let verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 20));
-    console.log("SHA1 checkHash:", checkHash.toString(), "verifierHashW:", verifierHashW.toString());
-
-    if (checkHash.toString() !== verifierHashW.toString()) {
-        // VerifierHashをSHA-256でテスト
-        console.log("Trying SHA-256 for VerifierHash...");
-        let checkHash1 = CryptoJS.SHA256(waTemp);
-        console.log("SHA256 checkHash1:", checkHash1.toString());
-		checkHash1 = CryptoJS.HmacSHA256(waTemp, waTemp);
-        verifierHashW = CryptoJS.lib.WordArray.create(verifierHash.slice(0, 32));
-        console.log("SHA256 checkHash:", checkHash1.toString(), "verifierHashW (32 bytes):", verifierHashW.toString());
-
-        if (checkHash1.toString() !== verifierHashW.toString()) {
-			console.error
-            // throw new Error
-			(`パスワード検証に失敗しました。\n` +
-                            `SHA1 checkHash: ${checkHash.toString()}\n` +
-                            `SHA256 checkHash: ${checkHash1.toString()}\n` +
-                            `verifierHashW: ${verifierHashW.toString()}`);
-        }
-    }
-
-    // コンテンツ復号用の鍵（blockKey 0x08）
-    const contentBlockKey = CryptoJS.lib.WordArray.create([0x08, 0x00, 0x00, 0x00]);
-    let contentKey = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).update(contentBlockKey).finalize();
-
-    for (let i = 0; i < 50000; i++) {
-        const iBytes = new Uint8Array(4);
-        iBytes[0] = i & 0xff;
-        iBytes[1] = (i >>> 8) & 0xff;
-        iBytes[2] = (i >>> 16) & 0xff;
-        iBytes[3] = (i >>> 24) & 0xff;
-        const iW = CryptoJS.lib.WordArray.create(iBytes);
-        contentKey = CryptoJS.algo.SHA1.create().update(iW).update(contentKey).finalize();
-    }
-    contentKey.sigBytes = keySize;
-    const contentIV = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // ゼロ埋めIV
-    console.log("Content Key:", contentKey.toString(), "Content IV:", contentIV.toString());
-
-    const contentW = CryptoJS.lib.WordArray.create(new Uint8Array(data.content));
-    const decryptedContentW = CryptoJS.AES.decrypt(
-        { ciphertext: contentW },
-        contentKey,
-        {
-            iv: contentIV,
-            mode: CryptoJS.mode.ECB,
-            padding: CryptoJS.pad.NoPadding
-        }
-    );
-
-    const result = wordArrayToUint8Array(decryptedContentW);
-    console.log("Decrypted Content Length:", result.length);
-    return result;
+	throw new Error("Unsupported encryption info format:" + JSON.stringify(einfo), cfb);
 }
 
-function wordArrayToUint8Array(wa) {
-    const size = wa.sigBytes;
-    if (size < 0) throw new Error("無効なsigBytes値: " + size);
+function wordArrayToUint8Array(wa, sz) {
+    const size = sz || wa.sigBytes;
+    if (size < 0) throw new Error("invalid sigBytes:" + size);
     const words = wa.words;
     const ret = new Uint8Array(size);
     for (let i = 0; i < size; i++) {
@@ -461,4 +343,130 @@ function wordArrayToUint8Array(wa) {
     }
     return ret;
 }
+function wordArrayXorUint8Array(wa, buf) {
+	const size = wa.sigBytes;
+    if (size < 0) throw new Error("invalid sigBytes:" + size);
+    const words = wa.words;
+	if (!buf) {
+		buf = new Uint8Array(size);
+	} else if (buf.length < size) {
+		buf.fill(buf.length, size - buf.length);
+	}
+    for (let i = 0; i < size; i++) {
+        buf[i] ^= (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    }
+    return buf;
+}
+function concatUint8Arrays(chunks) {
+	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+	const ret = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		ret.set(chunk, offset);
+		offset += chunk.length;
+	}
+	return ret;
+}
 
+var Ecma376Standard = {
+	REPEAT_COUNT: 50000,
+	iv: [],
+	_decrypt: function(cipherW, keyW) {
+		return CryptoJS.AES.decrypt(
+			{
+				ciphertext: cipherW
+			},
+			keyW,
+			{
+				iv: this.iv,
+				mode: CryptoJS.mode.ECB,
+				padding: CryptoJS.pad.NoPadding
+			}
+		);
+	},
+	passwordToKey: function(password, salt, keySize = 128) {
+		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+		const saltW = CryptoJS.lib.WordArray.create(salt);
+		let hash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
+		for (let i = 0; i < this.REPEAT_COUNT; i++) {
+			const iBytes = new Uint8Array(4);
+			iBytes[0] = i & 0xff;
+			iBytes[1] = (i >>> 8) & 0xff;
+			iBytes[2] = (i >>> 16) & 0xff;
+			iBytes[3] = (i >>> 24) & 0xff;
+			const iW = CryptoJS.lib.WordArray.create(iBytes);
+			hash = CryptoJS.algo.SHA1.create().update(iW).update(hash).finalize();
+		}
+	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
+		const keyHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
+		const buf = wordArrayXorUint8Array(keyHash, new Uint8Array(64).fill(0x36));
+		const keyHashW = CryptoJS.lib.WordArray.create(buf);
+		const key = CryptoJS.algo.SHA1.create().update(keyHashW).finalize();
+		return wordArrayToUint8Array(key, keySize / 8);
+	},
+	verifyKey: function(key, verifier, verifierHash) {
+		const keyW = CryptoJS.lib.WordArray.create(key);
+		const verifierW = CryptoJS.lib.WordArray.create(verifier);
+		const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+		const decryptedVerifierW = this._decrypt(verifierW, keyW);
+		const expectedHashW = CryptoJS.algo.SHA1.create().update(decryptedVerifierW).finalize();
+		const expectedHash = wordArrayToUint8Array(expectedHashW);
+		const checkW = this._decrypt(verifierHashW, keyW);
+		const check = wordArrayToUint8Array(checkW, 20);
+		return expectedHash.toString() === check.toString();
+	},
+	decryptData: function(key, data) {
+		const keyW = CryptoJS.lib.WordArray.create(key);
+		const content = data.content;
+		const len = content.length;
+		const size = content.read_shift(2);
+		const chunks = [];
+		const offset = 8; // Skip the first 8 bytes (size and reserved)
+		const blockSize = 16; // AES block size in bytes
+		const chunkLen = 4096; // Chunk size for processing
+		let sIdx, eIdx = 0;
+		while (eIdx < len) {
+			sIdx = eIdx;
+			eIdx = sIdx + chunkLen; 
+			if (eIdx > len) eIdx = len;
+			let buf = content.slice(sIdx + offset, eIdx + offset);
+			const remaind = buf.length % blockSize;
+			if (remaind) {
+				const padding = new Uint8Array(blockSize - remaind).fill(0);
+				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
+			}
+			const bufW = CryptoJS.lib.WordArray.create(new Uint8Array(buf));
+			const decryptedW = this._decrypt(bufW, keyW);
+			chunks.push(wordArrayToUint8Array(decryptedW));
+		}
+		const result = concatUint8Arrays(chunks);
+		return result.slice(0, size); // Return only the decrypted content up to the specified size
+	},
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		const {Salt, Verifier, VerifierHash} = einfo.v;
+		const {Flags, AlgID, AlgIDHash, KeySize, ProviderType} = einfo.h;
+		if (AlgID !== 0x660E && AlgID !== 0x6801) {
+			throw new Error("Unsupported AlgID: " + AlgID);
+		}
+		this.iv = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Zero IV
+		const key = this.passwordToKey(opts.password, Salt, KeySize);
+		if (!this.verifyKey(key, Verifier, VerifierHash)) {
+			throw new Error("Password verification failed");
+		}
+		return this.decryptData(key, data);
+	}
+};
+var Ecma376Agile = {
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		throw new Error("not implement yet Ecma376Agile:", einfo);
+	}
+};
+
+var Ecma376Extensible = {
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		throw new Error("not implement yet Ecma376Extensible:", einfo);
+	}
+};

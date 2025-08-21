@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250811';
+XLSX.version = '0.20.3.20250821';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -12263,7 +12263,163 @@ function parse_FilePass(blob, length, opts) {
 	return o;
 }
 
+// decrypt password (Need CryptoJS)
+function decrypt(einfo, data, cfb, opts) {
+	if (typeof CryptoJS === 'undefined')
+		throw new Error("CryptoJS is required for decryption");
+	if (Array.isArray(einfo) && einfo.length === 2) {
+		let type = einfo[0];
+		switch (type) {
+		case 2: // Standard Encryption
+			return Ecma376Standard.decrypt(einfo[1], data, opts);
+		case 3: // Extensible Encryption
+			return Ecma376Extensible.decrypt(einfo[1], data, opts);
+		case 4: // Agile Encryption
+			return Ecma376Agile.decrypt(einfo[1], data, opts);
+		default:
+			throw new Error("ECMA-376 Encrypted file unrecognized Version: " + type);
+		}
+	}
+	throw new Error("Unsupported encryption info format:" + JSON.stringify(einfo), cfb);
+}
 
+function wordArrayToUint8Array(wa, sz) {
+    const size = sz || wa.sigBytes;
+    if (size < 0) throw new Error("invalid sigBytes:" + size);
+    const words = wa.words;
+    const ret = new Uint8Array(size);
+    for (let i = 0; i < size; i++) {
+        ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    }
+    return ret;
+}
+function wordArrayXorUint8Array(wa, buf) {
+	const size = wa.sigBytes;
+    if (size < 0) throw new Error("invalid sigBytes:" + size);
+    const words = wa.words;
+	if (!buf) {
+		buf = new Uint8Array(size);
+	} else if (buf.length < size) {
+		buf.fill(buf.length, size - buf.length);
+	}
+    for (let i = 0; i < size; i++) {
+        buf[i] ^= (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    }
+    return buf;
+}
+function concatUint8Arrays(chunks) {
+	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+	const ret = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		ret.set(chunk, offset);
+		offset += chunk.length;
+	}
+	return ret;
+}
+
+var Ecma376Standard = {
+	REPEAT_COUNT: 50000,
+	iv: [],
+	_decrypt: function(cipherW, keyW) {
+		return CryptoJS.AES.decrypt(
+			{
+				ciphertext: cipherW
+			},
+			keyW,
+			{
+				iv: this.iv,
+				mode: CryptoJS.mode.ECB,
+				padding: CryptoJS.pad.NoPadding
+			}
+		);
+	},
+	passwordToKey: function(password, salt, keySize = 128) {
+		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+		const saltW = CryptoJS.lib.WordArray.create(salt);
+		let hash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
+		for (let i = 0; i < this.REPEAT_COUNT; i++) {
+			const iBytes = new Uint8Array(4);
+			iBytes[0] = i & 0xff;
+			iBytes[1] = (i >>> 8) & 0xff;
+			iBytes[2] = (i >>> 16) & 0xff;
+			iBytes[3] = (i >>> 24) & 0xff;
+			const iW = CryptoJS.lib.WordArray.create(iBytes);
+			hash = CryptoJS.algo.SHA1.create().update(iW).update(hash).finalize();
+		}
+	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
+		const keyHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
+		const buf = wordArrayXorUint8Array(keyHash, new Uint8Array(64).fill(0x36));
+		const keyHashW = CryptoJS.lib.WordArray.create(buf);
+		const key = CryptoJS.algo.SHA1.create().update(keyHashW).finalize();
+		return wordArrayToUint8Array(key, keySize / 8);
+	},
+	verifyKey: function(key, verifier, verifierHash) {
+		const keyW = CryptoJS.lib.WordArray.create(key);
+		const verifierW = CryptoJS.lib.WordArray.create(verifier);
+		const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+		const decryptedVerifierW = this._decrypt(verifierW, keyW);
+		const expectedHashW = CryptoJS.algo.SHA1.create().update(decryptedVerifierW).finalize();
+		const expectedHash = wordArrayToUint8Array(expectedHashW);
+		const checkW = this._decrypt(verifierHashW, keyW);
+		const check = wordArrayToUint8Array(checkW, 20);
+		return expectedHash.toString() === check.toString();
+	},
+	decryptData: function(key, data) {
+		const keyW = CryptoJS.lib.WordArray.create(key);
+		const content = data.content;
+		const len = content.length;
+		const size = content.read_shift(2);
+		const chunks = [];
+		const offset = 8; // Skip the first 8 bytes (size and reserved)
+		const blockSize = 16; // AES block size in bytes
+		const chunkLen = 4096; // Chunk size for processing
+		let sIdx, eIdx = 0;
+		while (eIdx < len) {
+			sIdx = eIdx;
+			eIdx = sIdx + chunkLen; 
+			if (eIdx > len) eIdx = len;
+			let buf = content.slice(sIdx + offset, eIdx + offset);
+			const remaind = buf.length % blockSize;
+			if (remaind) {
+				const padding = new Uint8Array(blockSize - remaind).fill(0);
+				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
+			}
+			const bufW = CryptoJS.lib.WordArray.create(new Uint8Array(buf));
+			const decryptedW = this._decrypt(bufW, keyW);
+			chunks.push(wordArrayToUint8Array(decryptedW));
+		}
+		const result = concatUint8Arrays(chunks);
+		return result.slice(0, size); // Return only the decrypted content up to the specified size
+	},
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		const {Salt, Verifier, VerifierHash} = einfo.v;
+		const {Flags, AlgID, AlgIDHash, KeySize, ProviderType} = einfo.h;
+		if (AlgID !== 0x660E && AlgID !== 0x6801) {
+			throw new Error("Unsupported AlgID: " + AlgID);
+		}
+		this.iv = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Zero IV
+		const key = this.passwordToKey(opts.password, Salt, KeySize);
+		if (!this.verifyKey(key, Verifier, VerifierHash)) {
+			throw new Error("Password verification failed");
+		}
+		return this.decryptData(key, data);
+	}
+};
+var Ecma376Agile = {
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		throw new Error("not implement yet Ecma376Agile:", einfo);
+	}
+};
+
+var Ecma376Extensible = {
+	decrypt: function(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		throw new Error("not implement yet Ecma376Extensible:", einfo);
+	}
+};
 function rtf_to_sheet(d, opts) {
   switch (opts.type) {
     case "base64":
@@ -30620,10 +30776,15 @@ function parse_xlsxcfb(cfb, _opts) {
 	f = '/EncryptedPackage';
 	data = CFB.find(cfb, f); if(!data || !data.content) throw new Error("ECMA-376 Encrypted file missing " + f);
 
+	const pass = opts.password || "";
 /*global decrypt_agile */
-if(einfo[0] == 0x04 && typeof decrypt_agile !== 'undefined') return decrypt_agile(einfo[1], data.content, opts.password || "", opts);
+if(einfo[0] == 0x04 && typeof decrypt_agile !== 'undefined') return decrypt_agile(einfo[1], data.content, pass, opts);
 /*global decrypt_std76 */
-if(einfo[0] == 0x02 && typeof decrypt_std76 !== 'undefined') return decrypt_std76(einfo[1], data.content, opts.password || "", opts);
+if(einfo[0] == 0x02 && typeof decrypt_std76 !== 'undefined') return decrypt_std76(einfo[1], data.content, pass, opts);
+	if (pass && typeof CryptoJS !== 'undefined' && typeof decrypt === 'function') {
+		const dt = decrypt(einfo, data, cfb, opts);
+		if (dt) return readSync(dt, opts);
+	}
 	throw new Error("File is password-protected");
 }
 
