@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250821';
+XLSX.version = '0.20.3.20250822';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -12374,6 +12374,7 @@ function decrypt(einfo, data, cfb, opts) {
 	throw new Error("Unsupported encryption info format:" + JSON.stringify(einfo), cfb);
 }
 
+// Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz) {
     const size = sz || wa.sigBytes;
     if (size < 0) throw new Error("invalid sigBytes:" + size);
@@ -12384,6 +12385,7 @@ function wordArrayToUint8Array(wa, sz) {
     }
     return ret;
 }
+// XOR a WordArray with a Uint8Array
 function wordArrayXorUint8Array(wa, buf) {
 	const size = wa.sigBytes;
     if (size < 0) throw new Error("invalid sigBytes:" + size);
@@ -12398,6 +12400,16 @@ function wordArrayXorUint8Array(wa, buf) {
     }
     return buf;
 }
+// Convert an integer to a WordArray in little-endian format
+function intToWordArrayLE(i) {
+	const iBytes = new Uint8Array(4);
+	iBytes[0] = i & 0xff;
+	iBytes[1] = (i >>> 8) & 0xff;
+	iBytes[2] = (i >>> 16) & 0xff;
+	iBytes[3] = (i >>> 24) & 0xff;
+    return CryptoJS.lib.WordArray.create(iBytes);
+}
+// Concatenate multiple Uint8Arrays into a single Uint8Array
 function concatUint8Arrays(chunks) {
 	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
 	const ret = new Uint8Array(total);
@@ -12409,9 +12421,15 @@ function concatUint8Arrays(chunks) {
 	return ret;
 }
 
+// ECMA-376 Encryption Decryption
 var Ecma376Standard = {
-	REPEAT_COUNT: 50000,
-	iv: [],
+	KEY_REPEAT_COUNT: 50000,	// Number of iterations for key derivation
+	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
+	AES_BLOCK_SIZE: 16, // AES block size in bytes
+	CHUNK_SIZE: 32768, // Chunk size for processing
+	iv: [], // Initialization vector for AES decryption
+
+	// Decrypt a single chunk of data using AES in ECB mode
 	_decrypt: function(cipherW, keyW) {
 		return CryptoJS.AES.decrypt(
 			{
@@ -12425,17 +12443,15 @@ var Ecma376Standard = {
 			}
 		);
 	},
+
+	// Derive a key from the password and salt
+	// The key size can be specified, default is 128 bits
 	passwordToKey: function(password, salt, keySize = 128) {
 		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
 		const saltW = CryptoJS.lib.WordArray.create(salt);
 		let hash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
-		for (let i = 0; i < this.REPEAT_COUNT; i++) {
-			const iBytes = new Uint8Array(4);
-			iBytes[0] = i & 0xff;
-			iBytes[1] = (i >>> 8) & 0xff;
-			iBytes[2] = (i >>> 16) & 0xff;
-			iBytes[3] = (i >>> 24) & 0xff;
-			const iW = CryptoJS.lib.WordArray.create(iBytes);
+		for (let i = 0; i < this.KEY_REPEAT_COUNT; i++) {
+			const iW = intToWordArrayLE(i);
 			hash = CryptoJS.algo.SHA1.create().update(iW).update(hash).finalize();
 		}
 	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
@@ -12445,6 +12461,9 @@ var Ecma376Standard = {
 		const key = CryptoJS.algo.SHA1.create().update(keyHashW).finalize();
 		return wordArrayToUint8Array(key, keySize / 8);
 	},
+
+	// Verify the key against the verifier and verifier hash
+	// Returns true if the key is valid, false otherwise
 	verifyKey: function(key, verifier, verifierHash) {
 		const keyW = CryptoJS.lib.WordArray.create(key);
 		const verifierW = CryptoJS.lib.WordArray.create(verifier);
@@ -12456,15 +12475,18 @@ var Ecma376Standard = {
 		const check = wordArrayToUint8Array(checkW, 20);
 		return expectedHash.toString() === check.toString();
 	},
-	decryptData: function(key, data) {
+
+	// Decrypt the content using the derived key
+	// The content is expected to be in a specific format with a size header
+	// Returns the decrypted content as a Uint8Array
+	decryptContent: function(key, content) {
 		const keyW = CryptoJS.lib.WordArray.create(key);
-		const content = data.content;
 		const len = content.length;
 		const size = content.read_shift(2);
 		const chunks = [];
-		const offset = 8; // Skip the first 8 bytes (size and reserved)
-		const blockSize = 16; // AES block size in bytes
-		const chunkLen = 4096; // Chunk size for processing
+		const offset = this.CONTENT_OFFSET;
+		const blockSize = this.AES_BLOCK_SIZE;
+		const chunkLen = this.CHUNK_SIZE;
 		let sIdx, eIdx = 0;
 		while (eIdx < len) {
 			sIdx = eIdx;
@@ -12483,6 +12505,10 @@ var Ecma376Standard = {
 		const result = concatUint8Arrays(chunks);
 		return result.slice(0, size); // Return only the decrypted content up to the specified size
 	},
+
+	// Main decryption function that takes the encryption info, data, and options
+	// It verifies the password, derives the key, and decrypts the content
+	// Returns the decrypted content as a Uint8Array
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		const {Salt, Verifier, VerifierHash} = einfo.v;
@@ -12495,16 +12521,32 @@ var Ecma376Standard = {
 		if (!this.verifyKey(key, Verifier, VerifierHash)) {
 			throw new Error("Password verification failed");
 		}
-		return this.decryptData(key, data);
+		return this.decryptContent(key, data.content);
 	}
 };
+
+// ECMA-376 Agile and Extensible Encryption Decryption
+// These are placeholders for the Agile and Extensible encryption methods.
+// They will need to be implemented based on the specific requirements of those encryption methods.
+// Currently, they throw an error indicating that they are not implemented yet.
+// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.
+// They will need to handle the specific formats and algorithms used in Agile and Extensible encryption.
+// The implementation details will depend on the specific encryption algorithms and formats used in those cases.
+// For now, they are left as stubs to indicate that they require further development.
+// Note: The actual implementation of these methods will require a deep understanding of the ECMA-376 Agile and Extensible encryption specifications.
+// This may involve handling different key derivation methods, content formats, and decryption processes.
+// The current implementation serves as a placeholder to indicate that these methods are expected
+// to be implemented in the future, and they will need to follow a similar pattern to the
+// Ecma376Standard.decrypt method.
+// The Agile and Extensible encryption methods will need to be implemented based on the specific requirements of those encryption methods.
+// Currently, they throw an error indicating that they are not implemented yet.
+// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.	
 var Ecma376Agile = {
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		throw new Error("not implement yet Ecma376Agile:", einfo);
 	}
 };
-
 var Ecma376Extensible = {
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
