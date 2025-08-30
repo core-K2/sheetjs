@@ -87,9 +87,13 @@ function zip_new() { return CFB.utils.cfb_new(); }
 
 function zip_read(d, o) {
 	switch(o.type) {
-		case "base64": return CFB.read(d, { type: "base64" });
-		case "binary": return CFB.read(d, { type: "binary" });
-		case "buffer": case "array": return CFB.read(d, { type: "buffer" });
+		case "array":
+			o = Object.assign({}, o);
+			o.type = "buffer";
+		case "buffer":
+		case "base64":
+		case "binary":
+			return CFB.read(d, o);
 	}
 	throw new Error("Unrecognized type " + o.type);
 }

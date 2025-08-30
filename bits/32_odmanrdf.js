@@ -16,6 +16,8 @@ function parse_manifest(d, opts) {
       case "algorithm":
       case "start-key-generation":
       case "key-derivation":
+		if (opts && opts.password)
+			return parse_xml(str);
         throw new Error("Unsupported ODS Encryption");
       default:
         if (opts && opts.WTF)

@@ -335,14 +335,14 @@ function decrypt(einfo, data, cfb, opts) {
 
 // Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz) {
-    const size = sz || wa.sigBytes;
-    if (size < 0) throw new Error("invalid sigBytes:" + size);
-    const words = wa.words;
-    const ret = new Uint8Array(size);
-    for (let i = 0; i < size; i++) {
-        ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    }
-    return ret;
+	const size = sz || wa.sigBytes;
+	if (size < 0) throw new Error("invalid sigBytes:" + size);
+	const words = wa.words;
+	const ret = new Uint8Array(size);
+	for (let i = 0; i < size; i++) {
+		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+	}
+	return ret;
 }
 // XOR a WordArray with a Uint8Array
 function wordArrayXorUint8Array(wa, buf) {
@@ -512,3 +512,102 @@ var Ecma376Extensible = {
 		throw new Error("not implement yet Ecma376Extensible:", einfo);
 	}
 };
+
+// 必要なライブラリ: CryptoJS, argon2-browser
+async function decrypt_ods(zip, manifest, opts) {
+	if (typeof CryptoJS === 'undefined')
+		throw new Error("CryptoJS is required for decryption");
+	if (typeof argon2 === 'undefined')
+		throw new Error("argon2 is required for decryption");
+    try {
+		// マニフェストから暗号化パラメータを取得
+		const entry = manifest["file-entry"];
+		const path = entry["full-path"];
+		const encryptionData = entry["encryption-data"];
+		const algo = encryptionData.algorithm;
+		const keyGen = encryptionData["start-key-generation"];
+		const keyDeri = encryptionData["key-derivation"];
+		const algorithm = algo["algorithm-name"];
+		const ivBase64 = algo["initialisation-vector"];
+		const startKeyGenName = keyGen["start-key-generation-name"];
+		const startKeySize = parseInt(keyGen["key-size"]);
+		const saltBase64 = keyDeri.salt;
+		const iterations = parseInt(keyDeri["argon2-iterations"]);
+		const memory = parseInt(keyDeri["argon2-memory"]);
+		const lanes = parseInt(keyDeri["argon2-lanes"]);
+		const keySize = parseInt(keyDeri["key-size"]);
+
+		// Base64デコード
+		const iv = CryptoJS.enc.Base64.parse(ivBase64);
+		const salt = CryptoJS.enc.Base64.parse(saltBase64);
+		const ivBytes = wordArrayToUint8Array(iv);
+		const saltBytes = wordArrayToUint8Array(salt);
+
+		// start-key-generation: パスワードをSHA-256でハッシュ
+		let passwordInput = opts.password;
+		const gens = startKeyGenName.split("#");
+		switch (gens[1]) {
+		case "sha256":
+			const hash = CryptoJS.SHA256(passwordInput);
+			const hashBytes = hash.sigBytes;
+			if (startKeySize !== hashBytes) {
+				throw new Error(`start-key-size ${startKeySize} not match SHA-256 size(${hashBytes})`);
+			}
+			passwordInput = hash.toString(CryptoJS.enc.Hex);
+			break;
+		default:
+			throw new Error("not supported start-key-generation algorithm:" + startKeyGenName);
+		}
+
+		// Argon2idで鍵導出
+		const argon2Result = await argon2.hash({
+			pass: passwordInput,
+			salt: saltBytes,
+			time: iterations,
+			mem: memory,
+			parallelism: lanes,
+			hashLen: keySize,
+			type: argon2.ArgonType.Argon2id,
+		});
+
+		// 暗号化されたパッケージを取得
+		const fi = zip.FileIndex.find(fi => fi.name === path);
+		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
+		const encryptedData = fi.content;
+
+		// AES-256-GCMで復号化 (CryptoJSはGCMモードに対応していないため、別のライブラリを使用する必要があります) 
+		// const encrypted = CryptoJS.lib.WordArray.create(encryptedPackage);
+		// const derivedKey = CryptoJS.enc.Hex.parse(argon2Result.hashHex);
+		// const decrypted = CryptoJS.AES.decrypt(
+		// 	{ ciphertext: encrypted },
+		// 	derivedKey,
+		// 	{
+		// 		iv: iv,
+		// 		mode: CryptoJS.mode.GCM,
+		// 		padding: CryptoJS.pad.NoPadding // GCMではパディング不要
+		// 	}
+		// );
+		// return wordArrayToUint8Array(decrypted);
+
+		// Web Crypto APIでAES-256-GCM復号化
+		const cryptoKey = await crypto.subtle.importKey(
+			"raw",
+			argon2Result.hash,
+			{ name: "AES-GCM" },
+			false,
+			["decrypt"]
+		);
+		const decrypted = await crypto.subtle.decrypt(
+			{
+				name: "AES-GCM",
+				iv: ivBytes,
+				tagLength: 128
+			},
+			cryptoKey,
+			encryptedData
+		);
+		return new Uint8Array(decrypted);
+	} catch (e) {
+		throw new Error("Decryption failed: " + e.message);
+	}
+}

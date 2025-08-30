@@ -812,7 +812,13 @@ function parse_zip_xml(zip, fname, xmlOpts) {
 
 function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	opts = opts || ({}/*:any*/);
-	if(safegetzipfile(zip, 'META-INF/manifest.xml')) parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
+	if(safegetzipfile(zip, 'META-INF/manifest.xml')) {
+		const manifest = parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
+		if (manifest) {
+			const dt = decrypt_ods(zip, manifest, opts);
+			if (dt) return parse_ods(dt, opts);
+		}
+	}
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {

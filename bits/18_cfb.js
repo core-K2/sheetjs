@@ -1415,7 +1415,7 @@ function parse_zip(file/*:RawBytes*/, options/*:CFBReadOpts*/)/*:CFBContainer*/ 
 			if((EF[0x0001]||{}).usz) usz = EF[0x0001].usz;
 			if((EF[0x0001]||{}).csz) csz = EF[0x0001].csz;
 		}
-		parse_local_file(blob, csz, usz, o, EF);
+		parse_local_file(blob, csz, usz, o, EF, options);
 		blob.l = L;
 	}
 
@@ -1424,7 +1424,7 @@ function parse_zip(file/*:RawBytes*/, options/*:CFBReadOpts*/)/*:CFBContainer*/ 
 
 
 /* head starts just after local file header signature */
-function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:CFBContainer*/, EF) {
+function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:CFBContainer*/, EF, options/*:CFBReadOpts*/) {
 	/* [local file header] */
 	blob.l += 2;
 	var flags = blob.read_shift(2);
@@ -1457,6 +1457,7 @@ function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:C
 	/* [encryption header] */
 
 	/* [file data] */
+	const offset = blob.l;
 	var data = blob.slice(blob.l, blob.l + _csz);
 	switch(meth) {
 		case 8: data = _inflateRawSync(blob, _usz); break;
@@ -1472,11 +1473,15 @@ function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:C
 		_csz = blob.read_shift(4);
 		_usz = blob.read_shift(4);
 	}
-
-	if(_csz != csz) warn_or_throw(wrn, "Bad compressed size: " + csz + " != " + _csz);
-	if(_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);
-	//var _crc32 = CRC32.buf(data, 0);
-	//if((crc32>>0) != (_crc32>>0)) warn_or_throw(wrn, "Bad CRC32 checksum: " + crc32 + " != " + _crc32);
+	if (/encrypted/.test(name)) {
+		if (!options?.password) throw new Error("File is password-protected");
+		data = blob.slice(offset, offset + csz);
+	} else {
+		if(_csz != csz) warn_or_throw(wrn, "Bad compressed size: " + csz + " != " + _csz);
+		if(_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);
+		//var _crc32 = CRC32.buf(data, 0);
+		//if((crc32>>0) != (_crc32>>0)) warn_or_throw(wrn, "Bad CRC32 checksum: " + crc32 + " != " + _crc32);
+	}
 	cfb_add(o, name, data, {unsafe: true, mt: date});
 }
 function write_zip(cfb/*:CFBContainer*/, options/*:CFBWriteOpts*/)/*:RawBytes*/ {
