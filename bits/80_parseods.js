@@ -815,8 +815,7 @@ function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	if(safegetzipfile(zip, 'META-INF/manifest.xml')) {
 		const manifest = parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
 		if (manifest) {
-			const dt = decrypt_ods(zip, manifest, opts);
-			if (dt) return parse_ods(dt, opts);
+			return decrypt_ods(zip, manifest, opts);
 		}
 	}
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");

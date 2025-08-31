@@ -1473,9 +1473,14 @@ function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:C
 		_csz = blob.read_shift(4);
 		_usz = blob.read_shift(4);
 	}
-	if (/encrypted/.test(name)) {
+	if (/^encrypted-/.test(name)) {
 		if (!options?.password) throw new Error("File is password-protected");
-		data = blob.slice(offset, offset + csz);
+		if (meth === 8) {
+			blob.l = offset;
+			data = _inflateRawSync(blob, usz);
+		} else {
+			data = blob.slice(offset, offset + usz);
+		}
 	} else {
 		if(_csz != csz) warn_or_throw(wrn, "Bad compressed size: " + csz + " != " + _csz);
 		if(_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);

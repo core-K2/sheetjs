@@ -359,6 +359,14 @@ function wordArrayXorUint8Array(wa, buf) {
     }
     return buf;
 }
+// Compare two Uint8Arrays for equality
+function compareUint8Array(a, b) {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
+}
 // Convert an integer to a WordArray in little-endian format
 function intToWordArrayLE(i) {
 	const iBytes = new Uint8Array(4);
@@ -538,10 +546,10 @@ async function decrypt_ods(zip, manifest, opts) {
 		const keySize = parseInt(keyDeri["key-size"]);
 
 		// Base64デコード
-		const iv = CryptoJS.enc.Base64.parse(ivBase64);
-		const salt = CryptoJS.enc.Base64.parse(saltBase64);
-		const ivBytes = wordArrayToUint8Array(iv);
-		const saltBytes = wordArrayToUint8Array(salt);
+		const ivW = CryptoJS.enc.Base64.parse(ivBase64);
+		const saltW = CryptoJS.enc.Base64.parse(saltBase64);
+		const ivBytes = wordArrayToUint8Array(ivW);
+		const saltBytes = wordArrayToUint8Array(saltW);
 
 		// start-key-generation: パスワードをSHA-256でハッシュ
 		let passwordInput = opts.password;
@@ -569,11 +577,41 @@ async function decrypt_ods(zip, manifest, opts) {
 			hashLen: keySize,
 			type: argon2.ArgonType.Argon2id,
 		});
+		const keyBytes = new Uint8Array(argon2Result.hash); // または hexToBytes(argon2Result.hashHex)
+
+		const cryptoKey = await crypto.subtle.importKey(
+			"raw",
+			keyBytes.buffer,
+			{ name: "AES-GCM" },
+			false,
+			["decrypt"]
+		);
 
 		// 暗号化されたパッケージを取得
 		const fi = zip.FileIndex.find(fi => fi.name === path);
 		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
-		const encryptedData = fi.content;
+		const encryptedDataRaw = fi.content;
+
+		// IV が先頭に含まれている場合は除去
+		const iv = new Uint8Array(ivBytes);
+		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv) ? encryptedDataRaw.slice(12) : encryptedDataRaw;
+// デバッグ用ログ
+console.log("encryptedDataRaw length:", encryptedDataRaw.byteLength);
+console.log("iv length:", iv.byteLength);
+console.log("encrypted length:", encrypted.byteLength);
+console.log("encrypted last 16 bytes:", Array.from(encrypted.slice(-16)));
+
+		// Web Crypto APIでAES-256-GCM復号化
+		const decrypted = await crypto.subtle.decrypt(
+			{
+				name: "AES-GCM",
+				iv: iv.buffer,
+				tagLength: 128
+			},
+			cryptoKey,
+			encrypted.buffer
+		);
+		return new Uint8Array(decrypted);
 
 		// AES-256-GCMで復号化 (CryptoJSはGCMモードに対応していないため、別のライブラリを使用する必要があります) 
 		// const encrypted = CryptoJS.lib.WordArray.create(encryptedPackage);
@@ -588,25 +626,6 @@ async function decrypt_ods(zip, manifest, opts) {
 		// 	}
 		// );
 		// return wordArrayToUint8Array(decrypted);
-
-		// Web Crypto APIでAES-256-GCM復号化
-		const cryptoKey = await crypto.subtle.importKey(
-			"raw",
-			argon2Result.hash,
-			{ name: "AES-GCM" },
-			false,
-			["decrypt"]
-		);
-		const decrypted = await crypto.subtle.decrypt(
-			{
-				name: "AES-GCM",
-				iv: ivBytes,
-				tagLength: 128
-			},
-			cryptoKey,
-			encryptedData
-		);
-		return new Uint8Array(decrypted);
 	} catch (e) {
 		throw new Error("Decryption failed: " + e.message);
 	}
