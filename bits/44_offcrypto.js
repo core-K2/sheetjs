@@ -527,7 +527,7 @@ async function decrypt_ods(zip, manifest, opts) {
 		throw new Error("CryptoJS is required for decryption");
 	if (typeof argon2 === 'undefined')
 		throw new Error("argon2 is required for decryption");
-    try {
+	try {
 		// マニフェストから暗号化パラメータを取得
 		const entry = manifest["file-entry"];
 		const path = entry["full-path"];
@@ -545,14 +545,19 @@ async function decrypt_ods(zip, manifest, opts) {
 		const lanes = parseInt(keyDeri["argon2-lanes"]);
 		const keySize = parseInt(keyDeri["key-size"]);
 
+		// console.log("Manifest data:", { ivBase64, saltBase64, algorithm, startKeyGenName, startKeySize, iterations, memory, lanes, keySize });
+
 		// Base64デコード
 		const ivW = CryptoJS.enc.Base64.parse(ivBase64);
 		const saltW = CryptoJS.enc.Base64.parse(saltBase64);
 		const ivBytes = wordArrayToUint8Array(ivW);
 		const saltBytes = wordArrayToUint8Array(saltW);
+		// console.log("ivBytes length:", ivBytes.length, "ivBytes:", Array.from(ivBytes));
+		// console.log("saltBytes length:", saltBytes.length, "saltBytes:", Array.from(saltBytes));
 
 		// start-key-generation: パスワードをSHA-256でハッシュ
 		let passwordInput = opts.password;
+		// console.log("Input password:", passwordInput);
 		const gens = startKeyGenName.split("#");
 		switch (gens[1]) {
 		case "sha256":
@@ -561,7 +566,9 @@ async function decrypt_ods(zip, manifest, opts) {
 			if (startKeySize !== hashBytes) {
 				throw new Error(`start-key-size ${startKeySize} not match SHA-256 size(${hashBytes})`);
 			}
-			passwordInput = hash.toString(CryptoJS.enc.Hex);
+			// passwordInput = hash.toString(CryptoJS.enc.Hex);
+			passwordInput = wordArrayToUint8Array(hash); 
+			// console.log("SHA-256 hash:", passwordInput);
 			break;
 		default:
 			throw new Error("not supported start-key-generation algorithm:" + startKeyGenName);
@@ -577,7 +584,8 @@ async function decrypt_ods(zip, manifest, opts) {
 			hashLen: keySize,
 			type: argon2.ArgonType.Argon2id,
 		});
-		const keyBytes = new Uint8Array(argon2Result.hash); // または hexToBytes(argon2Result.hashHex)
+		const keyBytes = new Uint8Array(argon2Result.hash);
+		// console.log("keyBytes length:", keyBytes.length, "keyBytes:", Array.from(keyBytes));
 
 		const cryptoKey = await crypto.subtle.importKey(
 			"raw",
@@ -591,42 +599,46 @@ async function decrypt_ods(zip, manifest, opts) {
 		const fi = zip.FileIndex.find(fi => fi.name === path);
 		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
 		const encryptedDataRaw = fi.content;
+		// console.log("Raw data length:", encryptedDataRaw.byteLength, "Raw data first 12 bytes:", Array.from(encryptedDataRaw.slice(0, 12)));
 
-		// IV が先頭に含まれている場合は除去
+		// IV を検証し、暗号文を準備
 		const iv = new Uint8Array(ivBytes);
-		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv) ? encryptedDataRaw.slice(12) : encryptedDataRaw;
-// デバッグ用ログ
-console.log("encryptedDataRaw length:", encryptedDataRaw.byteLength);
-console.log("iv length:", iv.byteLength);
-console.log("encrypted length:", encrypted.byteLength);
-console.log("encrypted last 16 bytes:", Array.from(encrypted.slice(-16)));
+		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv)
+			? encryptedDataRaw.slice(12)
+			: encryptedDataRaw;
+
+		// デバッグ用ログ
+		// console.log("encryptedDataRaw length:", encryptedDataRaw.byteLength);
+		// console.log("iv length:", iv.byteLength);
+		// console.log("encrypted length:", encrypted.length);
+		// console.log("encrypted first 16 bytes:", Array.from(encrypted.slice(0, 16)));
+		// console.log("encrypted last 16 bytes:", Array.from(encrypted.slice(-16)));
+
+		// 暗号化操作の詳細ログ
+		// console.log("Decryption input:", {
+		// 	iv: Array.from(new Uint8Array(iv.buffer)),
+		// 	encryptedData: Array.from(new Uint8Array(encrypted.buffer)),
+		// 	key: Array.from(keyBytes)
+		// });
 
 		// Web Crypto APIでAES-256-GCM復号化
 		const decrypted = await crypto.subtle.decrypt(
 			{
 				name: "AES-GCM",
-				iv: iv.buffer,
+				iv: iv,
 				tagLength: 128
 			},
 			cryptoKey,
 			encrypted.buffer
 		);
-		return new Uint8Array(decrypted);
 
-		// AES-256-GCMで復号化 (CryptoJSはGCMモードに対応していないため、別のライブラリを使用する必要があります) 
-		// const encrypted = CryptoJS.lib.WordArray.create(encryptedPackage);
-		// const derivedKey = CryptoJS.enc.Hex.parse(argon2Result.hashHex);
-		// const decrypted = CryptoJS.AES.decrypt(
-		// 	{ ciphertext: encrypted },
-		// 	derivedKey,
-		// 	{
-		// 		iv: iv,
-		// 		mode: CryptoJS.mode.GCM,
-		// 		padding: CryptoJS.pad.NoPadding // GCMではパディング不要
-		// 	}
-		// );
-		// return wordArrayToUint8Array(decrypted);
+		// inflate 解凍
+		const blob = new Uint8Array(decrypted);
+		prep_blob(blob, 0);
+		const data = CFB.utils._inflateRaw(blob, entry.size);
+		return readSync(data, opts);
 	} catch (e) {
-		throw new Error("Decryption failed: " + e.message);
+		console.error(e);
+		throw new Error(`Decryption failed:${e.message} (maybe password is incorrect)`);
 	}
 }
