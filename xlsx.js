@@ -12534,6 +12534,22 @@ async function decrypt_ods(zip, manifest, opts) {
 			throw new Error("not supported start-key-generation algorithm:" + startKeyGenName);
 		}
 
+		// alorithm: AES-256-GCMのみ対応
+		const algos = algorithm.split("#");
+		let algoName, tagLength;
+		switch (algos[1]) {
+		case "aes256gcm":
+		case "aes256-gcm":
+			if (keySize !== 32) {
+				throw new Error(`key-size ${keySize} not match AES-256 size(32)`);
+			}
+			algoName = "AES-GCM";
+			tagLength = 128;
+			break;
+		default:
+			throw new Error("not supported algorithm:" + algorithm);
+		}
+
 		// Argon2idで鍵導出
 		const argon2Result = await argon2.hash({
 			pass: passwordInput,
@@ -12548,7 +12564,7 @@ async function decrypt_ods(zip, manifest, opts) {
 		const cryptoKey = await crypto.subtle.importKey(
 			"raw",
 			keyBytes.buffer,
-			{ name: "AES-GCM" },
+			{ name: algoName },
 			false,
 			["decrypt"]
 		);
@@ -12558,18 +12574,18 @@ async function decrypt_ods(zip, manifest, opts) {
 		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
 		const encryptedDataRaw = fi.content;
 
-		// IV を検証し、暗号文を準備
+		// IV を検証し、暗号文を準備(IV付きならIVを除去)
 		const iv = new Uint8Array(ivBytes);
 		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv)
 			? encryptedDataRaw.slice(12)
 			: encryptedDataRaw;
 
-		// Web Crypto APIでAES-256-GCM復号化
+		// Web Crypto APIで復号化
 		const decrypted = await crypto.subtle.decrypt(
 			{
-				name: "AES-GCM",
+				name: algoName,
 				iv: iv,
-				tagLength: 128
+				tagLength: tagLength
 			},
 			cryptoKey,
 			encrypted.buffer
