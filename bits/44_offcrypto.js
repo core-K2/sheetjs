@@ -545,19 +545,14 @@ async function decrypt_ods(zip, manifest, opts) {
 		const lanes = parseInt(keyDeri["argon2-lanes"]);
 		const keySize = parseInt(keyDeri["key-size"]);
 
-		// console.log("Manifest data:", { ivBase64, saltBase64, algorithm, startKeyGenName, startKeySize, iterations, memory, lanes, keySize });
-
 		// Base64デコード
 		const ivW = CryptoJS.enc.Base64.parse(ivBase64);
 		const saltW = CryptoJS.enc.Base64.parse(saltBase64);
 		const ivBytes = wordArrayToUint8Array(ivW);
 		const saltBytes = wordArrayToUint8Array(saltW);
-		// console.log("ivBytes length:", ivBytes.length, "ivBytes:", Array.from(ivBytes));
-		// console.log("saltBytes length:", saltBytes.length, "saltBytes:", Array.from(saltBytes));
 
 		// start-key-generation: パスワードをSHA-256でハッシュ
 		let passwordInput = opts.password;
-		// console.log("Input password:", passwordInput);
 		const gens = startKeyGenName.split("#");
 		switch (gens[1]) {
 		case "sha256":
@@ -568,7 +563,6 @@ async function decrypt_ods(zip, manifest, opts) {
 			}
 			// passwordInput = hash.toString(CryptoJS.enc.Hex);
 			passwordInput = wordArrayToUint8Array(hash); 
-			// console.log("SHA-256 hash:", passwordInput);
 			break;
 		default:
 			throw new Error("not supported start-key-generation algorithm:" + startKeyGenName);
@@ -585,8 +579,6 @@ async function decrypt_ods(zip, manifest, opts) {
 			type: argon2.ArgonType.Argon2id,
 		});
 		const keyBytes = new Uint8Array(argon2Result.hash);
-		// console.log("keyBytes length:", keyBytes.length, "keyBytes:", Array.from(keyBytes));
-
 		const cryptoKey = await crypto.subtle.importKey(
 			"raw",
 			keyBytes.buffer,
@@ -599,27 +591,12 @@ async function decrypt_ods(zip, manifest, opts) {
 		const fi = zip.FileIndex.find(fi => fi.name === path);
 		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
 		const encryptedDataRaw = fi.content;
-		// console.log("Raw data length:", encryptedDataRaw.byteLength, "Raw data first 12 bytes:", Array.from(encryptedDataRaw.slice(0, 12)));
 
 		// IV を検証し、暗号文を準備
 		const iv = new Uint8Array(ivBytes);
 		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv)
 			? encryptedDataRaw.slice(12)
 			: encryptedDataRaw;
-
-		// デバッグ用ログ
-		// console.log("encryptedDataRaw length:", encryptedDataRaw.byteLength);
-		// console.log("iv length:", iv.byteLength);
-		// console.log("encrypted length:", encrypted.length);
-		// console.log("encrypted first 16 bytes:", Array.from(encrypted.slice(0, 16)));
-		// console.log("encrypted last 16 bytes:", Array.from(encrypted.slice(-16)));
-
-		// 暗号化操作の詳細ログ
-		// console.log("Decryption input:", {
-		// 	iv: Array.from(new Uint8Array(iv.buffer)),
-		// 	encryptedData: Array.from(new Uint8Array(encrypted.buffer)),
-		// 	key: Array.from(keyBytes)
-		// });
 
 		// Web Crypto APIでAES-256-GCM復号化
 		const decrypted = await crypto.subtle.decrypt(
@@ -632,13 +609,24 @@ async function decrypt_ods(zip, manifest, opts) {
 			encrypted.buffer
 		);
 
-		// inflate 解凍
 		const blob = new Uint8Array(decrypted);
-		prep_blob(blob, 0);
-		const data = CFB.utils._inflateRaw(blob, entry.size);
+		let data;
+		if (blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09) {
+			// ZIP ヘッダ検出
+			data = blob;
+		} else {
+			// inflate 解凍
+			prep_blob(blob, 0);
+			data = CFB.utils._inflateRaw(blob, entry.size);
+		}
 		return readSync(data, opts);
 	} catch (e) {
-		console.error(e);
-		throw new Error(`Decryption failed:${e.message} (maybe password is incorrect)`);
+		let msg = e?.message || '';
+		if (msg) msg = `(${msg})`;
+		throw new Error((e.name === 'OperationError' ?
+			'password is incorrect':
+			'Decryption failed')
+			+ msg
+		);
 	}
 }

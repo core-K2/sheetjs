@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250822';
+XLSX.version = '0.20.3.20250902';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -2833,7 +2833,7 @@ function parse_zip(file/*:RawBytes*/, options/*:CFBReadOpts*/)/*:CFBContainer*/ 
 			if((EF[0x0001]||{}).usz) usz = EF[0x0001].usz;
 			if((EF[0x0001]||{}).csz) csz = EF[0x0001].csz;
 		}
-		parse_local_file(blob, csz, usz, o, EF);
+		parse_local_file(blob, csz, usz, o, EF, options);
 		blob.l = L;
 	}
 
@@ -2842,7 +2842,7 @@ function parse_zip(file/*:RawBytes*/, options/*:CFBReadOpts*/)/*:CFBContainer*/ 
 
 
 /* head starts just after local file header signature */
-function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:CFBContainer*/, EF) {
+function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:CFBContainer*/, EF, options/*:CFBReadOpts*/) {
 	/* [local file header] */
 	blob.l += 2;
 	var flags = blob.read_shift(2);
@@ -2875,6 +2875,7 @@ function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:C
 	/* [encryption header] */
 
 	/* [file data] */
+	const offset = blob.l;
 	var data = blob.slice(blob.l, blob.l + _csz);
 	switch(meth) {
 		case 8: data = _inflateRawSync(blob, _usz); break;
@@ -2890,11 +2891,20 @@ function parse_local_file(blob/*:CFBlob*/, csz/*:number*/, usz/*:number*/, o/*:C
 		_csz = blob.read_shift(4);
 		_usz = blob.read_shift(4);
 	}
-
-	if(_csz != csz) warn_or_throw(wrn, "Bad compressed size: " + csz + " != " + _csz);
-	if(_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);
-	//var _crc32 = CRC32.buf(data, 0);
-	//if((crc32>>0) != (_crc32>>0)) warn_or_throw(wrn, "Bad CRC32 checksum: " + crc32 + " != " + _crc32);
+	if (/^encrypted-/.test(name)) {
+		if (!options?.password) throw new Error("File is password-protected");
+		if (meth === 8) {
+			blob.l = offset;
+			data = _inflateRawSync(blob, usz);
+		} else {
+			data = blob.slice(offset, offset + usz);
+		}
+	} else {
+		if(_csz != csz) warn_or_throw(wrn, "Bad compressed size: " + csz + " != " + _csz);
+		if(_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);
+		//var _crc32 = CRC32.buf(data, 0);
+		//if((crc32>>0) != (_crc32>>0)) warn_or_throw(wrn, "Bad CRC32 checksum: " + crc32 + " != " + _crc32);
+	}
 	cfb_add(o, name, data, {unsafe: true, mt: date});
 }
 function write_zip(cfb/*:CFBContainer*/, options/*:CFBWriteOpts*/)/*:RawBytes*/ {
@@ -5088,9 +5098,13 @@ function zip_new() { return CFB.utils.cfb_new(); }
 
 function zip_read(d, o) {
 	switch(o.type) {
-		case "base64": return CFB.read(d, { type: "base64" });
-		case "binary": return CFB.read(d, { type: "binary" });
-		case "buffer": case "array": return CFB.read(d, { type: "buffer" });
+		case "array":
+			o = Object.assign({}, o);
+			o.type = "buffer";
+		case "buffer":
+		case "base64":
+		case "binary":
+			return CFB.read(d, o);
 	}
 	throw new Error("Unrecognized type " + o.type);
 }
@@ -7152,6 +7166,8 @@ function parse_manifest(d, opts) {
       case "algorithm":
       case "start-key-generation":
       case "key-derivation":
+		if (opts && opts.password)
+			return parse_xml(str);
         throw new Error("Unsupported ODS Encryption");
       default:
         if (opts && opts.WTF)
@@ -12376,14 +12392,14 @@ function decrypt(einfo, data, cfb, opts) {
 
 // Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz) {
-    const size = sz || wa.sigBytes;
-    if (size < 0) throw new Error("invalid sigBytes:" + size);
-    const words = wa.words;
-    const ret = new Uint8Array(size);
-    for (let i = 0; i < size; i++) {
-        ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    }
-    return ret;
+	const size = sz || wa.sigBytes;
+	if (size < 0) throw new Error("invalid sigBytes:" + size);
+	const words = wa.words;
+	const ret = new Uint8Array(size);
+	for (let i = 0; i < size; i++) {
+		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+	}
+	return ret;
 }
 // XOR a WordArray with a Uint8Array
 function wordArrayXorUint8Array(wa, buf) {
@@ -12399,6 +12415,14 @@ function wordArrayXorUint8Array(wa, buf) {
         buf[i] ^= (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
     }
     return buf;
+}
+// Compare two Uint8Arrays for equality
+function compareUint8Array(a, b) {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }
 // Convert an integer to a WordArray in little-endian format
 function intToWordArrayLE(i) {
@@ -12553,6 +12577,116 @@ var Ecma376Extensible = {
 		throw new Error("not implement yet Ecma376Extensible:", einfo);
 	}
 };
+
+// 必要なライブラリ: CryptoJS, argon2-browser
+async function decrypt_ods(zip, manifest, opts) {
+	if (typeof CryptoJS === 'undefined')
+		throw new Error("CryptoJS is required for decryption");
+	if (typeof argon2 === 'undefined')
+		throw new Error("argon2 is required for decryption");
+	try {
+		// マニフェストから暗号化パラメータを取得
+		const entry = manifest["file-entry"];
+		const path = entry["full-path"];
+		const encryptionData = entry["encryption-data"];
+		const algo = encryptionData.algorithm;
+		const keyGen = encryptionData["start-key-generation"];
+		const keyDeri = encryptionData["key-derivation"];
+		const algorithm = algo["algorithm-name"];
+		const ivBase64 = algo["initialisation-vector"];
+		const startKeyGenName = keyGen["start-key-generation-name"];
+		const startKeySize = parseInt(keyGen["key-size"]);
+		const saltBase64 = keyDeri.salt;
+		const iterations = parseInt(keyDeri["argon2-iterations"]);
+		const memory = parseInt(keyDeri["argon2-memory"]);
+		const lanes = parseInt(keyDeri["argon2-lanes"]);
+		const keySize = parseInt(keyDeri["key-size"]);
+
+		// Base64デコード
+		const ivW = CryptoJS.enc.Base64.parse(ivBase64);
+		const saltW = CryptoJS.enc.Base64.parse(saltBase64);
+		const ivBytes = wordArrayToUint8Array(ivW);
+		const saltBytes = wordArrayToUint8Array(saltW);
+
+		// start-key-generation: パスワードをSHA-256でハッシュ
+		let passwordInput = opts.password;
+		const gens = startKeyGenName.split("#");
+		switch (gens[1]) {
+		case "sha256":
+			const hash = CryptoJS.SHA256(passwordInput);
+			const hashBytes = hash.sigBytes;
+			if (startKeySize !== hashBytes) {
+				throw new Error(`start-key-size ${startKeySize} not match SHA-256 size(${hashBytes})`);
+			}
+			// passwordInput = hash.toString(CryptoJS.enc.Hex);
+			passwordInput = wordArrayToUint8Array(hash); 
+			break;
+		default:
+			throw new Error("not supported start-key-generation algorithm:" + startKeyGenName);
+		}
+
+		// Argon2idで鍵導出
+		const argon2Result = await argon2.hash({
+			pass: passwordInput,
+			salt: saltBytes,
+			time: iterations,
+			mem: memory,
+			parallelism: lanes,
+			hashLen: keySize,
+			type: argon2.ArgonType.Argon2id,
+		});
+		const keyBytes = new Uint8Array(argon2Result.hash);
+		const cryptoKey = await crypto.subtle.importKey(
+			"raw",
+			keyBytes.buffer,
+			{ name: "AES-GCM" },
+			false,
+			["decrypt"]
+		);
+
+		// 暗号化されたパッケージを取得
+		const fi = zip.FileIndex.find(fi => fi.name === path);
+		if (!fi) throw new Error("encrypted file not found in the zip: " + path);
+		const encryptedDataRaw = fi.content;
+
+		// IV を検証し、暗号文を準備
+		const iv = new Uint8Array(ivBytes);
+		const encrypted = compareUint8Array(encryptedDataRaw.slice(0, 12), iv)
+			? encryptedDataRaw.slice(12)
+			: encryptedDataRaw;
+
+		// Web Crypto APIでAES-256-GCM復号化
+		const decrypted = await crypto.subtle.decrypt(
+			{
+				name: "AES-GCM",
+				iv: iv,
+				tagLength: 128
+			},
+			cryptoKey,
+			encrypted.buffer
+		);
+
+		const blob = new Uint8Array(decrypted);
+		let data;
+		if (blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09) {
+			// ZIP ヘッダ検出
+			data = blob;
+		} else {
+			// inflate 解凍
+			prep_blob(blob, 0);
+			data = CFB.utils._inflateRaw(blob, entry.size);
+		}
+		return readSync(data, opts);
+	} catch (e) {
+		let msg = e?.message || '';
+		if (msg) msg = `(${msg})`;
+		throw new Error((e.name === 'OperationError' ?
+			'password is incorrect':
+			'Decryption failed')
+			+ msg
+		);
+	}
+}
 function rtf_to_sheet(d, opts) {
   switch (opts.type) {
     case "base64":
@@ -26163,7 +26297,12 @@ function parse_zip_xml(zip, fname, xmlOpts) {
 
 function parse_ods(zip/*:ZIPFile*/, opts/*:?ParseOpts*/)/*:Workbook*/ {
 	opts = opts || ({}/*:any*/);
-	if(safegetzipfile(zip, 'META-INF/manifest.xml')) parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
+	if(safegetzipfile(zip, 'META-INF/manifest.xml')) {
+		const manifest = parse_manifest(getzipdata(zip, 'META-INF/manifest.xml'), opts);
+		if (manifest) {
+			return decrypt_ods(zip, manifest, opts);
+		}
+	}
 	if(!safegetzipfile(zip, 'content.xml')) throw new Error("Missing content.xml in ODS / UOF file");
 	var wb = {};
 	if (opts.ck2Ex) {
