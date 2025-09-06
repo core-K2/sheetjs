@@ -308,15 +308,26 @@ function parse_FilePassHeader(blob, length/*:number*/, oo) {
 }
 function parse_FilePass(blob, length/*:number*/, opts) {
 	var o = ({ Type: opts.biff >= 8 ? blob.read_shift(2) : 0 }/*:any*/); /* wEncryptionType */
-	if(o.Type) parse_FilePassHeader(blob, length-2, o);
-	else parse_XORObfuscation(blob, opts.biff >= 8 ? length : length - 2, opts, o);
+	if(o.Type) {
+		parse_FilePassHeader(blob, length-2, o);
+		Rc4.verifyPassword(o, opts);
+	} else {
+		parse_XORObfuscation(blob, opts.biff >= 8 ? length : length - 2, opts, o);
+	}
 	return o;
+}
+
+// Check for required libraries
+function checkLibs() {
+	for (var i = 0; i < arguments.length; ++i) {
+		const lib = arguments[i];
+		if (typeof window[lib] === 'undefined') throw new Error(lib + " is required for decryption");
+	}
 }
 
 // decrypt password (Need CryptoJS)
 function decrypt(einfo, data, cfb, opts) {
-	if (typeof CryptoJS === 'undefined')
-		throw new Error("CryptoJS is required for decryption");
+	checkLibs('CryptoJS');
 	if (Array.isArray(einfo) && einfo.length === 2) {
 		let type = einfo[0];
 		switch (type) {
@@ -333,6 +344,12 @@ function decrypt(einfo, data, cfb, opts) {
 	throw new Error("Unsupported encryption info format:" + JSON.stringify(einfo), cfb);
 }
 
+// Convert a string or ArrayBuffer to a CryptoJS WordArray
+function createWordArray(buf) {
+	return typeof buf === 'string' ?
+		CryptoJS.enc.Hex.parse(buf):
+		CryptoJS.lib.WordArray.create(buf);
+}
 // Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz) {
 	const size = sz || wa.sigBytes;
@@ -521,12 +538,117 @@ var Ecma376Extensible = {
 	}
 };
 
+// RC4 Encryption Decryption
+// This implementation uses the CryptoJS library for RC4 decryption.
+// It supports two types of FilePass structures: Type 0 (XOR Obfuscation) and Type 1 (RC4 Encryption).
+// The verifyPassword function checks if the provided password is correct by decrypting the verifier and verifier hash.
+// The decrypt function decrypts the actual data using the derived key from the password.
+// Note: The RC4 algorithm is considered weak and is not recommended for secure applications.
+// This implementation is provided for compatibility with legacy formats that use RC4 encryption.
+var Rc4 = {
+	BLOCK_SIZE: 0x200, // 512 bytes
+
+	// Convert password to key using MD5 hashing
+	convertPasswordToKey(password, Salt, block) {
+		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+		const saltW = createWordArray(Salt);
+		const salt = wordArrayToUint8Array(saltW);
+		const h0 = CryptoJS.MD5(passwordW);
+		const truncatedHash = wordArrayToUint8Array(h0, 5);
+		const intermediateBuffer = concatUint8Arrays([truncatedHash, salt]);
+		const chunks = [];
+		for (let i = 0; i < 16; i++) {
+			chunks.push(intermediateBuffer);
+		}
+		const concatenatedBuffer = concatUint8Arrays(chunks);
+		const concatenatedBufferW = CryptoJS.lib.WordArray.create(concatenatedBuffer);
+		const hashW = CryptoJS.MD5(concatenatedBufferW);
+		const hash = wordArrayToUint8Array(hashW, 5);
+		const intermediate = concatUint8Arrays([hash, wordArrayToUint8Array(intToWordArrayLE(block))]);
+		const intermediateW = CryptoJS.lib.WordArray.create(intermediate);
+		const keyW = CryptoJS.MD5(intermediateW);
+		return wordArrayToUint8Array(keyW, 128 / 8);
+	},
+
+	// Verify the password against the FilePass structure
+	verifyPassword: function(fpass, opts) {
+		if (!opts?.password) throw new Error('need password');
+		console.log(fpass, opts);
+		checkLibs('CryptoJS');
+		const {Type, Data} = fpass;
+		if (Type === 1) {
+			const {Salt, EncryptedVerifier, EncryptedVerifierHash} = Data;
+			const block = 0;
+			const key = this.convertPasswordToKey(opts.password, Salt, block);
+  
+			// RC4デクリプタを作成
+			const keyW = CryptoJS.lib.WordArray.create(key);
+  			const cipher = CryptoJS.algo.RC4.createDecryptor(keyW);
+  			// encryptedVerifierを復号化してverifierを取得
+			const encryptedVerifierW = createWordArray(EncryptedVerifier);
+  			const verifier = cipher.finalize(encryptedVerifierW);
+  
+			// verifierのMD5ハッシュを計算
+			const hash = CryptoJS.MD5(verifier);
+			// encryptedVerifierHashを復号化
+			const EncryptedVerifierHashW = createWordArray(EncryptedVerifierHash);
+			const verifierHash = cipher.process(EncryptedVerifierHashW).concat(cipher.finalize());
+  
+			// ハッシュ値が一致するか比較
+			return (fpass.valid = verifierHash.toString(CryptoJS.enc.Hex) === hash.toString(CryptoJS.enc.Hex));
+		} else {
+			throw new Error("Unsupported FilePass Type: " + Type);
+		}
+	},	
+
+	// Decrypt data using RC4 algorithm
+	decrypt: function(fpass, data, opts, blocksize) {
+		if (!opts?.password) throw new Error('need password');
+		console.log(fpass, opts);
+		checkLibs('CryptoJS');
+		const {Type, Data} = fpass;
+		let decrypted;
+		if (Type === 1) {
+			if (!blocksize) blocksize = this.BLOCK_SIZE;
+			let start = 0;
+			let end = 0;
+			let block = 0;
+			const {Salt} = Data;
+			const key = this.convertPasswordToKey(opts.password, Salt, block);
+
+			const input = new Uint8Array(data);
+			const outputChunks = [];
+			while (end < input.length) {
+				start = end;
+				end = start + blocksize;
+				if (end > input.length) end = input.length;
+
+				// 次のチャンクを取得
+				const inputChunk = CryptoJS.lib.WordArray.create(input.words.slice(start / 4, end / 4), end - start);
+
+				// RC4デクリプタを作成し、チャンクを復号化
+				const cipher = CryptoJS.algo.RC4.createDecryptor(key);
+				const outputChunk = cipher.process(inputChunk).concat(cipher.finalize());
+
+				outputChunks.push(outputChunk);
+
+				block += 1;
+				key = convertPasswordToKey(password, salt, block);
+			}
+
+			// すべての出力チャンクを結合
+			const output = CryptoJS.lib.WordArray.create().concat(outputChunks);
+			decrypted = wordArrayToUint8Array(output);
+		} else {
+			throw new Error("Unsupported FilePass Type: " + Type);
+		}
+		return decrypted;
+	}
+}
+
 // 必要なライブラリ: CryptoJS, argon2-browser
 async function decrypt_ods(zip, manifest, opts) {
-	if (typeof CryptoJS === 'undefined')
-		throw new Error("CryptoJS is required for decryption");
-	if (typeof argon2 === 'undefined')
-		throw new Error("argon2 is required for decryption");
+	checkLibs('CryptoJS', 'argon2');
 	try {
 		// マニフェストから暗号化パラメータを取得
 		const entry = manifest["file-entry"];
