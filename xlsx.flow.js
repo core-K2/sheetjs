@@ -12665,25 +12665,22 @@ var Rc4 = {
 	},	
 
 	// Decrypt data using RC4 algorithm
-	decrypt: function(fpass, input, opts, blocksize) {
+	decrypt: function(fpass, data, opts, blocksize) {
 		if (!opts?.password) throw new Error('need password');
 		checkLibs('CryptoJS');
 		const {Type, Data} = fpass;
 		let decrypted;
 		if (Type === 1) {
 			if (!blocksize) blocksize = this.BLOCK_SIZE;
-			let start = 0;
-			let end = 0;
-			let block = 0;
 			const {Salt} = Data;
 			const outputChunks = [];
-			while (end < input.length) {
+			for (let start, end = 0, block = 0; end < data.length; block++) {
 				start = end;
 				end = start + blocksize;
-				if (end > input.length) end = input.length;
+				if (end > data.length) end = data.length;
 
 				// 次のチャンクを取得
-				const inputChunk = input.slice(start, end);
+				const inputChunk = data.slice(start, end);
 
 				// パスワードからキーを生成
 				const key = this.convertPasswordToKey(opts.password, Salt, block);
@@ -12692,7 +12689,6 @@ var Rc4 = {
 				const cipher = CryptoJS.algo.RC4.createDecryptor(CryptoJS.lib.WordArray.create(key));
 				const outputChunk = cipher.finalize(CryptoJS.lib.WordArray.create(inputChunk));
 				outputChunks.push(wordArrayToUint8Array(outputChunk));
-				block += 1;
 			}
 			// すべての出力チャンクを結合
 			decrypted = concatUint8Arrays(outputChunks);
@@ -12728,7 +12724,7 @@ var Xls97 = {
 	iterRecord: function(blob) {
 		const dataList = [];
 		prep_blob(blob, 0);
-		while (true) {
+		for (;;) {
 			const h = blob.read_shift(4);
 			if (!h) {
 				break;
