@@ -306,11 +306,17 @@ function parse_FilePassHeader(blob, length/*:number*/, oo) {
 	else o.Data = parse_RC4CryptoHeader(blob, length);
 	return o;
 }
-function parse_FilePass(blob, length/*:number*/, opts) {
+function parse_FilePass(blob, length/*:number*/, opts, data) {
 	var o = ({ Type: opts.biff >= 8 ? blob.read_shift(2) : 0 }/*:any*/); /* wEncryptionType */
 	if(o.Type) {
 		parse_FilePassHeader(blob, length-2, o);
-		Rc4.verifyPassword(o, opts);
+		if (Rc4.verifyPassword(o, opts)) {
+			const content = Xls97.decrypt(o, data, opts);
+			if (content) {
+				prep_blob(content, 0);
+				o.content = content;
+			}
+		}
 	} else {
 		parse_XORObfuscation(blob, opts.biff >= 8 ? length : length - 2, opts, o);
 	}
@@ -546,6 +552,7 @@ var Ecma376Extensible = {
 // Note: The RC4 algorithm is considered weak and is not recommended for secure applications.
 // This implementation is provided for compatibility with legacy formats that use RC4 encryption.
 var Rc4 = {
+	// Block size for processing data in chunks
 	BLOCK_SIZE: 0x200, // 512 bytes
 
 	// Convert password to key using MD5 hashing
@@ -573,7 +580,6 @@ var Rc4 = {
 	// Verify the password against the FilePass structure
 	verifyPassword: function(fpass, opts) {
 		if (!opts?.password) throw new Error('need password');
-		console.log(fpass, opts);
 		checkLibs('CryptoJS');
 		const {Type, Data} = fpass;
 		if (Type === 1) {
@@ -602,9 +608,8 @@ var Rc4 = {
 	},	
 
 	// Decrypt data using RC4 algorithm
-	decrypt: function(fpass, data, opts, blocksize) {
+	decrypt: function(fpass, input, opts, blocksize) {
 		if (!opts?.password) throw new Error('need password');
-		console.log(fpass, opts);
 		checkLibs('CryptoJS');
 		const {Type, Data} = fpass;
 		let decrypted;
@@ -614,9 +619,6 @@ var Rc4 = {
 			let end = 0;
 			let block = 0;
 			const {Salt} = Data;
-			const key = this.convertPasswordToKey(opts.password, Salt, block);
-
-			const input = new Uint8Array(data);
 			const outputChunks = [];
 			while (end < input.length) {
 				start = end;
@@ -624,28 +626,136 @@ var Rc4 = {
 				if (end > input.length) end = input.length;
 
 				// 次のチャンクを取得
-				const inputChunk = CryptoJS.lib.WordArray.create(input.words.slice(start / 4, end / 4), end - start);
+				const inputChunk = input.slice(start, end);
+
+				// パスワードからキーを生成
+				const key = this.convertPasswordToKey(opts.password, Salt, block);
 
 				// RC4デクリプタを作成し、チャンクを復号化
-				const cipher = CryptoJS.algo.RC4.createDecryptor(key);
-				const outputChunk = cipher.process(inputChunk).concat(cipher.finalize());
-
-				outputChunks.push(outputChunk);
-
+				const cipher = CryptoJS.algo.RC4.createDecryptor(CryptoJS.lib.WordArray.create(key));
+				const outputChunk = cipher.finalize(CryptoJS.lib.WordArray.create(inputChunk));
+				outputChunks.push(wordArrayToUint8Array(outputChunk));
 				block += 1;
-				key = convertPasswordToKey(password, salt, block);
 			}
-
 			// すべての出力チャンクを結合
-			const output = CryptoJS.lib.WordArray.create().concat(outputChunks);
-			decrypted = wordArrayToUint8Array(output);
+			decrypted = concatUint8Arrays(outputChunks);
 		} else {
 			throw new Error("Unsupported FilePass Type: " + Type);
 		}
 		return decrypted;
-	}
-}
+	},
+};
 
+// XLS97 Decryption
+// This implementation handles the decryption of XLS files encrypted with the RC4 algorithm.
+// It processes the file in chunks, deriving a new key for each chunk based on the block number.
+// The decrypt function takes the FilePass structure, the encrypted data, and options including the password.
+// It returns the decrypted content as a Uint8Array.
+var Xls97 = {
+	// Size of each block for key derivation
+	BLOCK_SIZE: 1024,
+
+	// Record type numbers for specific records
+	recordNameNum: {
+		BOF: 0x0809,
+		FilePass: 0x002F,
+		UsrExcl: 0x0194,
+		FileLock: 0x0195,
+		InterfaceHdr: 0x00E1,
+		RRDInfo: 0x0106,
+		RRDHead: 0x0138,
+		BoundSheet8: 0x0085,
+	},
+
+	// Iterate over records in the binary blob
+	iterRecord: function(blob) {
+		const dataList = [];
+		prep_blob(blob, 0);
+		while (true) {
+			const h = blob.read_shift(4);
+			if (!h) {
+				break;
+			}
+			blob.l = blob.l - 4;
+			const header = blob.slice(blob.l, blob.l + 4);
+			const num = blob.read_shift(2);
+			const size = blob.read_shift(2);
+			const record = blob.slice(blob.l, blob.l + size);
+			const temp = {header, num, size, record};
+			dataList.push(temp);
+			blob.l = blob.l + size;
+		}
+		return dataList;
+	},
+
+	// Allocate a Uint8Array of specified size, optionally filled with a specific value
+	alloc: function(size, fill = 0) {
+		const buf = new Uint8Array(size);
+		buf.fill(fill);
+		return buf;
+	},
+
+	// Concatenate multiple Uint8Arrays into a single Uint8Array
+	concat: function(chunks) {
+		return concatUint8Arrays(chunks);
+	},
+
+	// Decrypt the data using the provided FilePass structure and options
+	decrypt: function(fpass, data, opts) {
+		const plainBuf = [];
+		let encryptedBuf = [];
+		const dataList = this.iterRecord(data);
+
+		// header [num, size] 2 bytes each
+		for (const {header, num, size, record} of dataList) {
+			// Remove encryption, pad by zero to preserve stream size
+			if (num === this.recordNameNum.FilePass) {
+				// header.slice(2); // size
+				plainBuf.push(0, 0, ...header.slice(2), ...Array(size).fill(0));
+				encryptedBuf.push(this.alloc(4 + size));
+			} else if ([
+				// The following records MUST NOT be obfuscated or encrypted: BOF (section 2.4.21),
+				// FilePass (section 2.4.117), UsrExcl (section 2.4.339), FileLock (section 2.4.116),
+				// InterfaceHdr (section 2.4.146), RRDInfo (section 2.4.227), and RRDHead (section 2.4.226).
+				this.recordNameNum.BOF,
+				this.recordNameNum.FilePass,
+				this.recordNameNum.UsrExcl,
+				this.recordNameNum.FileLock,
+				this.recordNameNum.InterfaceHdr,
+				this.recordNameNum.RRDInfo,
+				this.recordNameNum.RRDHead,
+			].includes(num)) {
+				plainBuf.push(...header, ...record);
+				encryptedBuf.push(this.alloc(4 + size));
+			} else if (num === this.recordNameNum.BoundSheet8) {
+				// The lbPlyPos field of the BoundSheet8 record (section 2.4.28) MUST NOT be encrypted.
+				const lbPlyPos = record.slice(0, 4);
+				const restSize = size - 4;
+				plainBuf.push(...header, ...lbPlyPos, ...Array(restSize).fill(-2));
+				encryptedBuf.push(this.concat([this.alloc(4), this.alloc(4), record.slice(4)]));
+			} else {
+				plainBuf.push(...header, ...Array(size).fill(-1));
+				encryptedBuf.push(this.concat([this.alloc(4), record]));
+			}
+		}
+		const encrypted = this.concat(encryptedBuf);
+		const dec = Rc4.decrypt(fpass, encrypted, opts, this.BLOCK_SIZE);
+	
+		for (let i = 0; i < plainBuf.length; i++) {
+			const c = plainBuf[i];
+			if (c !== -1 && c !== -2) {
+				dec[i] = c;
+			}
+		}
+		return dec;
+	},
+};
+
+// Decrypt ODS (OpenDocument Spreadsheet) files
+// This function handles the decryption of ODS files that are encrypted using the methods specified in the manifest.
+// It supports AES-256-GCM encryption with Argon2id key derivation.
+// The function retrieves the necessary parameters from the manifest, derives the encryption key, and decrypts the content.
+// It returns the decrypted content as a CFB container.
 // 必要なライブラリ: CryptoJS, argon2-browser
 async function decrypt_ods(zip, manifest, opts) {
 	checkLibs('CryptoJS', 'argon2');

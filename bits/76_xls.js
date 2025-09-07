@@ -68,7 +68,7 @@ function slurp(RecordType, R, blob, length/*:number*/, opts)/*:any*/ {
 	var ll = 0; b.lens = [];
 	for(var j = 0; j < bufs.length; ++j) { b.lens.push(ll); ll += bufs[j].length; }
 	if(b.length < length) throw "XLS Record 0x" + RecordType.toString(16) + " Truncated: " + b.length + " < " + length;
-	return R.f(b, b.length, opts);
+	return R.f(b, b.length, opts, blob);
 }
 
 function safe_format_xf(p/*:any*/, opts/*:ParseOpts*/, date1904/*:?boolean*/) {
@@ -246,6 +246,7 @@ function parse_workbook(blob, options/*:ParseOpts*/)/*:Workbook*/ {
 					if(!options.password) throw new Error("File is password-protected");
 					if(val.valid == null) throw new Error("Encryption scheme unsupported");
 					if(!val.valid) throw new Error("Password is incorrect");
+					if (val.content) return parse_workbook(val.content, options);
 					break;
 				case 0x005c /* WriteAccess */: opts.lastuser = val; break;
 				case 0x0042 /* CodePage */:
