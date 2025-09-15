@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250907';
+XLSX.version = '0.20.3.20250915';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -27528,7 +27528,7 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control', 'annotation'
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control', 'annotation', 'connector'
 ];
 function addDraws(drawings, draw, iCol, iRow) {
 	let ret = 0;

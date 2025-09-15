@@ -1798,7 +1798,7 @@ function getProp(name) {
 	return null;
 }
 const DRAW_SHAPES = [
-	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control', 'annotation'
+	'g', 'custom-shape', 'frame', 'caption', 'ellipse', 'line', 'measure', 'path', 'polygon', 'polyline', 'control', 'annotation', 'connector'
 ];
 function addDraws(drawings, draw, iCol, iRow) {
 	let ret = 0;
