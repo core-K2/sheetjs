@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250915';
+XLSX.version = '0.20.3.20250919';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -14200,7 +14200,9 @@ function parse_clrScheme(t, themes, opts) {
 
 			/* 20.1.2.3.33 sysClr CT_SystemColor */
 			case '<a:sysClr':
-				color.rgb = y.lastClr; break;
+				color.rgb = y.lastClr;
+				color.val = y.val;
+				break;
 			case '</a:sysClr>': break;
 
 			/* 20.1.4.1.1 accent1 (Accent 1) */

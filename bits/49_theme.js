@@ -22,7 +22,9 @@ function parse_clrScheme(t, themes, opts) {
 
 			/* 20.1.2.3.33 sysClr CT_SystemColor */
 			case '<a:sysClr':
-				color.rgb = y.lastClr; break;
+				color.rgb = y.lastClr;
+				color.val = y.val;
+				break;
 			case '</a:sysClr>': break;
 
 			/* 20.1.4.1.1 accent1 (Accent 1) */
