@@ -63,7 +63,7 @@ function SSF_init_table(t/*:any*/) {
 	t[47]= 'mmss.0';
 	t[48]= '##0.0E+0';
 	t[49]= '@';
-	t[56]= '"上午/下午 "hh"時"mm"分"ss"秒 "';
+	// t[56]= '"上午/下午 "hh"時"mm"分"ss"秒 "';
 	return t;
 }
 /* repeated to satiate webpack */
@@ -96,7 +96,7 @@ var table_fmt = {
 	47: 'mmss.0',
 	48: '##0.0E+0',
 	49: '@',
-	56: '"上午/下午 "hh"時"mm"分"ss"秒 "'
+	// 56: '"上午/下午 "hh"時"mm"分"ss"秒 "'
 };
 
 /* Defaults determined by systematically testing in Excel 2019 */

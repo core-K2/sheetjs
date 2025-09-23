@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250919';
+XLSX.version = '0.20.3.20250923';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -359,7 +359,7 @@ function SSF_init_table(t) {
 	t[47]= 'mmss.0';
 	t[48]= '##0.0E+0';
 	t[49]= '@';
-	t[56]= '"上午/下午 "hh"時"mm"分"ss"秒 "';
+	// t[56]= '"上午/下午 "hh"時"mm"分"ss"秒 "';
 	return t;
 }
 /* repeated to satiate webpack */
@@ -392,7 +392,7 @@ var table_fmt = {
 	47: 'mmss.0',
 	48: '##0.0E+0',
 	49: '@',
-	56: '"上午/下午 "hh"時"mm"分"ss"秒 "'
+	// 56: '"上午/下午 "hh"時"mm"分"ss"秒 "'
 };
 
 /* Defaults determined by systematically testing in Excel 2019 */
@@ -1323,8 +1323,15 @@ var SSFImplicit/*{[number]:string}*/ = ({
 	"42": '_("$"* #,##0_);_("$"* \(#,##0\);_("$"* "-"_);_(@_)',
 	"43": '_(* #,##0.00_);_(* \(#,##0.00\);_(* "-"??_);_(@_)',
 	"44": '_("$"* #,##0.00_);_("$"* \(#,##0.00\);_("$"* "-"??_);_(@_)',
-	"50": 'm/d/yy', "51": 'm/d/yy', "52": 'm/d/yy', "53": 'm/d/yy', "54": 'm/d/yy',
-	"55": 'm/d/yy', "56": 'm/d/yy', "57": 'm/d/yy', "58": 'm/d/yy',
+	"50": 'm/d/yy',
+	"51": 'm/d/yy',
+	"52": 'm/d/yy',
+	"53": 'm/d/yy',
+	"54": 'm/d/yy',
+	"55": 'm/d/yy',
+	"56": 'MM"月"DD"日"',
+	"57": 'm/d/yy',
+	"58": 'm/d/yy',
 	"59": '0',
 	"60": '0.00',
 	"61": '#,##0',
