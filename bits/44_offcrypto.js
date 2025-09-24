@@ -410,9 +410,17 @@ function concatUint8Arrays(chunks) {
 	}
 	return ret;
 }
+function cryptHash(algo, ...bufs) {
+	const hash = CryptoJS.algo[algo].create();
+	for (let i = 0; i < bufs.length; i++) {
+		hash.update(bufs[i]);
+	}
+	return hash.finalize();
+}
 
 // ECMA-376 Encryption Decryption
 var Ecma376Standard = {
+	HASH_ALGO: 'SHA1',	// hash algorithm
 	KEY_REPEAT_COUNT: 50000,	// Number of iterations for key derivation
 	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
 	AES_BLOCK_SIZE: 16, // AES block size in bytes
@@ -439,16 +447,16 @@ var Ecma376Standard = {
 	passwordToKey: function(password, salt, keySize = 128) {
 		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
 		const saltW = CryptoJS.lib.WordArray.create(salt);
-		let hash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
+		let hash = cryptHash(this.HASH_ALGO, saltW, passwordW);
 		for (let i = 0; i < this.KEY_REPEAT_COUNT; i++) {
 			const iW = intToWordArrayLE(i);
-			hash = CryptoJS.algo.SHA1.create().update(iW).update(hash).finalize();
+			hash = cryptHash(this.HASH_ALGO, iW, hash);
 		}
 	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
-		const keyHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
+		const keyHash = cryptHash(this.HASH_ALGO, dataW);
 		const buf = wordArrayXorUint8Array(keyHash, new Uint8Array(64).fill(0x36));
 		const keyHashW = CryptoJS.lib.WordArray.create(buf);
-		const key = CryptoJS.algo.SHA1.create().update(keyHashW).finalize();
+		const key = cryptHash(this.HASH_ALGO, keyHashW);
 		return wordArrayToUint8Array(key, keySize / 8);
 	},
 
@@ -459,7 +467,7 @@ var Ecma376Standard = {
 		const verifierW = CryptoJS.lib.WordArray.create(verifier);
 		const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
 		const decryptedVerifierW = this._decrypt(verifierW, keyW);
-		const expectedHashW = CryptoJS.algo.SHA1.create().update(decryptedVerifierW).finalize();
+		const expectedHashW = cryptHash(this.HASH_ALGO, decryptedVerifierW);
 		const expectedHash = wordArrayToUint8Array(expectedHashW);
 		const checkW = this._decrypt(verifierHashW, keyW);
 		const check = wordArrayToUint8Array(checkW, 20);
@@ -532,9 +540,28 @@ var Ecma376Standard = {
 // Currently, they throw an error indicating that they are not implemented yet.
 // Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.	
 var Ecma376Agile = {
+	passwordToKey: function(password, enc) {
+		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+		const {hashAlgorithm, saltValue, spinCount, keyBits} = enc;
+		let hash = cryptHash(hashAlgorithm, saltValue, passwordW);
+		const count = Number(spinCount);
+		for ( let i = 0; i < count; i++) {
+			const iW = intToWordArrayLE(i);
+			hash = cryptHash(hashAlgorithm, iw, hash);
+		}
+	},
+	verifyKey: function(key, einfo) {
+
+	},
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
-		throw new Error("not implement yet Ecma376Agile:", einfo);
+		// throw new Error("not implement yet Ecma376Agile:", einfo);
+		const enc = einfo.encs[0];
+		const key = this.passwordToKey(opts.password, enc);
+		if (!this.verifyKey(opts.password, einfo)) {
+			throw new Error('password is incorrect');
+		}
+		return this.decryptContent()
 	}
 };
 var Ecma376Extensible = {
