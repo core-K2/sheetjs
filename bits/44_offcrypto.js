@@ -352,9 +352,15 @@ function decrypt(einfo, data, cfb, opts) {
 
 // Convert a string or ArrayBuffer to a CryptoJS WordArray
 function createWordArray(buf) {
-	return typeof buf === 'string' ?
-		CryptoJS.enc.Hex.parse(buf):
-		CryptoJS.lib.WordArray.create(buf);
+	if (!(buf instanceof Uint8Array)) {
+		if (typeof buf === 'string') {
+			return CryptoJS.enc.Hex.parse(buf);
+		}
+		if (Array.isArray(buf)) {
+			buf = new Uint8Array(buf);
+		}
+	}
+	return CryptoJS.lib.WordArray.create(buf);
 }
 // Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz) {
@@ -397,7 +403,7 @@ function intToWordArrayLE(i) {
 	iBytes[1] = (i >>> 8) & 0xff;
 	iBytes[2] = (i >>> 16) & 0xff;
 	iBytes[3] = (i >>> 24) & 0xff;
-    return CryptoJS.lib.WordArray.create(iBytes);
+    return createWordArray(iBytes);
 }
 // Concatenate multiple Uint8Arrays into a single Uint8Array
 function concatUint8Arrays(chunks) {
@@ -446,16 +452,16 @@ var Ecma376Standard = {
 	// The key size can be specified, default is 128 bits
 	passwordToKey: function(password, salt, keySize = 128) {
 		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-		const saltW = CryptoJS.lib.WordArray.create(salt);
+		const saltW = createWordArray(salt);
 		let hash = cryptHash(this.HASH_ALGO, saltW, passwordW);
 		for (let i = 0; i < this.KEY_REPEAT_COUNT; i++) {
 			const iW = intToWordArrayLE(i);
 			hash = cryptHash(this.HASH_ALGO, iW, hash);
 		}
-	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
+	    const dataW = createWordArray(wordArrayToUint8Array(hash, 24));
 		const keyHash = cryptHash(this.HASH_ALGO, dataW);
 		const buf = wordArrayXorUint8Array(keyHash, new Uint8Array(64).fill(0x36));
-		const keyHashW = CryptoJS.lib.WordArray.create(buf);
+		const keyHashW = createWordArray(buf);
 		const key = cryptHash(this.HASH_ALGO, keyHashW);
 		return wordArrayToUint8Array(key, keySize / 8);
 	},
@@ -463,9 +469,9 @@ var Ecma376Standard = {
 	// Verify the key against the verifier and verifier hash
 	// Returns true if the key is valid, false otherwise
 	verifyKey: function(key, verifier, verifierHash) {
-		const keyW = CryptoJS.lib.WordArray.create(key);
-		const verifierW = CryptoJS.lib.WordArray.create(verifier);
-		const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+		const keyW = createWordArray(key);
+		const verifierW = createWordArray(verifier);
+		const verifierHashW = createWordArray(verifierHash);
 		const decryptedVerifierW = this._decrypt(verifierW, keyW);
 		const expectedHashW = cryptHash(this.HASH_ALGO, decryptedVerifierW);
 		const expectedHash = wordArrayToUint8Array(expectedHashW);
@@ -478,7 +484,7 @@ var Ecma376Standard = {
 	// The content is expected to be in a specific format with a size header
 	// Returns the decrypted content as a Uint8Array
 	decryptContent: function(key, content) {
-		const keyW = CryptoJS.lib.WordArray.create(key);
+		const keyW = createWordArray(key);
 		const len = content.length;
 		const size = content.read_shift(2);
 		const chunks = [];
@@ -496,7 +502,7 @@ var Ecma376Standard = {
 				const padding = new Uint8Array(blockSize - remaind).fill(0);
 				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
 			}
-			const bufW = CryptoJS.lib.WordArray.create(new Uint8Array(buf));
+			const bufW = createWordArray(new Uint8Array(buf));
 			const decryptedW = this._decrypt(bufW, keyW);
 			chunks.push(wordArrayToUint8Array(decryptedW));
 		}
@@ -514,7 +520,7 @@ var Ecma376Standard = {
 		if (AlgID !== 0x660E && AlgID !== 0x6801) {
 			throw new Error("Unsupported AlgID: " + AlgID);
 		}
-		this.iv = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Zero IV
+		this.iv = createWordArray(new Uint8Array(16)); // Zero IV
 		const key = this.passwordToKey(opts.password, Salt, KeySize);
 		if (!this.verifyKey(key, Verifier, VerifierHash)) {
 			throw new Error("Password verification failed");
@@ -540,14 +546,25 @@ var Ecma376Standard = {
 // Currently, they throw an error indicating that they are not implemented yet.
 // Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.	
 var Ecma376Agile = {
+	BLOCK_KEYS: {
+		dataIntegrity: {
+			hmacKey: [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6],
+			hmacValue: [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33],
+		},
+		key: [0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd6],
+		verifierHash: {
+			input: [0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79],
+			value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
+		},
+	},
 	passwordToKey: function(password, enc) {
 		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
 		const {hashAlgorithm, saltValue, spinCount, keyBits} = enc;
-		let hash = cryptHash(hashAlgorithm, saltValue, passwordW);
+		let hash = cryptHash(hashAlgorithm, createWordArray(saltValue), passwordW);
 		const count = Number(spinCount);
 		for ( let i = 0; i < count; i++) {
 			const iW = intToWordArrayLE(i);
-			hash = cryptHash(hashAlgorithm, iw, hash);
+			hash = cryptHash(hashAlgorithm, iW, hash);
 		}
 	},
 	verifyKey: function(key, einfo) {
@@ -595,11 +612,11 @@ var Rc4 = {
 			chunks.push(intermediateBuffer);
 		}
 		const concatenatedBuffer = concatUint8Arrays(chunks);
-		const concatenatedBufferW = CryptoJS.lib.WordArray.create(concatenatedBuffer);
+		const concatenatedBufferW = createWordArray(concatenatedBuffer);
 		const hashW = CryptoJS.MD5(concatenatedBufferW);
 		const hash = wordArrayToUint8Array(hashW, 5);
 		const intermediate = concatUint8Arrays([hash, wordArrayToUint8Array(intToWordArrayLE(block))]);
-		const intermediateW = CryptoJS.lib.WordArray.create(intermediate);
+		const intermediateW = createWordArray(intermediate);
 		const keyW = CryptoJS.MD5(intermediateW);
 		return wordArrayToUint8Array(keyW, 128 / 8);
 	},
@@ -615,7 +632,7 @@ var Rc4 = {
 			const key = this.convertPasswordToKey(opts.password, Salt, block);
   
 			// RC4デクリプタを作成
-			const keyW = CryptoJS.lib.WordArray.create(key);
+			const keyW = createWordArray(key);
   			const cipher = CryptoJS.algo.RC4.createDecryptor(keyW);
   			// encryptedVerifierを復号化してverifierを取得
 			const encryptedVerifierW = createWordArray(EncryptedVerifier);
@@ -656,8 +673,8 @@ var Rc4 = {
 				const key = this.convertPasswordToKey(opts.password, Salt, block);
 
 				// RC4デクリプタを作成し、チャンクを復号化
-				const cipher = CryptoJS.algo.RC4.createDecryptor(CryptoJS.lib.WordArray.create(key));
-				const outputChunk = cipher.finalize(CryptoJS.lib.WordArray.create(inputChunk));
+				const cipher = CryptoJS.algo.RC4.createDecryptor(createWordArray(key));
+				const outputChunk = cipher.finalize(createWordArray(inputChunk));
 				outputChunks.push(wordArrayToUint8Array(outputChunk));
 			}
 			// すべての出力チャンクを結合
