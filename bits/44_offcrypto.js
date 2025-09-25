@@ -92,7 +92,7 @@ function parse_EncryptionHeader(blob, length/*:number*/) {
 	var valid = false;
 	switch(o.AlgID) {
 		case 0x660E: case 0x660F: case 0x6610: valid = (o.Flags == 0x24); break;
-		case 0x6801: valid = (o.Flags == 0x04); break;
+		case 0x6801: valid = !!(o.Flags & 0x04); break;
 		case 0: valid = (o.Flags == 0x10 || o.Flags == 0x04 || o.Flags == 0x24); break;
 		default: throw 'Unrecognized encryption algorithm: ' + o.AlgID;
 	}
@@ -354,16 +354,19 @@ function decrypt(einfo, data, cfb, opts) {
 // Convert a string or ArrayBuffer to a CryptoJS WordArray
 function createWordArray(buf) {
 	if (!(buf instanceof Uint8Array)) {
-		if (typeof buf === 'string') {
+		switch (typeof buf) {
+		case 'string':
 			if (/^[0-9a-f]+$/i.test(buf))
 				return CryptoJS.enc.Hex.parse(buf);
 			else
 				return CryptoJS.enc.Base64.parse(buf);
-		}
-		if (Array.isArray(buf)) {
-			buf = new Uint8Array(buf);
-		} else if (buf.hasOwnProperty('sigBytes') && buf.words) {
-			return buf;
+		case 'object':
+			if (Array.isArray(buf)) {
+				buf = new Uint8Array(buf);
+			} else if (buf?.hasOwnProperty('sigBytes') && buf.words) {
+				return buf;
+			}
+			break;
 		}
 	}
 	return CryptoJS.lib.WordArray.create(buf);
