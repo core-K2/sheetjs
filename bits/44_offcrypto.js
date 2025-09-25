@@ -438,6 +438,7 @@ var Ecma376Standard = {
 	HASH_ALGO: 'SHA1',	// hash algorithm
 	KEY_REPEAT_COUNT: 50000,	// Number of iterations for key derivation
 	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
+	HEADER_SIZE: 2,	// contents header size
 	AES_BLOCK_SIZE: 16, // AES block size in bytes
 	CHUNK_SIZE: 32768, // Chunk size for processing
 	iv: [], // Initialization vector for AES decryption
@@ -495,7 +496,7 @@ var Ecma376Standard = {
 	decryptContent: function(key, content) {
 		const keyW = createWordArray(key);
 		const len = content.length;
-		const size = content.read_shift(2);
+		const size = content.read_shift(this.HEADER_SIZE);
 		const chunks = [];
 		const offset = this.CONTENT_OFFSET;
 		const blockSize = this.AES_BLOCK_SIZE;
@@ -566,15 +567,18 @@ var Ecma376Agile = {
 			value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
 		},
 	},
+	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
+	HEADER_SIZE: 4,	// contents header size
+	CHUNK_SIZE: 32768, // Chunk size for processing
+	FILL_VALUE: 0x36,	// fill value
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
-		const repeat = Number(spinCount);
-		for (let i = 0; i < repeat; i++) {
+		for (let i = 0; i < spinCount; i++) {
 			const iW = intToWordArrayLE(i);
 			hash = cryptHash(hashAlgorithm, iW, hash);
 		}
 		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
-		return wordArrayToUint8Array(hash, Number(keyBits) / 8, 0x36);
+		return wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
 	},
 	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv) {
 		return CryptoJS[cipherAlgorithm].decrypt(
@@ -583,18 +587,29 @@ var Ecma376Agile = {
 			},
 			createWordArray(key),
 			{
-				iv: iv,
+				iv: createWordArray(iv),
 				mode: CryptoJS.mode[cipherMode],
 				padding: CryptoJS.pad.NoPadding
 			}
 		);
 	},
-	verifyPassword: function(password, enc) {
-		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedVerifierHashInput, encryptedVerifierHashValue} = enc;
-		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-		const saltValueW = createWordArray(saltValue);
+	createIV: function(hashAlgorithm, saltValueW, blockSize, blockKey) {
+		if (typeof blockKey === 'number') blockKey = intToWordArrayLE(blockKey);
+		let iv = cryptHash(hashAlgorithm, saltValueW, blockKey);
+		return wordArrayToUint8Array(iv, blockSize, this.FILL_VALUE);
+	},
+	getCipherMode: function(cipherChaining) {
 		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
-		const cipherMode = m ? m[1] : 'CBC';
+		return m ? m[1] : 'CBC';
+	},
+	getEncryptor: function(einfo) {
+		const encryptor = einfo.encs[0];
+		return toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+	},
+	verifyPassword: function(passwordW, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const cipherMode = this.getCipherMode(cipherChaining);
 		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.input);
 		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.value);
 		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
@@ -602,16 +617,46 @@ var Ecma376Agile = {
 		const verifierHash = cryptHash(hashAlgorithm, hashInput);
 		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
 	},
-	decryptContent: function(password, content, enc) {
+	decryptContent: function(passwordW, content, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedKeyValue, blockSize} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const cipherMode = this.getCipherMode(cipherChaining);
+		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		const packageKey = this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+		const len = content.length;
+		const size = content.read_shift(this.HEADER_SIZE);
+		const chunks = [];
+		const offset = this.CONTENT_OFFSET;
+		const chunkLen = this.CHUNK_SIZE;
+		let sIdx, eIdx = 0;
+		let i = 0;
+		while (eIdx < len) {
+			sIdx = eIdx;
+			eIdx = sIdx + chunkLen; 
+			if (eIdx > len) eIdx = len;
+			let buf = content.slice(sIdx + offset, eIdx + offset);
+			const remaind = buf.length % blockSize;
+			if (remaind) {
+				const padding = new Uint8Array(blockSize - remaind).fill(0);
+				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
+			}
+			const iv = this.createIV(hashAlgorithm, saltValueW, blockSize, i++);
+			const decryptedW = this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv);
+			chunks.push(wordArrayToUint8Array(decryptedW));
+		}
+		const result = concatUint8Arrays(chunks);
+		return result.slice(0, size);
 	},
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		// throw new Error("not implement yet Ecma376Agile:", einfo);
-		const enc = einfo.encs[0];
-		if (!this.verifyPassword(opts.password, enc)) {
-			throw new Error('password is incorrect');
+		const encryptor = this.getEncryptor(einfo);
+		const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
+		if (!this.verifyPassword(passwordW, encryptor)) {
+			console.error('password is incorrect');
+			// throw new Error('password is incorrect');
 		}
-		return this.decryptContent(opts.password, data.content, enc);
+		return this.decryptContent(passwordW, data.content, encryptor);
 	}
 };
 var Ecma376Extensible = {

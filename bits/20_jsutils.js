@@ -752,6 +752,13 @@ function toNumber(v, def) {
 	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
 	return isNaN(ret) ? def === undefined ? 0 : def : ret;
 }
+function toNumberInObject(o, props) {
+	if (typeof props === 'string') props = props.split(',');
+	props.forEach(p => {
+		o[p] = toNumber(o[p]);
+	});
+	return o;	
+}
 function getPixelSize(v, u) {
 	if (!v || typeof v === 'number') return v;
 	let m = /(\d+(\.\d+)?)([^0-9.]*)?/.exec(v);
