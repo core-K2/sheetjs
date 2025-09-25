@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250923';
+XLSX.version = '0.20.3.20250925';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4136,6 +4136,13 @@ function toNumber(v, def) {
 	}
 	let ret = parseFloat(('' + v).replace(/[^+\-0-9.]/g, ''));
 	return isNaN(ret) ? def === undefined ? 0 : def : ret;
+}
+function toNumberInObject(o, props) {
+	if (typeof props === 'string') props = props.split(',');
+	props.forEach(p => {
+		o[p] = toNumber(o[p]);
+	});
+	return o;	
 }
 function getPixelSize(v, u) {
 	if (!v || typeof v === 'number') return v;
@@ -12226,6 +12233,7 @@ function parse_EncInfoAgl(blob/*::, vers*/) {
 			default: throw y[0];
 		}
 	});
+	// o.$raw = Xml.xmlStrToObject(xml);
 	return o;
 }
 
@@ -12416,18 +12424,34 @@ function decrypt(einfo, data, cfb, opts) {
 
 // Convert a string or ArrayBuffer to a CryptoJS WordArray
 function createWordArray(buf) {
-	return typeof buf === 'string' ?
-		CryptoJS.enc.Hex.parse(buf):
-		CryptoJS.lib.WordArray.create(buf);
+	if (!(buf instanceof Uint8Array)) {
+		if (typeof buf === 'string') {
+			if (/^[0-9a-f]+$/i.test(buf))
+				return CryptoJS.enc.Hex.parse(buf);
+			else
+				return CryptoJS.enc.Base64.parse(buf);
+		}
+		if (Array.isArray(buf)) {
+			buf = new Uint8Array(buf);
+		} else if (buf.hasOwnProperty('sigBytes') && buf.words) {
+			return buf;
+		}
+	}
+	return CryptoJS.lib.WordArray.create(buf);
 }
 // Convert a CryptoJS WordArray to a Uint8Array
-function wordArrayToUint8Array(wa, sz) {
-	const size = sz || wa.sigBytes;
+function wordArrayToUint8Array(wa, sz, fill = 0x0) {
+	const bsz = wa.sigBytes;
+	const size = sz || bsz;
 	if (size < 0) throw new Error("invalid sigBytes:" + size);
 	const words = wa.words;
 	const ret = new Uint8Array(size);
-	for (let i = 0; i < size; i++) {
+	let i;
+	for (i = 0; i < bsz; i++) {
 		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+	}
+	for (; i < size; i++) {
+		ret[i] = fill;
 	}
 	return ret;
 }
@@ -12461,7 +12485,7 @@ function intToWordArrayLE(i) {
 	iBytes[1] = (i >>> 8) & 0xff;
 	iBytes[2] = (i >>> 16) & 0xff;
 	iBytes[3] = (i >>> 24) & 0xff;
-    return CryptoJS.lib.WordArray.create(iBytes);
+    return createWordArray(iBytes);
 }
 // Concatenate multiple Uint8Arrays into a single Uint8Array
 function concatUint8Arrays(chunks) {
@@ -12474,11 +12498,20 @@ function concatUint8Arrays(chunks) {
 	}
 	return ret;
 }
+function cryptHash(algo, ...bufs) {
+	const hash = CryptoJS.algo[algo].create();
+	for (let i = 0; i < bufs.length; i++) {
+		hash.update(bufs[i]);
+	}
+	return hash.finalize();
+}
 
 // ECMA-376 Encryption Decryption
 var Ecma376Standard = {
+	HASH_ALGO: 'SHA1',	// hash algorithm
 	KEY_REPEAT_COUNT: 50000,	// Number of iterations for key derivation
 	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
+	HEADER_SIZE: 2,	// contents header size
 	AES_BLOCK_SIZE: 16, // AES block size in bytes
 	CHUNK_SIZE: 32768, // Chunk size for processing
 	iv: [], // Initialization vector for AES decryption
@@ -12502,28 +12535,28 @@ var Ecma376Standard = {
 	// The key size can be specified, default is 128 bits
 	passwordToKey: function(password, salt, keySize = 128) {
 		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-		const saltW = CryptoJS.lib.WordArray.create(salt);
-		let hash = CryptoJS.algo.SHA1.create().update(saltW).update(passwordW).finalize();
+		const saltW = createWordArray(salt);
+		let hash = cryptHash(this.HASH_ALGO, saltW, passwordW);
 		for (let i = 0; i < this.KEY_REPEAT_COUNT; i++) {
 			const iW = intToWordArrayLE(i);
-			hash = CryptoJS.algo.SHA1.create().update(iW).update(hash).finalize();
+			hash = cryptHash(this.HASH_ALGO, iW, hash);
 		}
-	    const dataW = CryptoJS.lib.WordArray.create(wordArrayToUint8Array(hash, 24));
-		const keyHash = CryptoJS.algo.SHA1.create().update(dataW).finalize();
+	    const dataW = createWordArray(wordArrayToUint8Array(hash, 24));
+		const keyHash = cryptHash(this.HASH_ALGO, dataW);
 		const buf = wordArrayXorUint8Array(keyHash, new Uint8Array(64).fill(0x36));
-		const keyHashW = CryptoJS.lib.WordArray.create(buf);
-		const key = CryptoJS.algo.SHA1.create().update(keyHashW).finalize();
+		const keyHashW = createWordArray(buf);
+		const key = cryptHash(this.HASH_ALGO, keyHashW);
 		return wordArrayToUint8Array(key, keySize / 8);
 	},
 
 	// Verify the key against the verifier and verifier hash
 	// Returns true if the key is valid, false otherwise
 	verifyKey: function(key, verifier, verifierHash) {
-		const keyW = CryptoJS.lib.WordArray.create(key);
-		const verifierW = CryptoJS.lib.WordArray.create(verifier);
-		const verifierHashW = CryptoJS.lib.WordArray.create(verifierHash);
+		const keyW = createWordArray(key);
+		const verifierW = createWordArray(verifier);
+		const verifierHashW = createWordArray(verifierHash);
 		const decryptedVerifierW = this._decrypt(verifierW, keyW);
-		const expectedHashW = CryptoJS.algo.SHA1.create().update(decryptedVerifierW).finalize();
+		const expectedHashW = cryptHash(this.HASH_ALGO, decryptedVerifierW);
 		const expectedHash = wordArrayToUint8Array(expectedHashW);
 		const checkW = this._decrypt(verifierHashW, keyW);
 		const check = wordArrayToUint8Array(checkW, 20);
@@ -12534,9 +12567,9 @@ var Ecma376Standard = {
 	// The content is expected to be in a specific format with a size header
 	// Returns the decrypted content as a Uint8Array
 	decryptContent: function(key, content) {
-		const keyW = CryptoJS.lib.WordArray.create(key);
+		const keyW = createWordArray(key);
 		const len = content.length;
-		const size = content.read_shift(2);
+		const size = content.read_shift(this.HEADER_SIZE);
 		const chunks = [];
 		const offset = this.CONTENT_OFFSET;
 		const blockSize = this.AES_BLOCK_SIZE;
@@ -12552,7 +12585,7 @@ var Ecma376Standard = {
 				const padding = new Uint8Array(blockSize - remaind).fill(0);
 				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
 			}
-			const bufW = CryptoJS.lib.WordArray.create(new Uint8Array(buf));
+			const bufW = createWordArray(new Uint8Array(buf));
 			const decryptedW = this._decrypt(bufW, keyW);
 			chunks.push(wordArrayToUint8Array(decryptedW));
 		}
@@ -12570,7 +12603,7 @@ var Ecma376Standard = {
 		if (AlgID !== 0x660E && AlgID !== 0x6801) {
 			throw new Error("Unsupported AlgID: " + AlgID);
 		}
-		this.iv = CryptoJS.lib.WordArray.create(new Uint8Array(16)); // Zero IV
+		this.iv = createWordArray(new Uint8Array(16)); // Zero IV
 		const key = this.passwordToKey(opts.password, Salt, KeySize);
 		if (!this.verifyKey(key, Verifier, VerifierHash)) {
 			throw new Error("Password verification failed");
@@ -12579,26 +12612,180 @@ var Ecma376Standard = {
 	}
 };
 
-// ECMA-376 Agile and Extensible Encryption Decryption
-// These are placeholders for the Agile and Extensible encryption methods.
-// They will need to be implemented based on the specific requirements of those encryption methods.
-// Currently, they throw an error indicating that they are not implemented yet.
-// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.
-// They will need to handle the specific formats and algorithms used in Agile and Extensible encryption.
-// The implementation details will depend on the specific encryption algorithms and formats used in those cases.
-// For now, they are left as stubs to indicate that they require further development.
-// Note: The actual implementation of these methods will require a deep understanding of the ECMA-376 Agile and Extensible encryption specifications.
-// This may involve handling different key derivation methods, content formats, and decryption processes.
-// The current implementation serves as a placeholder to indicate that these methods are expected
-// to be implemented in the future, and they will need to follow a similar pattern to the
-// Ecma376Standard.decrypt method.
-// The Agile and Extensible encryption methods will need to be implemented based on the specific requirements of those encryption methods.
-// Currently, they throw an error indicating that they are not implemented yet.
-// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.	
+/**
+ * Implements ECMA-376 Agile Encryption/Decryption for Office documents.
+ * Provides methods for password-based key derivation, decryption, and verification
+ * according to the ECMA-376 standard (Agile Encryption).
+ *
+ * @namespace Ecma376Agile
+ *
+ * @property {Object} BLOCK_KEYS - Predefined block keys for data integrity, key, and verifier hash.
+ * @property {number} CONTENT_OFFSET - Offset to the content in the encrypted data.
+ * @property {number} HEADER_SIZE - Size of the contents header.
+ * @property {number} CHUNK_SIZE - Chunk size for processing encrypted data.
+ * @property {number} FILL_VALUE - Value used to fill padding bytes.
+ *
+ * @method passwordToKey
+ *   Derives a key from a password using the specified hash algorithm, salt, spin count, and key bits.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a CryptoJS WordArray.
+ *   @param {string} hashAlgorithm - Hash algorithm name.
+ *   @param {CryptoJS.lib.WordArray} saltValueW - Salt value as a WordArray.
+ *   @param {number} spinCount - Number of hash iterations.
+ *   @param {number} keyBits - Desired key length in bits.
+ *   @param {Array|CryptoJS.lib.WordArray} key - Block key for derivation.
+ *   @returns {Uint8Array} Derived key.
+ *
+ * @method _decrypt
+ *   Decrypts a cipher buffer using the specified key, algorithm, mode, and IV.
+ *   @param {Uint8Array|CryptoJS.lib.WordArray} key - Decryption key.
+ *   @param {Uint8Array} cipher - Ciphertext to decrypt.
+ *   @param {string} cipherAlgorithm - Cipher algorithm name.
+ *   @param {string} cipherMode - Cipher mode (e.g., CBC).
+ *   @param {Uint8Array|CryptoJS.lib.WordArray} iv - Initialization vector.
+ *   @returns {CryptoJS.lib.WordArray} Decrypted data.
+ *
+ * @method createIV
+ *   Creates an initialization vector for a given block using hash algorithm, salt, and block key.
+ *   @param {string} hashAlgorithm - Hash algorithm name.
+ *   @param {CryptoJS.lib.WordArray} saltValueW - Salt value as a WordArray.
+ *   @param {number} blockSize - Block size in bytes.
+ *   @param {number|Array|CryptoJS.lib.WordArray} blockKey - Block key or block index.
+ *   @returns {Uint8Array} Initialization vector.
+ *
+ * @method getCipherMode
+ *   Extracts cipher mode from chaining mode string.
+ *   @param {string} cipherChaining - Chaining mode string.
+ *   @returns {string} Cipher mode (e.g., CBC).
+ *
+ * @method getEncryptor
+ *   Retrieves and normalizes the encryptor object from encryption info.
+ *   @param {Object} einfo - Encryption info object.
+ *   @returns {Object} Encryptor object.
+ *
+ * @method verifyPassword
+ *   Verifies the password against the encrypted verifier hash.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a WordArray.
+ *   @param {Object} encryptor - Encryptor object.
+ *   @returns {boolean} True if password is correct, false otherwise.
+ *
+ * @method decryptContent
+ *   Decrypts the main content using the derived package key.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a WordArray.
+ *   @param {Object} content - Encrypted content buffer.
+ *   @param {Object} encryptor - Encryptor object.
+ *   @returns {Uint8Array} Decrypted content.
+ *
+ * @method decrypt
+ *   Main entry point for decryption. Verifies password and decrypts content.
+ *   @param {Object} einfo - Encryption info object.
+ *   @param {Object} data - Data object containing encrypted content.
+ *   @param {Object} opts - Options object, must include 'password'.
+ *   @returns {Uint8Array} Decrypted content.
+ *   @throws {Error} If password is missing or incorrect.
+ */
 var Ecma376Agile = {
+	BLOCK_KEYS: {
+		dataIntegrity: {
+			hmacKey: [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6],
+			hmacValue: [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33],
+		},
+		key: [0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd6],
+		verifierHash: {
+			input: [0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79],
+			value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
+		},
+	},
+	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
+	HEADER_SIZE: 4,	// contents header size
+	CHUNK_SIZE: 32768, // Chunk size for processing
+	FILL_VALUE: 0x36,	// fill value
+
+	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
+		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
+		for (let i = 0; i < spinCount; i++) {
+			const iW = intToWordArrayLE(i);
+			hash = cryptHash(hashAlgorithm, iW, hash);
+		}
+		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
+		return wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
+	},
+	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv) {
+		return CryptoJS[cipherAlgorithm].decrypt(
+			{
+				ciphertext: createWordArray(cipher)
+			},
+			createWordArray(key),
+			{
+				iv: createWordArray(iv),
+				mode: CryptoJS.mode[cipherMode],
+				padding: CryptoJS.pad.NoPadding
+			}
+		);
+	},
+	createIV: function(hashAlgorithm, saltValueW, blockSize, blockKey) {
+		if (typeof blockKey === 'number') blockKey = intToWordArrayLE(blockKey);
+		let iv = cryptHash(hashAlgorithm, saltValueW, blockKey);
+		return wordArrayToUint8Array(iv, blockSize, this.FILL_VALUE);
+	},
+	getCipherMode: function(cipherChaining) {
+		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
+		return m ? m[1] : 'CBC';
+	},
+	getEncryptor: function(einfo) {
+		const encryptor = einfo.encs[0];
+		toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
+		return encryptor;
+	},
+	verifyPassword: function(passwordW, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.input);
+		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.value);
+		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
+		const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
+		const verifierHash = cryptHash(hashAlgorithm, hashInput);
+		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
+	},
+	decryptContent: function(passwordW, content, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue, blockSize} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		const packageKey = this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+		const len = content.length;
+		const size = content.read_shift(this.HEADER_SIZE);
+		const chunks = [];
+		const offset = this.CONTENT_OFFSET;
+		const chunkLen = this.CHUNK_SIZE;
+		let sIdx, eIdx = 0;
+		let i = 0;
+		while (eIdx < len) {
+			sIdx = eIdx;
+			eIdx = sIdx + chunkLen; 
+			if (eIdx > len) eIdx = len;
+			let buf = content.slice(sIdx + offset, eIdx + offset);
+			const remaind = buf.length % blockSize;
+			if (remaind) {
+				const padding = new Uint8Array(blockSize - remaind).fill(0);
+				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
+			}
+			const iv = this.createIV(hashAlgorithm, saltValueW, blockSize, i++);
+			const decryptedW = this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv);
+			chunks.push(wordArrayToUint8Array(decryptedW));
+		}
+		const result = concatUint8Arrays(chunks);
+		return result.slice(0, size);
+	},
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
-		throw new Error("not implement yet Ecma376Agile:", einfo);
+		// throw new Error("not implement yet Ecma376Agile:", einfo);
+		const encryptor = this.getEncryptor(einfo);
+		const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
+		if (!this.verifyPassword(passwordW, encryptor)) {
+			// console.error('password is incorrect');
+			throw new Error('password is incorrect');
+		}
+		return this.decryptContent(passwordW, data.content, encryptor);
 	}
 };
 var Ecma376Extensible = {
@@ -12632,11 +12819,11 @@ var Rc4 = {
 			chunks.push(intermediateBuffer);
 		}
 		const concatenatedBuffer = concatUint8Arrays(chunks);
-		const concatenatedBufferW = CryptoJS.lib.WordArray.create(concatenatedBuffer);
+		const concatenatedBufferW = createWordArray(concatenatedBuffer);
 		const hashW = CryptoJS.MD5(concatenatedBufferW);
 		const hash = wordArrayToUint8Array(hashW, 5);
 		const intermediate = concatUint8Arrays([hash, wordArrayToUint8Array(intToWordArrayLE(block))]);
-		const intermediateW = CryptoJS.lib.WordArray.create(intermediate);
+		const intermediateW = createWordArray(intermediate);
 		const keyW = CryptoJS.MD5(intermediateW);
 		return wordArrayToUint8Array(keyW, 128 / 8);
 	},
@@ -12652,7 +12839,7 @@ var Rc4 = {
 			const key = this.convertPasswordToKey(opts.password, Salt, block);
   
 			// RC4デクリプタを作成
-			const keyW = CryptoJS.lib.WordArray.create(key);
+			const keyW = createWordArray(key);
   			const cipher = CryptoJS.algo.RC4.createDecryptor(keyW);
   			// encryptedVerifierを復号化してverifierを取得
 			const encryptedVerifierW = createWordArray(EncryptedVerifier);
@@ -12693,8 +12880,8 @@ var Rc4 = {
 				const key = this.convertPasswordToKey(opts.password, Salt, block);
 
 				// RC4デクリプタを作成し、チャンクを復号化
-				const cipher = CryptoJS.algo.RC4.createDecryptor(CryptoJS.lib.WordArray.create(key));
-				const outputChunk = cipher.finalize(CryptoJS.lib.WordArray.create(inputChunk));
+				const cipher = CryptoJS.algo.RC4.createDecryptor(createWordArray(key));
+				const outputChunk = cipher.finalize(createWordArray(inputChunk));
 				outputChunks.push(wordArrayToUint8Array(outputChunk));
 			}
 			// すべての出力チャンクを結合

@@ -362,6 +362,8 @@ function createWordArray(buf) {
 		}
 		if (Array.isArray(buf)) {
 			buf = new Uint8Array(buf);
+		} else if (buf.hasOwnProperty('sigBytes') && buf.words) {
+			return buf;
 		}
 	}
 	return CryptoJS.lib.WordArray.create(buf);
@@ -539,22 +541,77 @@ var Ecma376Standard = {
 	}
 };
 
-// ECMA-376 Agile and Extensible Encryption Decryption
-// These are placeholders for the Agile and Extensible encryption methods.
-// They will need to be implemented based on the specific requirements of those encryption methods.
-// Currently, they throw an error indicating that they are not implemented yet.
-// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.
-// They will need to handle the specific formats and algorithms used in Agile and Extensible encryption.
-// The implementation details will depend on the specific encryption algorithms and formats used in those cases.
-// For now, they are left as stubs to indicate that they require further development.
-// Note: The actual implementation of these methods will require a deep understanding of the ECMA-376 Agile and Extensible encryption specifications.
-// This may involve handling different key derivation methods, content formats, and decryption processes.
-// The current implementation serves as a placeholder to indicate that these methods are expected
-// to be implemented in the future, and they will need to follow a similar pattern to the
-// Ecma376Standard.decrypt method.
-// The Agile and Extensible encryption methods will need to be implemented based on the specific requirements of those encryption methods.
-// Currently, they throw an error indicating that they are not implemented yet.
-// Once implemented, they should follow a similar structure to Ecma376Standard.decrypt.	
+/**
+ * Implements ECMA-376 Agile Encryption/Decryption for Office documents.
+ * Provides methods for password-based key derivation, decryption, and verification
+ * according to the ECMA-376 standard (Agile Encryption).
+ *
+ * @namespace Ecma376Agile
+ *
+ * @property {Object} BLOCK_KEYS - Predefined block keys for data integrity, key, and verifier hash.
+ * @property {number} CONTENT_OFFSET - Offset to the content in the encrypted data.
+ * @property {number} HEADER_SIZE - Size of the contents header.
+ * @property {number} CHUNK_SIZE - Chunk size for processing encrypted data.
+ * @property {number} FILL_VALUE - Value used to fill padding bytes.
+ *
+ * @method passwordToKey
+ *   Derives a key from a password using the specified hash algorithm, salt, spin count, and key bits.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a CryptoJS WordArray.
+ *   @param {string} hashAlgorithm - Hash algorithm name.
+ *   @param {CryptoJS.lib.WordArray} saltValueW - Salt value as a WordArray.
+ *   @param {number} spinCount - Number of hash iterations.
+ *   @param {number} keyBits - Desired key length in bits.
+ *   @param {Array|CryptoJS.lib.WordArray} key - Block key for derivation.
+ *   @returns {Uint8Array} Derived key.
+ *
+ * @method _decrypt
+ *   Decrypts a cipher buffer using the specified key, algorithm, mode, and IV.
+ *   @param {Uint8Array|CryptoJS.lib.WordArray} key - Decryption key.
+ *   @param {Uint8Array} cipher - Ciphertext to decrypt.
+ *   @param {string} cipherAlgorithm - Cipher algorithm name.
+ *   @param {string} cipherMode - Cipher mode (e.g., CBC).
+ *   @param {Uint8Array|CryptoJS.lib.WordArray} iv - Initialization vector.
+ *   @returns {CryptoJS.lib.WordArray} Decrypted data.
+ *
+ * @method createIV
+ *   Creates an initialization vector for a given block using hash algorithm, salt, and block key.
+ *   @param {string} hashAlgorithm - Hash algorithm name.
+ *   @param {CryptoJS.lib.WordArray} saltValueW - Salt value as a WordArray.
+ *   @param {number} blockSize - Block size in bytes.
+ *   @param {number|Array|CryptoJS.lib.WordArray} blockKey - Block key or block index.
+ *   @returns {Uint8Array} Initialization vector.
+ *
+ * @method getCipherMode
+ *   Extracts cipher mode from chaining mode string.
+ *   @param {string} cipherChaining - Chaining mode string.
+ *   @returns {string} Cipher mode (e.g., CBC).
+ *
+ * @method getEncryptor
+ *   Retrieves and normalizes the encryptor object from encryption info.
+ *   @param {Object} einfo - Encryption info object.
+ *   @returns {Object} Encryptor object.
+ *
+ * @method verifyPassword
+ *   Verifies the password against the encrypted verifier hash.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a WordArray.
+ *   @param {Object} encryptor - Encryptor object.
+ *   @returns {boolean} True if password is correct, false otherwise.
+ *
+ * @method decryptContent
+ *   Decrypts the main content using the derived package key.
+ *   @param {CryptoJS.lib.WordArray} passwordW - Password as a WordArray.
+ *   @param {Object} content - Encrypted content buffer.
+ *   @param {Object} encryptor - Encryptor object.
+ *   @returns {Uint8Array} Decrypted content.
+ *
+ * @method decrypt
+ *   Main entry point for decryption. Verifies password and decrypts content.
+ *   @param {Object} einfo - Encryption info object.
+ *   @param {Object} data - Data object containing encrypted content.
+ *   @param {Object} opts - Options object, must include 'password'.
+ *   @returns {Uint8Array} Decrypted content.
+ *   @throws {Error} If password is missing or incorrect.
+ */
 var Ecma376Agile = {
 	BLOCK_KEYS: {
 		dataIntegrity: {
@@ -571,6 +628,7 @@ var Ecma376Agile = {
 	HEADER_SIZE: 4,	// contents header size
 	CHUNK_SIZE: 32768, // Chunk size for processing
 	FILL_VALUE: 0x36,	// fill value
+
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
 		for (let i = 0; i < spinCount; i++) {
@@ -604,12 +662,13 @@ var Ecma376Agile = {
 	},
 	getEncryptor: function(einfo) {
 		const encryptor = einfo.encs[0];
-		return toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+		toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
+		return encryptor;
 	},
 	verifyPassword: function(passwordW, encryptor) {
-		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
 		const saltValueW = createWordArray(saltValue);
-		const cipherMode = this.getCipherMode(cipherChaining);
 		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.input);
 		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.value);
 		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
@@ -618,9 +677,8 @@ var Ecma376Agile = {
 		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
 	},
 	decryptContent: function(passwordW, content, encryptor) {
-		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedKeyValue, blockSize} = encryptor;
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue, blockSize} = encryptor;
 		const saltValueW = createWordArray(saltValue);
-		const cipherMode = this.getCipherMode(cipherChaining);
 		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
 		const packageKey = this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
 		const len = content.length;
@@ -653,8 +711,8 @@ var Ecma376Agile = {
 		const encryptor = this.getEncryptor(einfo);
 		const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
 		if (!this.verifyPassword(passwordW, encryptor)) {
-			console.error('password is incorrect');
-			// throw new Error('password is incorrect');
+			// console.error('password is incorrect');
+			throw new Error('password is incorrect');
 		}
 		return this.decryptContent(passwordW, data.content, encryptor);
 	}
