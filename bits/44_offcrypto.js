@@ -162,6 +162,7 @@ function parse_EncInfoAgl(blob/*::, vers*/) {
 			default: throw y[0];
 		}
 	});
+	// o.$raw = Xml.xmlStrToObject(xml);
 	return o;
 }
 
@@ -354,7 +355,10 @@ function decrypt(einfo, data, cfb, opts) {
 function createWordArray(buf) {
 	if (!(buf instanceof Uint8Array)) {
 		if (typeof buf === 'string') {
-			return CryptoJS.enc.Hex.parse(buf);
+			if (/^[0-9a-f]+$/i.test(buf))
+				return CryptoJS.enc.Hex.parse(buf);
+			else
+				return CryptoJS.enc.Base64.parse(buf);
 		}
 		if (Array.isArray(buf)) {
 			buf = new Uint8Array(buf);
@@ -363,13 +367,18 @@ function createWordArray(buf) {
 	return CryptoJS.lib.WordArray.create(buf);
 }
 // Convert a CryptoJS WordArray to a Uint8Array
-function wordArrayToUint8Array(wa, sz) {
-	const size = sz || wa.sigBytes;
+function wordArrayToUint8Array(wa, sz, fill = 0x0) {
+	const bsz = wa.sigBytes;
+	const size = sz || bsz;
 	if (size < 0) throw new Error("invalid sigBytes:" + size);
 	const words = wa.words;
 	const ret = new Uint8Array(size);
-	for (let i = 0; i < size; i++) {
+	let i;
+	for (i = 0; i < bsz; i++) {
 		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+	}
+	for (; i < size; i++) {
+		ret[i] = fill;
 	}
 	return ret;
 }
@@ -557,28 +566,52 @@ var Ecma376Agile = {
 			value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
 		},
 	},
-	passwordToKey: function(password, enc) {
-		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
-		const {hashAlgorithm, saltValue, spinCount, keyBits} = enc;
-		let hash = cryptHash(hashAlgorithm, createWordArray(saltValue), passwordW);
-		const count = Number(spinCount);
-		for ( let i = 0; i < count; i++) {
+	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
+		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
+		const repeat = Number(spinCount);
+		for (let i = 0; i < repeat; i++) {
 			const iW = intToWordArrayLE(i);
 			hash = cryptHash(hashAlgorithm, iW, hash);
 		}
+		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
+		return wordArrayToUint8Array(hash, Number(keyBits) / 8, 0x36);
 	},
-	verifyKey: function(key, einfo) {
-
+	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv) {
+		return CryptoJS[cipherAlgorithm].decrypt(
+			{
+				ciphertext: createWordArray(cipher)
+			},
+			createWordArray(key),
+			{
+				iv: iv,
+				mode: CryptoJS.mode[cipherMode],
+				padding: CryptoJS.pad.NoPadding
+			}
+		);
+	},
+	verifyPassword: function(password, enc) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherChaining, encryptedVerifierHashInput, encryptedVerifierHashValue} = enc;
+		const passwordW = CryptoJS.enc.Utf16LE.parse(password);
+		const saltValueW = createWordArray(saltValue);
+		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
+		const cipherMode = m ? m[1] : 'CBC';
+		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.input);
+		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.value);
+		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
+		const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
+		const verifierHash = cryptHash(hashAlgorithm, hashInput);
+		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
+	},
+	decryptContent: function(password, content, enc) {
 	},
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		// throw new Error("not implement yet Ecma376Agile:", einfo);
 		const enc = einfo.encs[0];
-		const key = this.passwordToKey(opts.password, enc);
-		if (!this.verifyKey(opts.password, einfo)) {
+		if (!this.verifyPassword(opts.password, enc)) {
 			throw new Error('password is incorrect');
 		}
-		return this.decryptContent()
+		return this.decryptContent(opts.password, data.content, enc);
 	}
 };
 var Ecma376Extensible = {
