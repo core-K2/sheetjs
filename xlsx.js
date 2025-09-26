@@ -13953,8 +13953,12 @@ function makeFills(v, themes) {
 	if (Array.isArray(dt)) {
 		dt.forEach(function(f) {
 			let obj = f.patternFill;
-			if (obj.fgColor) adjustColor(obj.fgColor, themes);
-			if (obj.bgColor) adjustColor(obj.bgColor, themes);
+			if (obj) {
+				if (obj.fgColor) adjustColor(obj.fgColor, themes);
+				if (obj.bgColor) adjustColor(obj.bgColor, themes);
+			} else {
+				obj = f;
+			}
 			ar.push(obj);
 		});
 	}
