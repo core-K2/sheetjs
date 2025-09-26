@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250925';
+XLSX.version = '0.20.3.20250926';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -12233,7 +12233,7 @@ function parse_EncInfoAgl(blob/*::, vers*/) {
 			default: throw y[0];
 		}
 	});
-	// o.$raw = Xml.xmlStrToObject(xml);
+	o.$raw = Xml.xmlStrToObject(xml);
 	return o;
 }
 
@@ -12422,25 +12422,73 @@ function decrypt(einfo, data, cfb, opts) {
 	throw new Error("Unsupported encryption info format:" + JSON.stringify(einfo), cfb);
 }
 
+// Convert an integer to little-endian
+function toNumberLE(i) {
+	return ((i & 0xff) << 24) |
+		((i & 0xff00) << 8) |
+		((i & 0xff0000) >>> 8) |
+		((i & 0xff000000) >>> 24);
+}
+// Convert an integer to a WordArray
+function intToWordArray(i) {
+	return CryptoJS.lib.WordArray.create([i]);
+}
+// Convert an integer to a WordArray in little-endian format
+function intToWordArrayLE(i) {
+	return intToWordArray(toNumberLE(i));
+}
 // Convert a string or ArrayBuffer to a CryptoJS WordArray
-function createWordArray(buf) {
-	if (!(buf instanceof Uint8Array)) {
-		switch (typeof buf) {
+function createWordArray(v) {
+	if (v) {
+		switch (typeof v) {
 		case 'string':
-			if (/^[0-9a-f]+$/i.test(buf))
-				return CryptoJS.enc.Hex.parse(buf);
+			if (/^[0-9a-f]+$/i.test(v))
+				return CryptoJS.enc.Hex.parse(v);
 			else
-				return CryptoJS.enc.Base64.parse(buf);
+				return CryptoJS.enc.Base64.parse(v);
 		case 'object':
-			if (Array.isArray(buf)) {
-				buf = new Uint8Array(buf);
-			} else if (buf?.hasOwnProperty('sigBytes') && buf.words) {
-				return buf;
+			if (v instanceof Uint8Array) {
+				break;
+			} else if (v.hasOwnProperty('sigBytes') && v.words) {
+				return v.clone();
+			} else if (Array.isArray(v)) {
+				v = new Uint8Array(v);
 			}
 			break;
 		}
 	}
-	return CryptoJS.lib.WordArray.create(buf);
+	return CryptoJS.lib.WordArray.create(v);
+}
+function toUint8Array(v) {
+	if (v) {
+		switch (typeof v) {
+		case 'string':
+			if (/^[0-9a-f]+$/i.test(v))
+				return Uint8Array.fromHex(v);
+			else
+				return Uint8Array.fromBase64(v);
+		case 'object':
+			if (v instanceof Uint8Array) {
+				return v;
+			} else if (!Array.isArray(v)) {
+				v = [v];
+			}
+			break;
+		}
+	}
+	return new Uint8Array(v);
+}
+function fillUint8Array(ar, sz, fill = 0x0) {
+	ar = toUint8Array(ar);
+	const len = ar.length;
+	if (len < sz) {
+		const dt = new Uint8Array(sz).fill(fill);
+		dt.set(ar);
+		return dt;
+	} else if (len > sz) {
+		return ar.slice(0, sz);
+	}
+	return ar;
 }
 // Convert a CryptoJS WordArray to a Uint8Array
 function wordArrayToUint8Array(wa, sz, fill = 0x0) {
@@ -12481,15 +12529,6 @@ function compareUint8Array(a, b) {
 	}
 	return true;
 }
-// Convert an integer to a WordArray in little-endian format
-function intToWordArrayLE(i) {
-	const iBytes = new Uint8Array(4);
-	iBytes[0] = i & 0xff;
-	iBytes[1] = (i >>> 8) & 0xff;
-	iBytes[2] = (i >>> 16) & 0xff;
-	iBytes[3] = (i >>> 24) & 0xff;
-    return createWordArray(iBytes);
-}
 // Concatenate multiple Uint8Arrays into a single Uint8Array
 function concatUint8Arrays(chunks) {
 	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -12507,6 +12546,9 @@ function cryptHash(algo, ...bufs) {
 		hash.update(bufs[i]);
 	}
 	return hash.finalize();
+}
+function isZip(blob) {
+	return blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09;
 }
 
 // ECMA-376 Encryption Decryption
@@ -12688,20 +12730,17 @@ var Ecma376Standard = {
  */
 var Ecma376Agile = {
 	BLOCK_KEYS: {
-		dataIntegrity: {
-			hmacKey: [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6],
-			hmacValue: [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33],
-		},
+		hmacKey: [0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6],
+		hmacValue: [0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33],
 		key: [0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd6],
-		verifierHash: {
-			input: [0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79],
-			value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
-		},
+		input: [0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79],
+		value: [0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
 	},
 	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
 	HEADER_SIZE: 4,	// contents header size
-	CHUNK_SIZE: 32768, // Chunk size for processing
+	CHUNK_SIZE: 4096, // Chunk size for processing
 	FILL_VALUE: 0x36,	// fill value
+	block_keys: {},	// current block keys information
 
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
@@ -12712,7 +12751,7 @@ var Ecma376Agile = {
 		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
 		return wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
 	},
-	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv) {
+	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv, padding = CryptoJS.pad.NoPadding) {
 		return CryptoJS[cipherAlgorithm].decrypt(
 			{
 				ciphertext: createWordArray(cipher)
@@ -12721,7 +12760,7 @@ var Ecma376Agile = {
 			{
 				iv: createWordArray(iv),
 				mode: CryptoJS.mode[cipherMode],
-				padding: CryptoJS.pad.NoPadding
+				padding: padding
 			}
 		);
 	},
@@ -12735,16 +12774,22 @@ var Ecma376Agile = {
 		return m ? m[1] : 'CBC';
 	},
 	getEncryptor: function(einfo) {
-		const encryptor = einfo.encs[0];
-		toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+		// const encryptor = einfo.encs[0];
+		// toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
+		const encryptor = einfo.$raw.keyEncryptors.keyEncryptor.encryptedKey;
 		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
+		const keyLen = encryptor.keyBits / 8;
+		for (let n in this.BLOCK_KEYS) {
+			const ar = this.BLOCK_KEYS[n];
+			this.block_keys[n] = fillUint8Array(ar, keyLen);
+		}
 		return encryptor;
 	},
 	verifyPassword: function(passwordW, encryptor) {
 		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
 		const saltValueW = createWordArray(saltValue);
-		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.input);
-		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.verifierHash.value);
+		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
+		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
 		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
 		const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
 		const verifierHash = cryptHash(hashAlgorithm, hashInput);
@@ -12753,7 +12798,8 @@ var Ecma376Agile = {
 	decryptContent: function(passwordW, content, encryptor) {
 		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue, blockSize} = encryptor;
 		const saltValueW = createWordArray(saltValue);
-		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.block_keys.key);
+		const padding = CryptoJS.pad.Pkcs7;
 		const packageKey = this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
 		const len = content.length;
 		const size = content.read_shift(this.HEADER_SIZE);
@@ -12767,13 +12813,13 @@ var Ecma376Agile = {
 			eIdx = sIdx + chunkLen; 
 			if (eIdx > len) eIdx = len;
 			let buf = content.slice(sIdx + offset, eIdx + offset);
-			const remaind = buf.length % blockSize;
-			if (remaind) {
-				const padding = new Uint8Array(blockSize - remaind).fill(0);
-				buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
-			}
+			// const remaind = buf.length % blockSize;
+			// if (remaind) {
+			// 	const padding = new Uint8Array(blockSize - remaind).fill(0);
+			// 	buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
+			// }
 			const iv = this.createIV(hashAlgorithm, saltValueW, blockSize, i++);
-			const decryptedW = this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv);
+			const decryptedW = this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv, padding);
 			chunks.push(wordArrayToUint8Array(decryptedW));
 		}
 		const result = concatUint8Arrays(chunks);
@@ -12788,7 +12834,11 @@ var Ecma376Agile = {
 			// console.error('password is incorrect');
 			throw new Error('password is incorrect');
 		}
-		return this.decryptContent(passwordW, data.content, encryptor);
+		const blob = this.decryptContent(passwordW, data.content, encryptor);
+		if (!isZip(blob)) {
+			throw new Error('decrypt failed', einfo.$raw, blob.slice(0, 16));
+		}
+		return blob;
 	}
 };
 var Ecma376Extensible = {
@@ -13109,7 +13159,7 @@ async function decrypt_ods(zip, manifest, opts) {
 
 		const blob = new Uint8Array(decrypted);
 		let data;
-		if (blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09) {
+		if (isZip(blob)) {
 			// ZIP ヘッダ検出
 			data = blob;
 		} else {
