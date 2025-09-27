@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20250926';
+XLSX.version = '0.20.3.20250927';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -11893,15 +11893,14 @@ function parse_sst_xml(data, opts) {
 
 function parseStringItem(si) {
 	let sis = [];
-	if (Array.isArray(si)) {
-		si.forEach(s => {
-			let ar = XlsxTextParser.getAsArray(s.r);
-			let t = XlsxTextParser.getText(ar || s.t);
-			let h = XlsxTextParser.getHtml(ar);
-			// let r = JSON.stringify(s);
-			sis.push({t, h});
-		});
-	}
+	if (!Array.isArray(si)) si = [si];
+	si.forEach(s => {
+		let ar = XlsxTextParser.getAsArray(s.r);
+		let t = XlsxTextParser.getText(ar || s.t);
+		let h = XlsxTextParser.getHtml(ar);
+		// let r = JSON.stringify(s);
+		sis.push({t, h});
+	});
 	return sis;
 }
 

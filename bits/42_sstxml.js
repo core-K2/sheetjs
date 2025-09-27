@@ -222,15 +222,14 @@ function parse_sst_xml(data/*:string*/, opts)/*:SST*/ {
 
 function parseStringItem(si) {
 	let sis = [];
-	if (Array.isArray(si)) {
-		si.forEach(s => {
-			let ar = XlsxTextParser.getAsArray(s.r);
-			let t = XlsxTextParser.getText(ar || s.t);
-			let h = XlsxTextParser.getHtml(ar);
-			// let r = JSON.stringify(s);
-			sis.push({t, h});
-		});
-	}
+	if (!Array.isArray(si)) si = [si];
+	si.forEach(s => {
+		let ar = XlsxTextParser.getAsArray(s.r);
+		let t = XlsxTextParser.getText(ar || s.t);
+		let h = XlsxTextParser.getHtml(ar);
+		// let r = JSON.stringify(s);
+		sis.push({t, h});
+	});
 	return sis;
 }
 
