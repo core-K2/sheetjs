@@ -411,7 +411,7 @@ function fillUint8Array(ar, sz, fill = 0x0) {
 	ar = toUint8Array(ar);
 	const len = ar.length;
 	if (len < sz) {
-		const dt = new Uint8Array(sz).fill(fill);
+		const dt = new Uint8Array(sz).fill(fill, len);
 		dt.set(ar);
 		return dt;
 	} else if (len > sz) {
@@ -426,12 +426,9 @@ function wordArrayToUint8Array(wa, sz, fill = 0x0) {
 	if (size < 0) throw new Error("invalid sigBytes:" + size);
 	const words = wa.words;
 	const ret = new Uint8Array(size);
-	let i;
-	for (i = 0; i < bsz; i++) {
+	if (bsz < size) ret.fill(fill, bsz);
+	for (let i = 0; i < bsz; i++) {
 		ret[i] = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-	}
-	for (; i < size; i++) {
-		ret[i] = fill;
 	}
 	return ret;
 }
@@ -443,7 +440,7 @@ function wordArrayXorUint8Array(wa, buf) {
 	if (!buf) {
 		buf = new Uint8Array(size);
 	} else if (buf.length < size) {
-		buf.fill(buf.length, size - buf.length);
+		buf = fillUint8Array(buf, size);
 	}
     for (let i = 0; i < size; i++) {
         buf[i] ^= (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
