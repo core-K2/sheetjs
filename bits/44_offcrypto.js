@@ -710,6 +710,11 @@ var Ecma376Agile = {
 		// }
 		return encryptor;
 	},
+	getKeyData: function(einfo) {
+		const keyData = einfo.$raw.keyData;
+		keyData.cipherMode = this.getCipherMode(keyData.cipherChaining);
+		return keyData;
+	},
 	verifyPassword: function(passwordW, encryptor) {
 		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
 		const saltValueW = createWordArray(saltValue);
@@ -720,12 +725,15 @@ var Ecma376Agile = {
 		const verifierHash = cryptHash(hashAlgorithm, hashInput);
 		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
 	},
-	decryptContent: function(passwordW, content, encryptor) {
-		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue, blockSize} = encryptor;
+	makePackageKey: function(passwordW, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue} = encryptor;
 		const saltValueW = createWordArray(saltValue);
 		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
-		// const padding = CryptoJS.pad.Pkcs7;
-		const packageKey = this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+		return this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+	},
+	decryptContent: function(packageKey, content, keyData) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, cipherMode, blockSize} = keyData;
+		const saltValueW = createWordArray(saltValue);
 		const len = content.length;
 		const size = content.read_shift(this.HEADER_SIZE);
 		const chunks = [];
@@ -736,11 +744,6 @@ var Ecma376Agile = {
 			eIdx = sIdx + chunkLen; 
 			if (eIdx > len) eIdx = len;
 			let buf = content.slice(sIdx, eIdx);
-			// const remaind = buf.length % blockSize;
-			// if (remaind) {
-			// 	const padding = new Uint8Array(blockSize - remaind).fill(0);
-			// 	buf = new Uint8Array([...buf, ...padding]); // Pad with zeros
-			// }
 			const iv = this.createIV(hashAlgorithm, saltValueW, blockSize, i);
 			const decryptedW = this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv);
 			chunks.push(wordArrayToUint8Array(decryptedW));
@@ -757,7 +760,9 @@ var Ecma376Agile = {
 			// console.error('password is incorrect');
 			throw new Error('password is incorrect');
 		}
-		const blob = this.decryptContent(passwordW, data.content, encryptor);
+		const packageKey = this.makePackageKey(passwordW, encryptor);
+		const keyData = this.getKeyData(einfo);
+		const blob = this.decryptContent(packageKey, data.content, keyData);
 		if (!isZip(blob)) {
 			console.error('decrypt failed', einfo.$raw, blob.slice(0, 16));
 			throw new Error('decrypt failed');
