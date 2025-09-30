@@ -12313,7 +12313,6 @@ function checkLibs() {
 
 // decrypt password (Need CryptoJS)
 function decrypt(einfo, data, cfb, opts) {
-	checkLibs('CryptoJS');
 	if (Array.isArray(einfo) && einfo.length === 2) {
 		let type = einfo[0];
 		switch (type) {
@@ -12367,14 +12366,50 @@ function createWordArray(v) {
 	}
 	return CryptoJS.lib.WordArray.create(v);
 }
+function stringToUint8Array(str, encoding = 'utf-8') {
+	if (encoding === 'utf-16le') {
+		const bytes = new Uint8Array(str.length * 2);
+		for (let i = 0; i < str.length; i++) {
+			const code = str.charCodeAt(i);
+			bytes[i * 2] = code & 0xff;
+			bytes[i * 2 + 1] = (code >> 8) & 0xff;
+		}
+		return bytes;
+	}
+	const encoder = new TextEncoder(encoding);
+	return encoder.encode(str);
+}
+function intToArrayLE(i) {
+	const buf = new Uint8Array(4);
+	buf[0] = i & 0xff;
+	buf[1] = (i >>> 8) & 0xff;
+	buf[2] = (i >>> 16) & 0xff;
+	buf[3] = (i >>> 24) & 0xff;
+	return buf;
+}
 function toUint8Array(v) {
 	if (v) {
 		switch (typeof v) {
 		case 'string':
-			if (/^[0-9a-f]+$/i.test(v))
-				return Uint8Array.fromHex(v);
-			else
-				return Uint8Array.fromBase64(v);
+			if (/^[0-9a-f]+$/i.test(v)) {
+				try {
+					return Uint8Array.fromHex
+						? Uint8Array.fromHex(v)
+						: new Uint8Array(v.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+				} catch (e) {
+					throw new Error('Invalid hex string');
+				}
+			} else {
+				try {
+					return Uint8Array.fromBase64
+						? Uint8Array.fromBase64(v)
+						: new Uint8Array(atob(v).split('').map(c => c.charCodeAt(0)));
+				} catch (e) {
+					throw new Error('Invalid base64 string');
+				}
+			}
+		case 'number':
+			return intToArrayLE(v);
 		case 'object':
 			if (v instanceof Uint8Array) {
 				return v;
@@ -12385,6 +12420,9 @@ function toUint8Array(v) {
 		}
 	}
 	return new Uint8Array(v);
+}
+function uint8ArrayToHex(bytes) {
+	return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 function fillUint8Array(ar, sz, fill = 0x0) {
 	ar = toUint8Array(ar);
@@ -12452,12 +12490,24 @@ function cryptHash(algo, ...bufs) {
 	}
 	return hash.finalize();
 }
+async function cryptWebHash(algo = 'SHA-512', ...bufs) {
+	let data = new Uint8Array();
+	for (let buf of bufs) {
+		let uint8Buf = toUint8Array(buf);
+		const newData = new Uint8Array(data.length + uint8Buf.length);
+		newData.set(data, 0);
+		newData.set(uint8Buf, data.length);
+		data = newData;
+	}
+	const hash = await crypto.subtle.digest(algo, data);
+	return new Uint8Array(hash);
+}
 function isZip(blob) {
 	return blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09;
 }
 
 // ECMA-376 Encryption Decryption
-var Ecma376Standard = {
+const Ecma376Standard = {
 	HASH_ALGO: 'SHA1',	// hash algorithm
 	KEY_REPEAT_COUNT: 50000,	// Number of iterations for key derivation
 	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
@@ -12547,6 +12597,7 @@ var Ecma376Standard = {
 	// Returns the decrypted content as a Uint8Array
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
+		checkLibs('CryptoJS');
 		const {Salt, Verifier, VerifierHash} = einfo.v;
 		const {Flags, AlgID, AlgIDHash, KeySize, ProviderType} = einfo.h;
 		if (AlgID !== 0x660E && AlgID !== 0x6801) {
@@ -12557,7 +12608,7 @@ var Ecma376Standard = {
 		if (!this.verifyKey(key, Verifier, VerifierHash)) {
 			throw new Error("Password verification failed");
 		}
-		return this.decryptContent(key, data.content);
+		return readSync(this.decryptContent(key, data.content), opts);
 	}
 };
 
@@ -12632,7 +12683,7 @@ var Ecma376Standard = {
  *   @returns {Uint8Array} Decrypted content.
  *   @throws {Error} If password is missing or incorrect.
  */
-var Ecma376Agile = {
+const Ecma376Agile = {
 	BLOCK_KEYS: {
 		input:		[0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79],
 		value:		[0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e],
@@ -12648,8 +12699,7 @@ var Ecma376Agile = {
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
 		for (let i = 0; i < spinCount; i++) {
-			const iW = intToWordArrayLE(i);
-			hash = cryptHash(hashAlgorithm, iW, hash);
+			hash = cryptHash(hashAlgorithm, intToWordArrayLE(i), hash);
 		}
 		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
 		return wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
@@ -12724,6 +12774,7 @@ var Ecma376Agile = {
 	},
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
+		checkLibs('CryptoJS');
 		// throw new Error("not implement yet Ecma376Agile:", einfo);
 		const encryptor = this.getEncryptor(einfo);
 		const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
@@ -12738,10 +12789,188 @@ var Ecma376Agile = {
 			console.error('decrypt failed', einfo.$raw, blob.slice(0, 16));
 			throw new Error('decrypt failed');
 		}
-		return blob;
+		return readSync(blob, opts);
 	}
 };
-var Ecma376Extensible = {
+const Ecma376AgileWebAPI = {
+	BLOCK_KEYS: {
+		input: new Uint8Array([0xfe, 0xa7, 0xd2, 0x76, 0x3b, 0x4b, 0x9e, 0x79]),
+		value: new Uint8Array([0xd7, 0xaa, 0x0f, 0x6d, 0x30, 0x61, 0x34, 0x4e]),
+		key: new Uint8Array([0x14, 0x6e, 0x0b, 0xe7, 0xab, 0xac, 0xd0, 0xd6]),
+		hmacKey: new Uint8Array([0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6]),
+		hmacValue: new Uint8Array([0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33]),
+	},
+	CONTENT_OFFSET: 8,
+	HEADER_SIZE: 4,
+	CHUNK_SIZE: 4096,
+	FILL_VALUE: 0x36,
+
+	async passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
+		const saltValue = toUint8Array(saltValueW);
+		const password = stringToUint8Array(passwordW, 'utf-16le');
+		const keyArray = toUint8Array(key);
+		const iWCache = new Array(spinCount).fill().map((_, i) => intToArrayLE(i));
+		let hash = await cryptWebHash(hashAlgorithm, saltValue, password);
+		for (let i = 0; i < spinCount; i++) {
+			hash = await cryptWebHash(hashAlgorithm, iWCache[i], hash);
+		}
+		hash = await cryptWebHash(hashAlgorithm, hash, keyArray);
+		const size = keyBits / 8;
+		if (hash.length !== size) {
+			const result = new Uint8Array(size);
+			result.fill(this.FILL_VALUE, hash.length);
+			result.set(hash.slice(0, Math.min(hash.length, size)));
+			return result;
+		}
+		return hash;
+	},
+
+	async _decrypt(key, cipher, cipherAlgorithm, cipherMode, iv) {
+		const algo = cipherAlgorithm.toUpperCase() === 'AES' ? `AES-${cipherMode.toUpperCase()}` : cipherAlgorithm;
+		const keyArray = toUint8Array(key);
+		let cipherArray = toUint8Array(cipher);
+		const ivArray = toUint8Array(iv);
+
+		const keyObj = await crypto.subtle.importKey(
+			'raw',
+			keyArray,
+			{ name: algo },
+			false,
+			['decrypt']
+		);
+		try {
+			const decrypted = await crypto.subtle.decrypt(
+				{
+					name: algo,
+					iv: ivArray,
+				},
+				keyObj,
+				cipherArray
+			);
+			let result = new Uint8Array(decrypted);
+			if (algo === 'AES-CBC') {
+				const padLength = result[result.length - 1];
+				if (padLength > 0 && padLength <= 16 && result.slice(-padLength).every(b => b === padLength)) {
+					console.log(`Removing PKCS#7 padding of length ${padLength}`);
+					result = result.slice(0, -padLength);
+				} else {
+					console.log('No valid PKCS#7 padding detected, assuming NoPadding');
+				}
+			}
+			return result;
+		} catch (e) {
+			console.error('Decryption error:', e.message, {
+				algo,
+				key: uint8ArrayToHex(keyArray),
+				iv: uint8ArrayToHex(ivArray),
+				cipher: uint8ArrayToHex(cipherArray.slice(0, 32)),
+			});
+			throw e;
+		}
+	},
+
+	async createIV(hashAlgorithm, saltValueW, blockSize, blockKey) {
+		const saltValue = toUint8Array(saltValueW);
+		const blockKeyArray = typeof blockKey === 'number' ? intToArrayLE(blockKey) : toUint8Array(blockKey);
+		const iv = await cryptWebHash(hashAlgorithm, saltValue, blockKeyArray);
+		const size = blockSize;
+		if (iv.length !== size) {
+			const result = new Uint8Array(size);
+			result.fill(this.FILL_VALUE, iv.length);
+			result.set(iv.slice(0, Math.min(iv.length, size)));
+			return result;
+		}
+		return iv;
+	},
+
+	getCipherMode(cipherChaining) {
+		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
+		return m ? m[1] : 'CBC';
+	},
+
+	getWebAPIAlogorithm(algorithm) {
+		const m = /^([a-z]+)(\d+)$/i.exec(algorithm);
+		return m ? m[1].toUpperCase() + '-' + m[2] : algorithm;
+	},
+
+	getEncryptor(einfo) {
+		const encryptor = einfo.$raw.keyEncryptors.keyEncryptor.encryptedKey;
+		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
+		encryptor.hashAlgorithm = this.getWebAPIAlogorithm(encryptor.hashAlgorithm);
+		return encryptor;
+	},
+
+	getKeyData(einfo) {
+		const keyData = einfo.$raw.keyData;
+		keyData.cipherMode = this.getCipherMode(keyData.cipherChaining);
+		keyData.hashAlgorithm = this.getWebAPIAlogorithm(keyData.hashAlgorithm);
+		return keyData;
+	},
+
+	async verifyPassword(passwordW, encryptor) {
+		const { cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue } = encryptor;
+		const saltValueW = toUint8Array(saltValue);
+		const keyInput = await this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
+		const keyValue = await this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
+		const hashInput = await this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
+		const hashValue = await this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
+		const verifierHash = await cryptWebHash(hashAlgorithm, hashInput);
+		return uint8ArrayToHex(verifierHash) === uint8ArrayToHex(hashValue);
+	},
+
+	async makePackageKey(passwordW, encryptor) {
+		const { cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue } = encryptor;
+		const saltValueW = toUint8Array(saltValue);
+		const key = await this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		return await this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+	},
+
+	async decryptContent(packageKey, content, keyData) {
+		const { cipherAlgorithm, hashAlgorithm, saltValue, cipherMode, blockSize } = keyData;
+		const saltValueW = toUint8Array(saltValue);
+		const len = content.length;
+		const size = new DataView(content.buffer, content.byteOffset, this.HEADER_SIZE).getUint32(0, true);
+		const chunks = [];
+		const chunkLen = this.CHUNK_SIZE;
+		let sIdx = this.CONTENT_OFFSET, eIdx = this.CONTENT_OFFSET;
+		for (let i = 0; eIdx < len; i++) {
+			sIdx = eIdx;
+			eIdx = sIdx + chunkLen;
+			if (eIdx > len) eIdx = len;
+			let buf = content.slice(sIdx, eIdx);
+			if (buf.length % 16 !== 0) {
+			const padded = new Uint8Array(Math.ceil(buf.length / 16) * 16);
+			padded.set(buf);
+			padded.fill(16, buf.length);
+			buf = padded;
+			}
+			const iv = await this.createIV(hashAlgorithm, saltValueW, blockSize, i);
+			const decrypted = await this._decrypt(packageKey, buf, cipherAlgorithm, cipherMode, iv);
+			chunks.push(decrypted);
+		}
+		const result = concatUint8Arrays(chunks);
+		return result.slice(0, size);
+	},
+
+	async decrypt(einfo, data, opts) {
+		if (!opts?.password) throw new Error('need password');
+		const encryptor = this.getEncryptor(einfo);
+		const passwordW = opts.password;
+		if (!(await this.verifyPassword(passwordW, encryptor))) {
+			throw new Error('password is incorrect');
+		}
+		const packageKey = await this.makePackageKey(passwordW, encryptor);
+		const keyData = this.getKeyData(einfo);
+		const blob = await this.decryptContent(packageKey, data.content, keyData);
+		if (!isZip(blob)) {
+			console.error('decrypt failed', einfo.$raw, blob.slice(0, 16));
+			throw new Error('decrypt failed');
+		}
+		return readSync(blob, opts);
+	},
+};
+
+const Ecma376Extensible = {
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		throw new Error("not implement yet Ecma376Extensible:", einfo);
@@ -12755,7 +12984,7 @@ var Ecma376Extensible = {
 // The decrypt function decrypts the actual data using the derived key from the password.
 // Note: The RC4 algorithm is considered weak and is not recommended for secure applications.
 // This implementation is provided for compatibility with legacy formats that use RC4 encryption.
-var Rc4 = {
+const Rc4 = {
 	// Block size for processing data in chunks
 	BLOCK_SIZE: 0x200, // 512 bytes
 
@@ -12851,7 +13080,7 @@ var Rc4 = {
 // It processes the file in chunks, deriving a new key for each chunk based on the block number.
 // The decrypt function takes the FilePass structure, the encrypted data, and options including the password.
 // It returns the decrypted content as a Uint8Array.
-var Xls97 = {
+const Xls97 = {
 	// Size of each block for key derivation
 	BLOCK_SIZE: 1024,
 
@@ -31452,8 +31681,7 @@ if(einfo[0] == 0x04 && typeof decrypt_agile !== 'undefined') return decrypt_agil
 /*global decrypt_std76 */
 if(einfo[0] == 0x02 && typeof decrypt_std76 !== 'undefined') return decrypt_std76(einfo[1], data.content, pass, opts);
 	if (pass && typeof CryptoJS !== 'undefined' && typeof decrypt === 'function') {
-		const dt = decrypt(einfo, data, cfb, opts);
-		if (dt) return readSync(dt, opts);
+		return decrypt(einfo, data, cfb, opts);
 	}
 	throw new Error("File is password-protected");
 }
