@@ -661,11 +661,10 @@ var Ecma376Agile = {
 		hmacKey:	[0x5f, 0xb2, 0xad, 0x01, 0x0c, 0xb9, 0xe1, 0xf6],
 		hmacValue:	[0xa0, 0x67, 0x7f, 0x02, 0xb2, 0x2c, 0x84, 0x33],
 	},
-	CONTENT_OFFSET: 8, // Offset to the content in the encrypted data
-	HEADER_SIZE: 4,	// contents header size
-	CHUNK_SIZE: 4096, // Chunk size for processing
+	CONTENT_OFFSET: 8,	// Offset to the content in the encrypted data
+	HEADER_SIZE: 4,		// contents header size
+	CHUNK_SIZE: 4096,	// Chunk size for processing
 	FILL_VALUE: 0x36,	// fill value
-	// block_keys: {},	// current block keys information
 
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
@@ -699,15 +698,8 @@ var Ecma376Agile = {
 		return m ? m[1] : 'CBC';
 	},
 	getEncryptor: function(einfo) {
-		// const encryptor = einfo.encs[0];
-		// toNumberInObject(encryptor, 'spinCount,blockSize,keyBits');
 		const encryptor = einfo.$raw.keyEncryptors.keyEncryptor.encryptedKey;
 		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
-		// const keySize = encryptor.keyBits / 8;
-		// for (let n in this.BLOCK_KEYS) {
-		// 	const ar = this.BLOCK_KEYS[n];
-		// 	this.block_keys[n] = fillUint8Array(ar, keySize);
-		// }
 		return encryptor;
 	},
 	getKeyData: function(einfo) {
