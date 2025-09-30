@@ -523,6 +523,14 @@ async function cryptWebHash(algo = 'SHA-512', ...bufs) {
 	const hash = await crypto.subtle.digest(algo, data);
 	return new Uint8Array(hash);
 }
+function getCipherMode(cipherChaining) {
+	const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
+	return m ? m[1] : 'CBC';
+}
+function getWebAPIAlogorithm(algorithm) {
+	const m = /^([a-z]+)(\d+)$/i.exec(algorithm);
+	return m ? m[1].toUpperCase() + '-' + m[2] : algorithm;
+}
 function isZip(blob) {
 	return blob[0] === 0x50 && blob[1] === 0x4B && blob[2] < 0x09 && blob[3] < 0x09;
 }
@@ -673,11 +681,6 @@ const Ecma376Standard = {
  *   @param {number|Array|CryptoJS.lib.WordArray} blockKey - Block key or block index.
  *   @returns {Uint8Array} Initialization vector.
  *
- * @method getCipherMode
- *   Extracts cipher mode from chaining mode string.
- *   @param {string} cipherChaining - Chaining mode string.
- *   @returns {string} Cipher mode (e.g., CBC).
- *
  * @method getEncryptor
  *   Retrieves and normalizes the encryptor object from encryption info.
  *   @param {Object} einfo - Encryption info object.
@@ -718,12 +721,15 @@ const Ecma376Agile = {
 	FILL_VALUE: 0x36,	// fill value
 
 	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
+		const t = performance.now();
 		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
 		for (let i = 0; i < spinCount; i++) {
 			hash = cryptHash(hashAlgorithm, intToWordArrayLE(i), hash);
 		}
 		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
-		return wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
+		const ret = wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
+		console.log('passwordToKey', performance.now() - t);
+		return ret;
 	},
 	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv, padding = CryptoJS.pad.NoPadding) {
 		return CryptoJS[cipherAlgorithm].decrypt(
@@ -743,18 +749,14 @@ const Ecma376Agile = {
 		let iv = cryptHash(hashAlgorithm, saltValueW, blockKey);
 		return wordArrayToUint8Array(iv, blockSize, this.FILL_VALUE);
 	},
-	getCipherMode: function(cipherChaining) {
-		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
-		return m ? m[1] : 'CBC';
-	},
 	getEncryptor: function(einfo) {
 		const encryptor = einfo.$raw.keyEncryptors.keyEncryptor.encryptedKey;
-		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
+		encryptor.cipherMode = getCipherMode(encryptor.cipherChaining);
 		return encryptor;
 	},
 	getKeyData: function(einfo) {
 		const keyData = einfo.$raw.keyData;
-		keyData.cipherMode = this.getCipherMode(keyData.cipherChaining);
+		keyData.cipherMode = getCipherMode(keyData.cipherChaining);
 		return keyData;
 	},
 	verifyPassword: function(passwordW, encryptor) {
@@ -796,9 +798,9 @@ const Ecma376Agile = {
 	decrypt: function(einfo, data, opts) {
 		if (!opts?.password) throw new Error('need password');
 		checkLibs('CryptoJS');
-		// throw new Error("not implement yet Ecma376Agile:", einfo);
 		const encryptor = this.getEncryptor(einfo);
 		const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
+		// const passwordW = stringToUint8Array(opts.password);
 		if (!this.verifyPassword(passwordW, encryptor)) {
 			// console.error('password is incorrect');
 			throw new Error('password is incorrect');
@@ -903,28 +905,16 @@ const Ecma376AgileWebAPI = {
 		}
 		return iv;
 	},
-
-	getCipherMode(cipherChaining) {
-		const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
-		return m ? m[1] : 'CBC';
-	},
-
-	getWebAPIAlogorithm(algorithm) {
-		const m = /^([a-z]+)(\d+)$/i.exec(algorithm);
-		return m ? m[1].toUpperCase() + '-' + m[2] : algorithm;
-	},
-
 	getEncryptor(einfo) {
 		const encryptor = einfo.$raw.keyEncryptors.keyEncryptor.encryptedKey;
-		encryptor.cipherMode = this.getCipherMode(encryptor.cipherChaining);
-		encryptor.hashAlgorithm = this.getWebAPIAlogorithm(encryptor.hashAlgorithm);
+		encryptor.cipherMode = getCipherMode(encryptor.cipherChaining);
+		encryptor.hashAlgorithm = getWebAPIAlogorithm(encryptor.hashAlgorithm);
 		return encryptor;
 	},
-
 	getKeyData(einfo) {
 		const keyData = einfo.$raw.keyData;
-		keyData.cipherMode = this.getCipherMode(keyData.cipherChaining);
-		keyData.hashAlgorithm = this.getWebAPIAlogorithm(keyData.hashAlgorithm);
+		keyData.cipherMode = getCipherMode(keyData.cipherChaining);
+		keyData.hashAlgorithm = getWebAPIAlogorithm(keyData.hashAlgorithm);
 		return keyData;
 	},
 
