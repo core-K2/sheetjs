@@ -347,8 +347,7 @@ function parse_xlsxcfb(cfb, _opts/*:?ParseOpts*/)/*:Workbook*/ {
 /*:: declare var decrypt_std76:any; */
 	if(einfo[0] == 0x02 && typeof decrypt_std76 !== 'undefined') return decrypt_std76(einfo[1], data.content, pass, opts);
 	if (pass && typeof CryptoJS !== 'undefined' && typeof decrypt === 'function') {
-		const dt = decrypt(einfo, data, cfb, opts);
-		if (dt) return readSync(dt, opts);
+		return decrypt(einfo, data, cfb, opts);
 	}
 	throw new Error("File is password-protected");
 }
