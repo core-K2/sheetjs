@@ -522,10 +522,10 @@ async function cryptWebHash(algo = 'SHA-512', ...bufs) {
 	const hash = await crypto.subtle.digest(algo, data);
 	return new Uint8Array(hash);
 }
-async function cryptWebSpinHash(algo, hash, spinCount, start = 0) {
+async function cryptWebSpinHash(algo, hash, spinCount, startValue = 0) {
 	const hlen = 4;
 	const ia = new Uint8Array(hash.length + hlen);
-	if (start) ia.set(intToArrayLE(start), 0);
+	if (startValue) ia.set(intToArrayLE(startValue), 0);
 	else ia.fill(0, hlen);
 	for (let i = 0; i < spinCount; i++) {
 		ia.set(hash, hlen);
@@ -731,24 +731,24 @@ const Ecma376Agile = {
 	CHUNK_SIZE: 4096,	// Chunk size for processing
 	FILL_VALUE: 0x36,	// fill value
 
-	// passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
-	// 	const t = performance.now();
-	// 	let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
-	// 	for (let i = 0; i < spinCount; i++) {
-	// 		hash = cryptHash(hashAlgorithm, intToWordArrayLE(i), hash);
-	// 	}
-	// 	hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
-	// 	const ret = wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
-	// 	console.log('passwordToKey', performance.now() - t);
-	// 	return ret;
-	// },
-	passwordToKey: async function(password, hashAlgorithm, saltValue, spinCount, keyBits, key) {
-		const t = performance.now();
+	passwordToKey: function(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, key) {
+		// const t = performance.now();
+		let hash = cryptHash(hashAlgorithm, saltValueW, passwordW);
+		for (let i = 0; i < spinCount; i++) {
+			hash = cryptHash(hashAlgorithm, intToWordArrayLE(i), hash);
+		}
+		hash = cryptHash(hashAlgorithm, hash, createWordArray(key));
+		const ret = wordArrayToUint8Array(hash, keyBits / 8, this.FILL_VALUE);
+		// console.log('passwordToKey', performance.now() - t);
+		return ret;
+	},
+	passwordToKeyA: async function(password, hashAlgorithm, saltValue, spinCount, keyBits, key) {
+		// const t = performance.now();
 		let hash = await cryptWebHash(hashAlgorithm, saltValue, password);
 		hash = await cryptWebSpinHash(hashAlgorithm, hash, spinCount);
 		hash = await cryptWebHash(hashAlgorithm, hash, toUint8Array(key));
 		hash = fillUint8Array(hash, keyBits / 8, this.FILL_VALUE);
-		console.log('passwordToKey', performance.now() - t);
+		// console.log('passwordToKey', performance.now() - t);
 		return hash;
 	},
 	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv, padding = CryptoJS.pad.NoPadding) {
@@ -781,36 +781,36 @@ const Ecma376Agile = {
 		keyData.hashAlgorithmWeb = getWebAPIAlogorithm(keyData.hashAlgorithm);
 		return keyData;
 	},
-	// verifyPassword: function(passwordW, encryptor) {
-	// 	const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
-	// 	const saltValueW = createWordArray(saltValue);
-	// 	const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
-	// 	const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
-	// 	const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
-	// 	const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
-	// 	const verifierHash = cryptHash(hashAlgorithm, hashInput);
-	// 	return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
-	// },
-	verifyPassword: async function(password, encryptor) {
-		const {cipherAlgorithm, hashAlgorithm, hashAlgorithmWeb, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
-		const saltValueW = toUint8Array(saltValue);
-		const keyInput = await this.passwordToKey(password, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
-		const keyValue = await this.passwordToKey(password, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
+	verifyPassword: function(passwordW, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const keyInput = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
+		const keyValue = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
 		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
 		const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
 		const verifierHash = cryptHash(hashAlgorithm, hashInput);
 		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
 	},
-	// makePackageKey: function(passwordW, encryptor) {
-	// 	const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue} = encryptor;
-	// 	const saltValueW = createWordArray(saltValue);
-	// 	const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
-	// 	return this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
-	// },
-	makePackageKey: async function(passwordW, encryptor) {
+	verifyPasswordA: async function(password, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, hashAlgorithmWeb, saltValue, spinCount, keyBits, cipherMode, encryptedVerifierHashInput, encryptedVerifierHashValue} = encryptor;
+		const saltValueW = toUint8Array(saltValue);
+		const keyInput = await this.passwordToKeyA(password, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.input);
+		const keyValue = await this.passwordToKeyA(password, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.value);
+		const hashInput = this._decrypt(keyInput, encryptedVerifierHashInput, cipherAlgorithm, cipherMode, saltValueW);
+		const hashValue = this._decrypt(keyValue, encryptedVerifierHashValue, cipherAlgorithm, cipherMode, saltValueW);
+		const verifierHash = cryptHash(hashAlgorithm, hashInput);
+		return verifierHash.toString(CryptoJS.enc.Hex) === hashValue.toString(CryptoJS.enc.Hex);
+	},
+	makePackageKey: function(passwordW, encryptor) {
+		const {cipherAlgorithm, hashAlgorithm, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue} = encryptor;
+		const saltValueW = createWordArray(saltValue);
+		const key = this.passwordToKey(passwordW, hashAlgorithm, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		return this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
+	},
+	makePackageKeyA: async function(passwordW, encryptor) {
 		const {cipherAlgorithm, hashAlgorithmWeb, saltValue, spinCount, keyBits, cipherMode, encryptedKeyValue} = encryptor;
 		const saltValueW = toUint8Array(saltValue);
-		const key = await this.passwordToKey(passwordW, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
+		const key = await this.passwordToKeyA(passwordW, hashAlgorithmWeb, saltValueW, spinCount, keyBits, this.BLOCK_KEYS.key);
 		return this._decrypt(key, encryptedKeyValue, cipherAlgorithm, cipherMode, saltValueW);
 	},
 	decryptContent: function(packageKey, content, keyData) {
@@ -837,12 +837,16 @@ const Ecma376Agile = {
 		if (!opts?.password) throw new Error('need password');
 		checkLibs('CryptoJS');
 		const encryptor = this.getEncryptor(einfo);
-		// const passwordW = CryptoJS.enc.Utf16LE.parse(opts.password);
-		const passwordW = stringToUint8Array(opts.password);
-		if (!(await this.verifyPassword(passwordW, encryptor))) {
-			throw new Error('password is incorrect');
-		}
-		const packageKey = await this.makePackageKey(passwordW, encryptor);
+		const passwordW = opts.useAsync ?
+			stringToUint8Array(opts.password) :
+			CryptoJS.enc.Utf16LE.parse(opts.password);
+		const valid = opts.useAsync ?
+			await this.verifyPasswordA(passwordW, encryptor) :
+			this.verifyPassword(passwordW, encryptor);
+		if (!valid) throw new Error('password is incorrect');
+		const packageKey = opts.useAsync ?
+			await this.makePackageKeyA(passwordW, encryptor) :
+			this.makePackageKey(passwordW, encryptor);
 		const keyData = this.getKeyData(einfo);
 		const blob = this.decryptContent(packageKey, data.content, keyData);
 		if (!isZip(blob)) {
