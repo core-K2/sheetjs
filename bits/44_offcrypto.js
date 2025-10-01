@@ -496,12 +496,16 @@ function compareUint8Array(a, b) {
 }
 // Concatenate multiple Uint8Arrays into a single Uint8Array
 function concatUint8Arrays(chunks) {
-	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-	const ret = new Uint8Array(total);
-	let offset = 0;
+	let ret = null;
 	for (const chunk of chunks) {
-		ret.set(chunk, offset);
-		offset += chunk.length;
+		if (!ret) {
+			ret = chunk;
+		} else {
+			const data = new Uint8Array(ret.length + chunk.length);
+			data.set(ret, 0);
+			data.set(chunk, ret.length);
+			ret = data;
+		}
 	}
 	return ret;
 }
@@ -514,15 +518,21 @@ function cryptHash(algo, ...bufs) {
 }
 // bufs allow Uint8Array only
 async function cryptWebHash(algo = 'SHA-512', ...bufs) {
-	let data = new Uint8Array();
-	for (let buf of bufs) {
-		const newData = new Uint8Array(data.length + buf.length);
-		newData.set(data, 0);
-		newData.set(buf, data.length);
-		data = newData;
-	}
+	const data = concatUint8Arrays(bufs);
 	const hash = await crypto.subtle.digest(algo, data);
 	return new Uint8Array(hash);
+}
+async function cryptWebSpinHash(algo, hash, spinCount, start = 0) {
+	const hlen = 4;
+	const ia = new Uint8Array(hash.length + hlen);
+	if (start) ia.set(intToArrayLE(start), 0);
+	else ia.fill(0, hlen);
+	for (let i = 0; i < spinCount; i++) {
+		ia.set(hash, hlen);
+		hash = await cryptWebHash(algo, ia);
+		if (++ia[0]>255) if (++ia[1]>255) if (++ia[2]>255) ++ia[3];
+	}
+	return hash;
 }
 function getCipherMode(cipherChaining) {
 	const m = /^ChainingMode([A-Z]+)$/.exec(cipherChaining);
@@ -733,14 +743,12 @@ const Ecma376Agile = {
 	// 	return ret;
 	// },
 	passwordToKey: async function(password, hashAlgorithm, saltValue, spinCount, keyBits, key) {
-		// const t = performance.now();
+		const t = performance.now();
 		let hash = await cryptWebHash(hashAlgorithm, saltValue, password);
-		for (let i = 0; i < spinCount; i++) {
-			hash = await cryptWebHash(hashAlgorithm, intToArrayLE(i), hash);
-		}
+		hash = await cryptWebSpinHash(hashAlgorithm, hash, spinCount);
 		hash = await cryptWebHash(hashAlgorithm, hash, toUint8Array(key));
 		hash = fillUint8Array(hash, keyBits / 8, this.FILL_VALUE);
-		// console.log('passwordToKey', performance.now() - t);
+		console.log('passwordToKey', performance.now() - t);
 		return hash;
 	},
 	_decrypt: function(key, cipher, cipherAlgorithm, cipherMode, iv, padding = CryptoJS.pad.NoPadding) {
