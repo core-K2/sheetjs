@@ -85,6 +85,10 @@ function safe_parse_sheet(zip, path/*:string*/, relsPath/*:string*/, sheet, idx/
 			case RELS.VML:
 				relDraw = '!vml';
 				break;
+			case RELS.TABLE:
+				dfile = resolve_path(rel.Target, path);
+				_ws.$table = parse_xml(getzipdata(zip, dfile, true));
+				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);
 				break;

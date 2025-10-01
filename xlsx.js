@@ -7017,6 +7017,7 @@ var RELS = ({
 	PRN_SETT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings',
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
 	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+	TABLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
 });
 
 /* 9.3.3 Representing Relationships */
@@ -31449,6 +31450,10 @@ function safe_parse_sheet(zip, path, relsPath, sheet, idx, sheetRels, sheets, st
 				break;
 			case RELS.VML:
 				relDraw = '!vml';
+				break;
+			case RELS.TABLE:
+				dfile = resolve_path(rel.Target, path);
+				_ws.$table = parse_xml(getzipdata(zip, dfile, true));
 				break;
 			default:
 				console.warn('Not implement rels:', rel.Type);

@@ -34,6 +34,7 @@ var RELS = ({
 	PRN_SETT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings',
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
 	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+	TABLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
 }/*:any*/);
 
 /* 9.3.3 Representing Relationships */
