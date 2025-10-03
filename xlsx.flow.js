@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251001';
+XLSX.version = '0.20.3.20251003';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -12911,16 +12911,16 @@ const Ecma376Agile = {
 		const passwordW = opts.useAsync ?
 			stringToUint8Array(opts.password) :
 			CryptoJS.enc.Utf16LE.parse(opts.password);
-		const valid = opts.useAsync ?
-			await this.verifyPasswordA(passwordW, encryptor) :
-			this.verifyPassword(passwordW, encryptor);
-		if (!valid) throw new Error('password is incorrect');
 		const packageKey = opts.useAsync ?
 			await this.makePackageKeyA(passwordW, encryptor) :
 			this.makePackageKey(passwordW, encryptor);
 		const keyData = this.getKeyData(einfo);
 		const blob = this.decryptContent(packageKey, data.content, keyData);
 		if (!isZip(blob)) {
+			const valid = opts.useAsync ?
+				await this.verifyPasswordA(passwordW, encryptor) :
+				this.verifyPassword(passwordW, encryptor);
+			if (!valid) throw new Error('password is incorrect');
 			console.error('decrypt failed', einfo.$raw, blob.slice(0, 16));
 			throw new Error('decrypt failed');
 		}
