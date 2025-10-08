@@ -1911,7 +1911,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 			}
 		});
 		makeDrawStyle(draw, ass, dss, styles, fonts);
-		let p = draw.p;
+		let p = draw.p || draw['text-box']?.p;
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
 		if (img) {

@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251003';
+XLSX.version = '0.20.3.20251008';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -28144,7 +28144,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 			}
 		});
 		makeDrawStyle(draw, ass, dss, styles, fonts);
-		let p = draw.p;
+		let p = draw.p || draw['text-box']?.p;
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
 		if (img) {
