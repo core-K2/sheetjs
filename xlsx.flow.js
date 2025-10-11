@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251008';
+XLSX.version = '0.20.3.20251011';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -15479,10 +15479,13 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	};
 	let draw = parse_xml(getzipdata(zip, dfile, true), xmlOpts);
 	let ar = draw?.twoCellAnchor;
+	let ar2 = draw?.absoluteAnchor;
 	if (typeof ar !== 'object') ar = [];
 	else if (!Array.isArray(ar)) ar = [ar];
+	if (typeof ar2 !== 'object') ar2 = [];
+	else if (!Array.isArray(ar2)) ar2 = [ar2];
 	addAlterContent(ar, draw?.AlternateContent);
-	if (ar.length < 1) return null;
+	if (ar.length < 1 && ar2.length < 1) return null;
 	let draws = {};
 	let dss = styles?.Draws;
 	if (!dss) {
@@ -15499,6 +15502,41 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		if (sp?.style) {
 			sp.si = getOrAddObject(dss, sp.style);
 			delete sp.style;
+		}
+		let d = draws[cn];
+		if (d) {
+			if (!Array.isArray(d)) d = [d];
+			addOrExShape(d, a);
+			a = d;
+		}
+		draws[cn] = a;
+	});
+	const cn = 'A1';
+	ar2.forEach(a => {
+		let sp = a.sp;
+		if (sp?.style) {
+			sp.si = getOrAddObject(dss, sp.style);
+			delete sp.style;
+		}
+		const pos = a.pos;
+		const ext = a.ext;
+		if (pos && ext) {
+			if (!a.from) {
+				a.from = {
+					col: 0,
+					row: 0,
+					colOff: pos.x,
+					rowOff: pos.y
+				};
+			}
+			if (!a.to) {
+				a.to = {
+					col: 0,
+					row: 0,
+					colOff: pos.x + ext.cx,
+					rowOff: pos.y + ext.cy
+				};
+			}
 		}
 		let d = draws[cn];
 		if (d) {
