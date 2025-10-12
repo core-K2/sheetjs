@@ -113,8 +113,26 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		let rs = {};
 		if (!Array.isArray(rels)) rels = [rels];
 		rels.forEach(r => {
-			rs[r.Id] = getMedia(zip, wb, r, draws)
+			rs[r.Id] = getMedia(zip, wb, r)
 		});
+		for (let n in rs) {
+			const r = rs[n];
+			if (r?.diagramData) {
+				const rid = r?.diagramData?.extLst?.ext?.dataModelExt?.relId;
+				if (rid) {
+					const o = rs[rid];
+					if (o) {
+						for (let m in draws) {
+							const d = draws[m];
+							if (d?.graphicFrame?.graphic?.graphicData?.relIds?.dm === n) {
+								Object.assign(d, o?.diagramDrawing?.spTree);
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
 		ws['!drawRels'] = rs;
 	}
 	return draws;
@@ -147,7 +165,7 @@ function addAlterContent(ar, alt) {
 		}
 	});
 }
-function getMedia(zip, wb, rel, draws) {
+function getMedia(zip, wb, rel) {
 	let media = wb['$media'];
 	if (!media) media = wb['$media'] = {};
 	const t = rel.Target;
@@ -164,23 +182,8 @@ function getMedia(zip, wb, rel, draws) {
 		case RELS.DIAGRAM_COLORS:
 		case RELS.DIAGRAM_LAYOUT:
 		case RELS.DIAGRAM_QSTYLE:
-			const name = type.split('/').at(-1);
 			m = {};
-			const xml = m[name] = parse_xml(getzipdata(zip, path));
-			if (name === 'diagramDrawing') {
-				const match = /(\w+)(\d+)/.exec(rel.Id);
-				let numb = parseInt(match?.[2]);
-				if (!isNaN(numb)) {
-					const rn = match[1] + ++numb;
-					for (let n in draws) {
-						const d = draws[n];
-						if (d?.graphicFrame?.graphic?.graphicData?.relIds?.dm === rn) {
-							Object.assign(d, xml?.spTree);
-							break;
-						}
-					}
-				}
-			}
+			m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
 			break;
 		default:
 			console.warn('Not implement rels type:', rel.Type);
