@@ -4700,6 +4700,19 @@ function analyzeImageData(bstr) {
 		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
 	}
 
+	// EMF (Enhanced Metafile)
+	if (bytes[0] === 0x01 && bytes[1] === 0x00 && bytes[2] === 0x00 && bytes[3] === 0x00) {
+		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
+		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
+		t = 'emf';
+		const left = bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (bytes[11] << 24);
+		const top = bytes[12] | (bytes[13] << 8) | (bytes[14] << 16) | (bytes[15] << 24);
+		const right = bytes[16] | (bytes[17] << 8) | (bytes[18] << 16) | (bytes[19] << 24);
+		const bottom = bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24);
+		w = right - left;
+		h = bottom - top;
+	}
+
 	if (!t) {
 		throw new Error('Unsupported image format', );
 	}
@@ -5063,11 +5076,15 @@ function resolve_path(path, base) {
 }
 
 function getImageAsBase64(zip, path) {
-	let m = analyzeImageData(getzipdata(zip, path, true));
-	m.ext = path.split('.').at(-1);
-	m.data = `data:image/${m.type};base64,${m.b64}`;
-	delete m.b64;
-	return m;
+	try {
+		let m = analyzeImageData(getzipdata(zip, path, true));
+		m.ext = path.split('.').at(-1);
+		m.data = `data:image/${m.type};base64,${m.b64}`;
+		delete m.b64;
+		return m;
+	} catch (e) {
+		return e;
+	}
 }
 var XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
 var attregexg=/\s([^"\s?>\/]+)\s*=\s*((?:")([^"]*)(?:")|(?:')([^']*)(?:')|([^'">\s]+))/g;
