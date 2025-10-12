@@ -112,13 +112,9 @@ function resolve_path(path/*:string*/, base/*:string*/)/*:string*/ {
 }
 
 function getImageAsBase64(zip, path) {
-	try {
-		let m = analyzeImageData(getzipdata(zip, path, true));
-		m.ext = path.split('.').at(-1);
-		m.data = `data:image/${m.type};base64,${m.b64}`;
-		delete m.b64;
-		return m;
-	} catch (e) {
-		return e;
-	}
+	let m = analyzeImageData(getzipdata(zip, path, true));
+	m.ext = path.split('.').at(-1);
+	m.data = `data:image/${m.type};base64,${m.b64}`;
+	delete m.b64;
+	return m;
 }

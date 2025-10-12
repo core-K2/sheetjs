@@ -5076,15 +5076,11 @@ function resolve_path(path, base) {
 }
 
 function getImageAsBase64(zip, path) {
-	try {
-		let m = analyzeImageData(getzipdata(zip, path, true));
-		m.ext = path.split('.').at(-1);
-		m.data = `data:image/${m.type};base64,${m.b64}`;
-		delete m.b64;
-		return m;
-	} catch (e) {
-		return e;
-	}
+	let m = analyzeImageData(getzipdata(zip, path, true));
+	m.ext = path.split('.').at(-1);
+	m.data = `data:image/${m.type};base64,${m.b64}`;
+	delete m.b64;
+	return m;
 }
 var XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
 var attregexg=/\s([^"\s?>\/]+)\s*=\s*((?:")([^"]*)(?:")|(?:')([^']*)(?:')|([^'">\s]+))/g;
