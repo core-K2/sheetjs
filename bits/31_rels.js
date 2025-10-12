@@ -35,6 +35,11 @@ var RELS = ({
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
 	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
 	TABLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
+	DIAGRAM_DRAWING: "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+	DIAGRAM_DATA: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+	DIAGRAM_COLORS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+	DIAGRAM_LAYOUT: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+	DIAGRAM_QSTYLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
 }/*:any*/);
 
 /* 9.3.3 Representing Relationships */
