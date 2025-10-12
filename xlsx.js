@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251011';
+XLSX.version = '0.20.3.20251012';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -7018,6 +7018,11 @@ var RELS = ({
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
 	CTL_PROP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
 	TABLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table",
+	DIAGRAM_DRAWING: "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
+	DIAGRAM_DATA: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
+	DIAGRAM_COLORS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
+	DIAGRAM_LAYOUT: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
+	DIAGRAM_QSTYLE: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
 });
 
 /* 9.3.3 Representing Relationships */
@@ -15468,6 +15473,24 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		rels.forEach(r => {
 			rs[r.Id] = getMedia(zip, wb, r)
 		});
+		for (let n in rs) {
+			const r = rs[n];
+			if (r?.diagramData) {
+				const rid = r?.diagramData?.extLst?.ext?.dataModelExt?.relId;
+				if (rid) {
+					const o = rs[rid];
+					if (o) {
+						for (let m in draws) {
+							const d = draws[m];
+							if (d?.graphicFrame?.graphic?.graphicData?.relIds?.dm === n) {
+								Object.assign(d, o?.diagramDrawing?.spTree);
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
 		ws['!drawRels'] = rs;
 	}
 	return draws;
@@ -15503,12 +15526,22 @@ function addAlterContent(ar, alt) {
 function getMedia(zip, wb, rel) {
 	let media = wb['$media'];
 	if (!media) media = wb['$media'] = {};
-	let t = rel.Target;
+	const t = rel.Target;
 	let m = media[t];
 	if (!m) {
-		switch (rel.Type) {
+		const type = rel.Type;
+		const path = t.replace('..', 'xl');
+		switch (type) {
 		case RELS.IMG:
-			m = getImageAsBase64(zip, t.replace('..', 'xl'));
+			m = getImageAsBase64(zip, path);
+			break;
+		case RELS.DIAGRAM_DRAWING:
+		case RELS.DIAGRAM_DATA:
+		case RELS.DIAGRAM_COLORS:
+		case RELS.DIAGRAM_LAYOUT:
+		case RELS.DIAGRAM_QSTYLE:
+			m = {};
+			m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
 			break;
 		default:
 			console.warn('Not implement rels type:', rel.Type);
@@ -27245,7 +27278,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 		for (let k in s) {
 			switch (k) {
 			case 'fill-image':
-				if (opts.drawings) makeDrawImage(s[k], wb, zip, s[k].name);
+				if (opts.drawings) s[k] = makeDrawImage(s[k], wb, zip, s[k].name);
 				break;
 			case 'hatch':
 			case 'gradient':
@@ -28051,12 +28084,19 @@ function makeDrawImage(img, wb, zip, key) {
 		if (!media) media = wb.Workbook['$media'] = {};
 		let m = media[href];
 		if (!m) {
-			m = media[href] = getImageAsBase64(zip, href);
+			try {
+				m = media[href] = getImageAsBase64(zip, href);
+			} catch (e) {
+				return null;
+			}
 		}
 		addDrawRel(wb, m, key || href);
-		return m;
+	} else if (Array.isArray(img)) {
+		img = img.find(i => {
+			return !!makeDrawImage(i, wb, zip, key);
+		});
 	}
-	return null;
+	return img;
 }
 function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	if (!draws) return;
@@ -28076,7 +28116,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
 		if (img) {
-			makeDrawImage(img, wb, zip);
+			draw.image = img = makeDrawImage(img, wb, zip);
 			if (img.p) {
 				let ip = img.p;
 				if (!Array.isArray(ip)) ip = [ip];

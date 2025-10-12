@@ -1084,7 +1084,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 		for (let k in s) {
 			switch (k) {
 			case 'fill-image':
-				if (opts.drawings) makeDrawImage(s[k], wb, zip, s[k].name);
+				if (opts.drawings) s[k] = makeDrawImage(s[k], wb, zip, s[k].name);
 				break;
 			case 'hatch':
 			case 'gradient':
@@ -1890,12 +1890,19 @@ function makeDrawImage(img, wb, zip, key) {
 		if (!media) media = wb.Workbook['$media'] = {};
 		let m = media[href];
 		if (!m) {
-			m = media[href] = getImageAsBase64(zip, href);
+			try {
+				m = media[href] = getImageAsBase64(zip, href);
+			} catch (e) {
+				return null;
+			}
 		}
 		addDrawRel(wb, m, key || href);
-		return m;
+	} else if (Array.isArray(img)) {
+		img = img.find(i => {
+			return !!makeDrawImage(i, wb, zip, key);
+		});
 	}
-	return null;
+	return img;
 }
 function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	if (!draws) return;
@@ -1915,7 +1922,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		if (p && !Array.isArray(p)) p = [p];
 		let img = draw.image;
 		if (img) {
-			makeDrawImage(img, wb, zip);
+			draw.image = img = makeDrawImage(img, wb, zip);
 			if (img.p) {
 				let ip = img.p;
 				if (!Array.isArray(ip)) ip = [ip];
