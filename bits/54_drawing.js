@@ -125,7 +125,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 						for (let m in draws) {
 							const d = draws[m];
 							if (d?.graphicFrame?.graphic?.graphicData?.relIds?.dm === n) {
-								Object.assign(d, o?.diagramDrawing?.spTree);
+								d.grpSp = o?.diagramDrawing?.spTree;
 								break;
 							}
 						}
