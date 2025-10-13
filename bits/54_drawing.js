@@ -171,23 +171,27 @@ function getMedia(zip, wb, rel) {
 	const t = rel.Target;
 	let m = media[t];
 	if (!m) {
-		const type = rel.Type;
-		const path = t.replace('..', 'xl');
-		switch (type) {
-		case RELS.IMG:
-			m = getImageAsBase64(zip, path);
-			break;
-		case RELS.DIAGRAM_DRAWING:
-		case RELS.DIAGRAM_DATA:
-		case RELS.DIAGRAM_COLORS:
-		case RELS.DIAGRAM_LAYOUT:
-		case RELS.DIAGRAM_QSTYLE:
-			m = {};
-			m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
-			break;
-		default:
-			console.warn('Not implement rels type:', rel.Type);
-			break;
+		try {
+			const type = rel.Type;
+			const path = t.replace('..', 'xl');
+			switch (type) {
+			case RELS.IMG:
+				m = getImageAsBase64(zip, path);
+				break;
+			case RELS.DIAGRAM_DRAWING:
+			case RELS.DIAGRAM_DATA:
+			case RELS.DIAGRAM_COLORS:
+			case RELS.DIAGRAM_LAYOUT:
+			case RELS.DIAGRAM_QSTYLE:
+				m = {};
+				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+				break;
+			default:
+				console.warn('Not implement rels type:', rel.Type);
+				break;
+			}
+		} catch (e) {
+			m = e;
 		}
 		media[t] = m;
 	}

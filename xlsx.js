@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251012';
+XLSX.version = '0.20.3.20251013';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4667,15 +4667,13 @@ function analyzeImageData(bstr) {
 	}
 	let t, w, h;
 
-	// PNG
 	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+		// PNG
 		t = 'png';
 		w = (bytes[16] << 24) + (bytes[17] << 16) + (bytes[18] << 8) + bytes[19];
 		h = (bytes[20] << 24) + (bytes[21] << 16) + (bytes[22] << 8) + bytes[23];
-	}
-
-	// JPEG
-	if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+	} else if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+		// JPEG
 		for (let i = 0; i < bytes.length - 9; i++) {
 			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
 				t = 'jpeg';
@@ -4684,24 +4682,18 @@ function analyzeImageData(bstr) {
 				break;
 			}
 		}
-	}
-
-	// GIF
-	if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
+	} else if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
+		// GIF
 		t = 'gif';
 		w = bytes[6] + (bytes[7] << 8);
 		h = bytes[8] + (bytes[9] << 8);
-	}
-
-	// BMP
-	if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
+	} else if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
+		// BMP
 		t = 'bmp';
 		w = bytes[18] + (bytes[19] << 8) + (bytes[20] << 16) + (bytes[21] << 24);
 		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
-	}
-
-	// EMF (Enhanced Metafile)
-	if (bytes[0] === 0x01 && bytes[1] === 0x00 && bytes[2] === 0x00 && bytes[3] === 0x00) {
+	} else if (bytes[0] === 0x01 && bytes[1] === 0x00 && bytes[2] === 0x00 && bytes[3] === 0x00) {
+		// EMF (Enhanced Metafile)
 		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
 		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
 		t = 'emf';
@@ -4714,7 +4706,7 @@ function analyzeImageData(bstr) {
 	}
 
 	if (!t) {
-		throw new Error('Unsupported image format', );
+		throw new Error('Unsupported image format:' + bstr.substring(0, 16));
 	}
 	return {
 		type: t,
@@ -15542,23 +15534,27 @@ function getMedia(zip, wb, rel) {
 	const t = rel.Target;
 	let m = media[t];
 	if (!m) {
-		const type = rel.Type;
-		const path = t.replace('..', 'xl');
-		switch (type) {
-		case RELS.IMG:
-			m = getImageAsBase64(zip, path);
-			break;
-		case RELS.DIAGRAM_DRAWING:
-		case RELS.DIAGRAM_DATA:
-		case RELS.DIAGRAM_COLORS:
-		case RELS.DIAGRAM_LAYOUT:
-		case RELS.DIAGRAM_QSTYLE:
-			m = {};
-			m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
-			break;
-		default:
-			console.warn('Not implement rels type:', rel.Type);
-			break;
+		try {
+			const type = rel.Type;
+			const path = t.replace('..', 'xl');
+			switch (type) {
+			case RELS.IMG:
+				m = getImageAsBase64(zip, path);
+				break;
+			case RELS.DIAGRAM_DRAWING:
+			case RELS.DIAGRAM_DATA:
+			case RELS.DIAGRAM_COLORS:
+			case RELS.DIAGRAM_LAYOUT:
+			case RELS.DIAGRAM_QSTYLE:
+				m = {};
+				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+				break;
+			default:
+				console.warn('Not implement rels type:', rel.Type);
+				break;
+			}
+		} catch (e) {
+			m = e;
 		}
 		media[t] = m;
 	}
