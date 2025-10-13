@@ -15489,7 +15489,6 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 							const d = draws[m];
 							if (d?.graphicFrame?.graphic?.graphicData?.relIds?.dm === n) {
 								d.grpSp = o?.diagramDrawing?.spTree;
-								// Object.assign(d, o?.diagramDrawing?.spTree);
 								break;
 							}
 						}
