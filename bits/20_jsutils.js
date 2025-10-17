@@ -1349,6 +1349,31 @@ function applyFormatValue(c, v, opts) {
 	}
 	return f ? SSF.format(f, v) : v;
 }
+function blobCheck(blob, cmp, pos = 0) {
+	if (typeof cmp === 'string') {
+		let ar = [];
+		for (let i = 0; i < cmp.length; i++) {
+			ar[i] = cmp.charCodeAt(i);
+		}
+		cmp = ar;
+	} else if (!Array.isArray(cmp)) {
+		cmp = [cmp];
+	}
+	for (let i = 0; i < cmp.length; i++) {
+		if (cmp[i] !== blob[pos + i]) return false;
+	}
+	return true;
+}
+function blobLsb(blob, pos = 0) {
+	blob.l = pos;
+	blob.numb2 = (_) => blob[blob.l++] | (blob[blob.l++] << 8);
+	blob.numb4 = (_) => blob[blob.l++] | (blob[blob.l++] << 8) | (blob[blob.l++] << 16) | (blob[blob.l++] << 24);
+}
+function blobMsb(blob, pos = 0) {
+	blob.l = pos;
+	blob.numb2 = (_) => (blob[blob.l++] << 8) | (blob[blob.l++]);
+	blob.numb4 = (_) => (blob[blob.l++] << 24) | (blob[blob.l++] << 16) | (blob[blob.l++] << 8) | (blob[blob.l++]);
+}
 function analyzeImageData(bstr) {
 	const bytes = new Uint8Array(bstr.length);
 	for (let i = 0; i < bstr.length; i++) {
@@ -1356,40 +1381,45 @@ function analyzeImageData(bstr) {
 	}
 	let t, w, h;
 
-	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+	if (blobCheck(bytes, [0x89,0x50,0x4E,0x47])) {
 		// PNG
 		t = 'png';
-		w = (bytes[16] << 24) + (bytes[17] << 16) + (bytes[18] << 8) + bytes[19];
-		h = (bytes[20] << 24) + (bytes[21] << 16) + (bytes[22] << 8) + bytes[23];
-	} else if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+		blobMsb(bytes, 16);
+		w = bytes.numb4();
+		h = bytes.numb4();
+	} else if (blobCheck(bytes, [0xFF,0xD8])) {
 		// JPEG
 		for (let i = 0; i < bytes.length - 9; i++) {
 			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
 				t = 'jpeg';
-				h = (bytes[i + 5] << 8) + bytes[i + 6];
-				w = (bytes[i + 7] << 8) + bytes[i + 8];
+				blobMsb(bytes, 5);
+				h = bytes.numb2();
+				w = bytes.numb2();
 				break;
 			}
 		}
-	} else if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
+	} else if (blobCheck(bytes, 'GIF')) {
 		// GIF
 		t = 'gif';
-		w = bytes[6] + (bytes[7] << 8);
-		h = bytes[8] + (bytes[9] << 8);
-	} else if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
+		blobLsb(bytes, 6);
+		w = bytes.numb2();
+		h = bytes.numb2();
+	} else if (blobCheck(bytes, 'BM')) {
 		// BMP
 		t = 'bmp';
-		w = bytes[18] + (bytes[19] << 8) + (bytes[20] << 16) + (bytes[21] << 24);
-		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
-	} else if (bytes[0] === 0x01 && bytes[1] === 0x00 && bytes[2] === 0x00 && bytes[3] === 0x00) {
+		blobLsb(bytes, 18);
+		w = bytes.numb4();
+		h = bytes.numb4();
+	} else if (blobCheck(bytes, [0x01,0x00,0x00,0x00])) {
 		// EMF (Enhanced Metafile)
 		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
 		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
 		t = 'emf';
-		const left = bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (bytes[11] << 24);
-		const top = bytes[12] | (bytes[13] << 8) | (bytes[14] << 16) | (bytes[15] << 24);
-		const right = bytes[16] | (bytes[17] << 8) | (bytes[18] << 16) | (bytes[19] << 24);
-		const bottom = bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24);
+		blobLsb(bytes, 18);
+		const left = bytes.numb4();
+		const top = bytes.numb4();
+		const right = bytes.numb4();
+		const bottom = bytes.numb4();
 		w = right - left;
 		h = bottom - top;
 	}

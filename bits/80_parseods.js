@@ -1891,7 +1891,7 @@ function makeDrawImage(img, wb, zip, key) {
 		let m = media[href];
 		if (!m) {
 			try {
-				m = media[href] = getImageAsBase64(zip, href);
+				m = media[href] = getImageAsBase64(zip, href, false);
 			} catch (e) {
 				return null;
 			}
@@ -1923,7 +1923,7 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		let img = draw.image;
 		if (img) {
 			draw.image = img = makeDrawImage(img, wb, zip);
-			if (img.p) {
+			if (img?.p) {
 				let ip = img.p;
 				if (!Array.isArray(ip)) ip = [ip];
 				p = p ? [].concat(p, ip) : ip;

@@ -36,6 +36,7 @@ function safegetzipfile(zip, file/*:string*/) {
 }
 
 function getzipfile(zip, file/*:string*/) {
+	if (/^\.\/\w+/i.test(file)) file = file.substring(2);
 	var o = safegetzipfile(zip, file);
 	if(o == null) throw new Error("Cannot find file " + file + " in zip");
 	return o;
@@ -111,10 +112,17 @@ function resolve_path(path/*:string*/, base/*:string*/)/*:string*/ {
 	return result.join('/');
 }
 
-function getImageAsBase64(zip, path) {
-	let m = analyzeImageData(getzipdata(zip, path, true));
-	m.ext = path.split('.').at(-1);
-	m.data = `data:image/${m.type};base64,${m.b64}`;
-	delete m.b64;
-	return m;
+function getImageAsBase64(zip, path, safe = true) {
+	const data = getzipdata(zip, path, true);
+	if (!data) return null;
+	try {
+		const m = analyzeImageData(data);
+		m.ext = path.split('.').at(-1);
+		m.data = `data:image/${m.type};base64,${m.b64}`;
+		delete m.b64;
+		return m;
+	} catch (e) {
+		if (!safe) throw e;
+	}
+	return data;
 }

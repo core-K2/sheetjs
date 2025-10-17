@@ -165,6 +165,18 @@ function addAlterContent(ar, alt) {
 		}
 	});
 }
+function findRelsType(type) {
+	for (let n in RELS) {
+		const v = RELS[n];
+		if (Array.isArray(v)) {
+			const found = v.find(x => x === type);
+			if (found) return found;
+		} else if (v === type) {
+			return v;
+		}
+	}
+	return null;
+}
 function getMedia(zip, wb, rel) {
 	let media = wb['$media'];
 	if (!media) media = wb['$media'] = {};
@@ -178,16 +190,13 @@ function getMedia(zip, wb, rel) {
 			case RELS.IMG:
 				m = getImageAsBase64(zip, path);
 				break;
-			case RELS.DIAGRAM_DRAWING:
-			case RELS.DIAGRAM_DATA:
-			case RELS.DIAGRAM_COLORS:
-			case RELS.DIAGRAM_LAYOUT:
-			case RELS.DIAGRAM_QSTYLE:
-				m = {};
-				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
-				break;
 			default:
-				console.warn('Not implement rels type:', rel.Type);
+				if (findRelsType(type)) {
+					m = {};
+					m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+				} else {
+					console.warn('Not implement rels type:', rel.Type);
+				}
 				break;
 			}
 		} catch (e) {
