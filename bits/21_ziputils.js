@@ -112,17 +112,14 @@ function resolve_path(path/*:string*/, base/*:string*/)/*:string*/ {
 	return result.join('/');
 }
 
-function getImageAsBase64(zip, path, safe = true) {
+function getImageAsBase64(zip, path) {
 	const data = getzipdata(zip, path, true);
 	if (!data) return null;
-	try {
-		const m = analyzeImageData(data);
+	const m = analyzeImageData(data);
+	if (m.b64) {
 		m.ext = path.split('.').at(-1);
 		m.data = `data:image/${m.type};base64,${m.b64}`;
 		delete m.b64;
-		return m;
-	} catch (e) {
-		if (!safe) throw e;
 	}
-	return data;
+	return m;
 }

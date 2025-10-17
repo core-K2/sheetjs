@@ -1375,63 +1375,84 @@ function blobMsb(blob, pos = 0) {
 	blob.numb4 = (_) => (blob[blob.l++] << 24) | (blob[blob.l++] << 16) | (blob[blob.l++] << 8) | (blob[blob.l++]);
 }
 function analyzeImageData(bstr) {
-	const bytes = new Uint8Array(bstr.length);
+	const blob = new Uint8Array(bstr.length);
 	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
+		blob[i] = bstr.charCodeAt(i);
 	}
-	let t, w, h;
+	let t, w, h, dat;
 
-	if (blobCheck(bytes, [0x89,0x50,0x4E,0x47])) {
+	if (blobCheck(blob, [0x89,0x50,0x4E,0x47])) {
 		// PNG
 		t = 'png';
-		blobMsb(bytes, 16);
-		w = bytes.numb4();
-		h = bytes.numb4();
-	} else if (blobCheck(bytes, [0xFF,0xD8])) {
+		blobMsb(blob, 16);
+		w = blob.numb4();
+		h = blob.numb4();
+	} else if (blobCheck(blob, [0xFF,0xD8])) {
 		// JPEG
-		for (let i = 0; i < bytes.length - 9; i++) {
-			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
+		for (let i = 0; i < blob.length - 9; i++) {
+			if (blob[i] === 0xFF && (blob[i + 1] === 0xC0 || blob[i + 1] === 0xC1 || blob[i + 1] === 0xC2)) {
 				t = 'jpeg';
-				blobMsb(bytes, 5);
-				h = bytes.numb2();
-				w = bytes.numb2();
+				blobMsb(blob, 5);
+				h = blob.numb2();
+				w = blob.numb2();
 				break;
 			}
 		}
-	} else if (blobCheck(bytes, 'GIF')) {
+	} else if (blobCheck(blob, 'GIF')) {
 		// GIF
 		t = 'gif';
-		blobLsb(bytes, 6);
-		w = bytes.numb2();
-		h = bytes.numb2();
-	} else if (blobCheck(bytes, 'BM')) {
+		blobLsb(blob, 6);
+		w = blob.numb2();
+		h = blob.numb2();
+	} else if (blobCheck(blob, 'BM')) {
 		// BMP
 		t = 'bmp';
-		blobLsb(bytes, 18);
-		w = bytes.numb4();
-		h = bytes.numb4();
-	} else if (blobCheck(bytes, [0x01,0x00,0x00,0x00])) {
+		blobLsb(blob, 18);
+		w = blob.numb4();
+		h = blob.numb4();
+	} else if (blobCheck(blob, [0x01,0x00,0x00,0x00])) {
 		// EMF (Enhanced Metafile)
 		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
 		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
 		t = 'emf';
-		blobLsb(bytes, 18);
-		const left = bytes.numb4();
-		const top = bytes.numb4();
-		const right = bytes.numb4();
-		const bottom = bytes.numb4();
-		w = right - left;
-		h = bottom - top;
+		blobLsb(blob, 18);
+		const left = blob.numb4();
+		const top = blob.numb4();
+		const right = blob.numb4();
+		const bottom = blob.numb4();
+		dat = {
+			left: left,
+			top: top,
+			right: right,
+			bottom: bottom,
+			w: right - left,
+			h: bottom - top,
+		};
+	} else if (blobCheck(blob, 'VCLMTF')) {
+		// StarView Metafile (SVM)
+		t = 'svm';
+		blobLsb(blob, 6);
+		dat = {
+			version: blob.numb2(),
+			compress: blob.numb4(),
+			reserved: blob.numb4(),
+			w: blob.numb4(),
+			h: blob.numb4(),
+		};
 	}
 
 	if (!t) {
-		throw new Error('Unsupported image format:' + bstr.substring(0, 16));
+		const msg = 'Unsupported image format:' + bstr.substring(0, 16);
+		console.warn(msg);
+		throw new Error(msg);
 	}
-	return {
+	if (dat) dat.blob = blob;
+	return dat ? dat : {
 		type: t,
 		w: w,
 		h: h,
-		b64: bytesToBase64(bytes)
+		isImage: true,
+		b64: bytesToBase64(blob)
 	};
 }
 function bytesToBase64(bytes, chunkSize) {

@@ -1891,7 +1891,8 @@ function makeDrawImage(img, wb, zip, key) {
 		let m = media[href];
 		if (!m) {
 			try {
-				m = media[href] = getImageAsBase64(zip, href, false);
+				m = media[href] = getImageAsBase64(zip, href);
+				if (!m.isImage) return null;
 			} catch (e) {
 				return null;
 			}
