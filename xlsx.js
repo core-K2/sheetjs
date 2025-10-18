@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251013';
+XLSX.version = '0.20.3.20251018';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4080,6 +4080,8 @@ function getPixelSize(v, u) {
 		return n;
 	}
 	switch (unit) {
+	case 'px':
+		return n;
 	case 'mm':
 		n *= 10;
 	case 'cm':
@@ -4660,59 +4662,131 @@ function applyFormatValue(c, v, opts) {
 	}
 	return f ? SSF.format(f, v) : v;
 }
-function analyzeImageData(bstr) {
-	const bytes = new Uint8Array(bstr.length);
-	for (let i = 0; i < bstr.length; i++) {
-		bytes[i] = bstr.charCodeAt(i);
+function blobCheck(blob, cmp, pos = 0) {
+	if (typeof cmp === 'string') {
+		let ar = [];
+		for (let i = 0; i < cmp.length; i++) {
+			ar[i] = cmp.charCodeAt(i);
+		}
+		cmp = ar;
+	} else if (!Array.isArray(cmp)) {
+		cmp = [cmp];
 	}
-	let t, w, h;
+	for (let i = 0; i < cmp.length; i++) {
+		if (cmp[i] !== blob[pos + i]) return false;
+	}
+	return true;
+}
+function blobLsb(blob, pos = 0) {
+	blob.l = pos;
+	blob.numb2 = (_) => blob[blob.l++] | (blob[blob.l++] << 8);
+	blob.numb4 = (_) => blob[blob.l++] | (blob[blob.l++] << 8) | (blob[blob.l++] << 16) | (blob[blob.l++] << 24);
+}
+function blobMsb(blob, pos = 0) {
+	blob.l = pos;
+	blob.numb2 = (_) => (blob[blob.l++] << 8) | (blob[blob.l++]);
+	blob.numb4 = (_) => (blob[blob.l++] << 24) | (blob[blob.l++] << 16) | (blob[blob.l++] << 8) | (blob[blob.l++]);
+}
+function analyzeImageData(bstr) {
+	// const blob = Uint8Array.from({length: bstr.length}, (_, i) => bstr.charCodeAt(i));
+	// ↑ は返って遅くなるので、ループで回す
+	const blob = new Uint8Array(bstr.length);
+	for (let i = 0; i < bstr.length; i++) {
+		blob[i] = bstr.charCodeAt(i);
+	}
+	let t, w, h, dat;
 
-	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+	if (blobCheck(blob, [0x89,0x50,0x4E,0x47])) {
 		// PNG
 		t = 'png';
-		w = (bytes[16] << 24) + (bytes[17] << 16) + (bytes[18] << 8) + bytes[19];
-		h = (bytes[20] << 24) + (bytes[21] << 16) + (bytes[22] << 8) + bytes[23];
-	} else if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+		blobMsb(blob, 16);
+		w = blob.numb4();
+		h = blob.numb4();
+	} else if (blobCheck(blob, [0xFF,0xD8])) {
 		// JPEG
-		for (let i = 0; i < bytes.length - 9; i++) {
-			if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC1 || bytes[i + 1] === 0xC2)) {
+		for (let i = 0; i < blob.length - 9; i++) {
+			if (blob[i] === 0xFF && (blob[i + 1] === 0xC0 || blob[i + 1] === 0xC1 || blob[i + 1] === 0xC2)) {
 				t = 'jpeg';
-				h = (bytes[i + 5] << 8) + bytes[i + 6];
-				w = (bytes[i + 7] << 8) + bytes[i + 8];
+				blobMsb(blob, 5);
+				h = blob.numb2();
+				w = blob.numb2();
 				break;
 			}
 		}
-	} else if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) === 'GIF') {
+	} else if (blobCheck(blob, 'GIF')) {
 		// GIF
 		t = 'gif';
-		w = bytes[6] + (bytes[7] << 8);
-		h = bytes[8] + (bytes[9] << 8);
-	} else if (String.fromCharCode(bytes[0], bytes[1]) === 'BM') {
+		blobLsb(blob, 6);
+		w = blob.numb2();
+		h = blob.numb2();
+	} else if (blobCheck(blob, 'BM')) {
 		// BMP
 		t = 'bmp';
-		w = bytes[18] + (bytes[19] << 8) + (bytes[20] << 16) + (bytes[21] << 24);
-		h = bytes[22] + (bytes[23] << 8) + (bytes[24] << 16) + (bytes[25] << 24);
-	} else if (bytes[0] === 0x01 && bytes[1] === 0x00 && bytes[2] === 0x00 && bytes[3] === 0x00) {
+		blobLsb(blob, 18);
+		w = blob.numb4();
+		h = blob.numb4();
+	} else if (blobCheck(blob, [0x01,0x00,0x00,0x00])) {
 		// EMF (Enhanced Metafile)
 		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
 		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
 		t = 'emf';
-		const left = bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (bytes[11] << 24);
-		const top = bytes[12] | (bytes[13] << 8) | (bytes[14] << 16) | (bytes[15] << 24);
-		const right = bytes[16] | (bytes[17] << 8) | (bytes[18] << 16) | (bytes[19] << 24);
-		const bottom = bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24);
-		w = right - left;
-		h = bottom - top;
+		blobLsb(blob, 18);
+		const left = blob.numb4();
+		const top = blob.numb4();
+		const right = blob.numb4();
+		const bottom = blob.numb4();
+		dat = {
+			left: left,
+			top: top,
+			right: right,
+			bottom: bottom,
+			w: right - left,
+			h: bottom - top,
+		};
+	} else if (blobCheck(blob, 'VCLMTF')) {
+		// StarView Metafile (SVM)
+		t = 'svm';
+		blobLsb(blob, 6);
+		dat = {
+			version: blob.numb2(),
+			compress: blob.numb4(),
+			reserved: blob.numb4(),
+			w: blob.numb4(),
+			h: blob.numb4(),
+		};
+	} else if (/<.*\Wxml.*svg\W/i.test(bstr)) {
+		t = 'svg+xml';
+		const xml = Xml.xmlStrToObject(bstr);
+		const st = xml?.style;
+		if (st) {
+			st.split(';').forEach(s => {
+				const ar = s.split(':');
+				if (ar.length === 2) {
+					switch (ar[0].trim()) {
+					case 'width':
+						w = getPixelSize(ar[1]);
+						break;
+					case 'height':
+						h = getPixelSize(ar[1]);
+						break;
+					}
+				}
+			});
+		}
 	}
 
 	if (!t) {
-		throw new Error('Unsupported image format:' + bstr.substring(0, 16));
+		const msg = 'Unsupported image format:' + bstr.substring(0, 16);
+		console.warn(msg);
+		throw new Error(msg);
 	}
-	return {
+	if (dat) dat.blob = blob;
+	return dat ? dat : {
 		type: t,
 		w: w,
 		h: h,
-		b64: bytesToBase64(bytes)
+		isImage: true,
+		b64: bytesToBase64(blob)
 	};
 }
 function bytesToBase64(bytes, chunkSize) {
@@ -4992,6 +5066,7 @@ function safegetzipfile(zip, file) {
 }
 
 function getzipfile(zip, file) {
+	if (/^\.\/\w+/i.test(file)) file = file.substring(2);
 	var o = safegetzipfile(zip, file);
 	if(o == null) throw new Error("Cannot find file " + file + " in zip");
 	return o;
@@ -5068,10 +5143,14 @@ function resolve_path(path, base) {
 }
 
 function getImageAsBase64(zip, path) {
-	let m = analyzeImageData(getzipdata(zip, path, true));
-	m.ext = path.split('.').at(-1);
-	m.data = `data:image/${m.type};base64,${m.b64}`;
-	delete m.b64;
+	const data = getzipdata(zip, path, true);
+	if (!data) return null;
+	const m = analyzeImageData(data);
+	if (m.b64) {
+		m.ext = path.split('.').at(-1);
+		m.data = `data:image/${m.type};base64,${m.b64}`;
+		delete m.b64;
+	}
 	return m;
 }
 var XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
@@ -15528,6 +15607,18 @@ function addAlterContent(ar, alt) {
 		}
 	});
 }
+function findRelsType(type) {
+	for (let n in RELS) {
+		const v = RELS[n];
+		if (Array.isArray(v)) {
+			const found = v.find(x => x === type);
+			if (found) return found;
+		} else if (v === type) {
+			return v;
+		}
+	}
+	return null;
+}
 function getMedia(zip, wb, rel) {
 	let media = wb['$media'];
 	if (!media) media = wb['$media'] = {};
@@ -15541,16 +15632,13 @@ function getMedia(zip, wb, rel) {
 			case RELS.IMG:
 				m = getImageAsBase64(zip, path);
 				break;
-			case RELS.DIAGRAM_DRAWING:
-			case RELS.DIAGRAM_DATA:
-			case RELS.DIAGRAM_COLORS:
-			case RELS.DIAGRAM_LAYOUT:
-			case RELS.DIAGRAM_QSTYLE:
-				m = {};
-				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
-				break;
 			default:
-				console.warn('Not implement rels type:', rel.Type);
+				if (findRelsType(type)) {
+					m = {};
+					m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+				} else {
+					console.warn('Not implement rels type:', rel.Type);
+				}
 				break;
 			}
 		} catch (e) {
@@ -28095,6 +28183,7 @@ function makeDrawImage(img, wb, zip, key) {
 		if (!m) {
 			try {
 				m = media[href] = getImageAsBase64(zip, href);
+				if (!m.isImage) return null;
 			} catch (e) {
 				return null;
 			}
@@ -28123,10 +28212,13 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		makeDrawStyle(draw, ass, dss, styles, fonts);
 		let p = draw.p || draw['text-box']?.p;
 		if (p && !Array.isArray(p)) p = [p];
+		if (draw.object) {
+			analyzeObject(draw, wb, ws, zip);
+		}
 		let img = draw.image;
 		if (img) {
 			draw.image = img = makeDrawImage(img, wb, zip);
-			if (img.p) {
+			if (img?.p) {
 				let ip = img.p;
 				if (!Array.isArray(ip)) ip = [ip];
 				p = p ? [].concat(p, ip) : ip;
@@ -28147,7 +28239,27 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	});
 	return draws;
 }
-/* OpenDocument */
+function analyzeObject(draw, wb, ws, zip) {
+	let path = draw.object?.href;
+	if (!path) return;
+	path = path.replace(/^\.\//, 'Root Entry/');
+	let obj = {};
+	zip.FullPaths.forEach((p, i) => {
+		if (!p.startsWith(path)) return;
+		try {
+			const file = zip.FileIndex[i];
+			const data = getdata(file);
+			if (data) {
+				obj[file.name.split('.')[0]] = parse_xml(data);
+			}
+		} catch (e) {
+			console.warn(e);
+		}
+	});
+	if (!isEmpty(obj)) {
+		draw.$obj = obj;
+	}
+}/* OpenDocument */
 function write_styles_ods(wb, opts) {
 	var master_styles = opts?.stayStyle ? makeOdsStyles(wb, opts) : [
 		'<office:master-styles>',

@@ -1921,6 +1921,9 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		makeDrawStyle(draw, ass, dss, styles, fonts);
 		let p = draw.p || draw['text-box']?.p;
 		if (p && !Array.isArray(p)) p = [p];
+		if (draw.object) {
+			analyzeObject(draw, wb, ws, zip);
+		}
 		let img = draw.image;
 		if (img) {
 			draw.image = img = makeDrawImage(img, wb, zip);
@@ -1944,4 +1947,25 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 		}
 	});
 	return draws;
+}
+function analyzeObject(draw, wb, ws, zip) {
+	let path = draw.object?.href;
+	if (!path) return;
+	path = path.replace(/^\.\//, 'Root Entry/');
+	let obj = {};
+	zip.FullPaths.forEach((p, i) => {
+		if (!p.startsWith(path)) return;
+		try {
+			const file = zip.FileIndex[i];
+			const data = getdata(file);
+			if (data) {
+				obj[file.name.split('.')[0]] = parse_xml(data);
+			}
+		} catch (e) {
+			console.warn(e);
+		}
+	});
+	if (!isEmpty(obj)) {
+		draw.$obj = obj;
+	}
 }

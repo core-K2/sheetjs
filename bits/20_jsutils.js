@@ -769,6 +769,8 @@ function getPixelSize(v, u) {
 		return n;
 	}
 	switch (unit) {
+	case 'px':
+		return n;
 	case 'mm':
 		n *= 10;
 	case 'cm':
@@ -1375,6 +1377,8 @@ function blobMsb(blob, pos = 0) {
 	blob.numb4 = (_) => (blob[blob.l++] << 24) | (blob[blob.l++] << 16) | (blob[blob.l++] << 8) | (blob[blob.l++]);
 }
 function analyzeImageData(bstr) {
+	// const blob = Uint8Array.from({length: bstr.length}, (_, i) => bstr.charCodeAt(i));
+	// ↑ は返って遅くなるので、ループで回す
 	const blob = new Uint8Array(bstr.length);
 	for (let i = 0; i < bstr.length; i++) {
 		blob[i] = bstr.charCodeAt(i);
