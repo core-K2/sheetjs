@@ -1439,6 +1439,25 @@ function analyzeImageData(bstr) {
 			w: blob.numb4(),
 			h: blob.numb4(),
 		};
+	} else if (/<.*\Wxml.*svg\W/i.test(bstr)) {
+		t = 'svg+xml';
+		const xml = Xml.xmlStrToObject(bstr);
+		const st = xml?.style;
+		if (st) {
+			st.split(';').forEach(s => {
+				const ar = s.split(':');
+				if (ar.length === 2) {
+					switch (ar[0].trim()) {
+					case 'width':
+						w = getPixelSize(ar[1]);
+						break;
+					case 'height':
+						h = getPixelSize(ar[1]);
+						break;
+					}
+				}
+			});
+		}
 	}
 
 	if (!t) {
