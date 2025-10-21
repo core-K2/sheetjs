@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251018';
+XLSX.version = '0.20.3.20251021';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -19500,6 +19500,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 		}
 		if(rstarti >= ri || iChkRow < tagr) break;
 		tag = parsexmltag(x.slice(rstarti,ri), true);
+		const pre_r = tagr;
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;
 		if(!opts.nodim) {
@@ -19520,6 +19521,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 		cells = x.slice(ri).split(cellregex);
 		for(var rslice = 0; rslice != cells.length; ++rslice) if(cells[rslice].trim().charAt(0) != "<") break;
 		cells = cells.slice(rslice);
+		let be = false;
 		for(ri = 0; ri != cells.length; ++ri) {
 			x = cells[ri].trim();
 			if(x.length === 0) continue;
@@ -19588,7 +19590,8 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 			let m = merges.find(function(m) {
 				return m.s.r === r && m.s.c === c;
 			});
-			if (tag.t || m) {
+			if (tag.t || m || p.v != null) {
+				be = true;
 				if (m) {
 					r = m.e.r;
 					c = m.e.c;
@@ -19672,6 +19675,7 @@ return function parse_ws_xml_data(sdata, s, opts, guess, themes, styles, wb, end
 				s["!data"][_r.r][_r.c] = p;
 			} else s[tag.r] = p;
 		}
+		if (!be && cells.length > 0 && tagr - pre_r < 10 && iMaxRow < tagr) iMaxRow = tagr;
 	}
 	if (iMaxRow > 0) endCell.r = iMaxRow;
 	if (iMaxCol > 0 && iMaxCol < iChkCol && iChkCol - iMaxCol > 10) endCell.c = iMaxCol;
