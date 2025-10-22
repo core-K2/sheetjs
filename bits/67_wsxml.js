@@ -402,6 +402,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		const pre_r = tagr;
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
+		if (tagr - pre_r > 20000) break;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;
 		if(!opts.nodim) {
 			if(guess.s.r > tagr - 1) guess.s.r = tagr - 1;

@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251021';
+XLSX.version = '0.20.3.20251022';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -19596,6 +19596,7 @@ return function parse_ws_xml_data(sdata/*:string*/, s, opts, guess/*:Range*/, th
 		tag = parsexmltag(x.slice(rstarti,ri), true);
 		const pre_r = tagr;
 		tagr = tag.r != null ? parseInt(tag.r, 10) : tagr+1; tagc = -1;
+		if (tagr - pre_r > 20000) break;
 		if(opts.sheetRows && opts.sheetRows < tagr) continue;
 		if(!opts.nodim) {
 			if(guess.s.r > tagr - 1) guess.s.r = tagr - 1;
