@@ -1949,17 +1949,19 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	return draws;
 }
 function analyzeObject(draw, wb, ws, zip) {
-	let path = draw.object?.href;
-	if (!path) return;
-	path = path.replace(/^\.\//, 'Root Entry/');
+	let href = draw.object?.href;
+	if (!href) return;
+	path = href.replace(/^\.\//, 'Root Entry/');
 	let obj = {};
 	zip.FullPaths.forEach((p, i) => {
 		if (!p.startsWith(path)) return;
 		try {
 			const file = zip.FileIndex[i];
-			const data = getdata(file);
-			if (data) {
-				obj[file.name.split('.')[0]] = parse_xml(data);
+			const ns = file.name.split('.');
+			switch (String(ns[1]).toLowerCase()) {
+			case 'xml':
+				obj[ns[0]] = parse_xml(getdata(file));
+				break;
 			}
 		} catch (e) {
 			console.warn(e);
@@ -1967,5 +1969,13 @@ function analyzeObject(draw, wb, ws, zip) {
 	});
 	if (!isEmpty(obj)) {
 		draw.$obj = obj;
+		const imgs = obj.styles?.styles?.['fill-image'];
+		if (imgs) {
+			if (!Array.isArray(imgs)) imgs = [imgs];
+			imgs.forEach(img => {
+				img.href = href + '/' + img.href;
+				makeDrawImage(img, wb, zip, img.name);
+			});
+		}
 	}
 }
