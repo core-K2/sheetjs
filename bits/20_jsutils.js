@@ -1488,6 +1488,11 @@ function bytesToBase64(bytes, chunkSize) {
 	return btoa(result);
 }
 
+// convert path to referrence path
+function convertToRelPath(path) {
+	return path.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
+}
+
 /**
  * XLSX text parser contain rPr
  */

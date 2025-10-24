@@ -106,14 +106,25 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		d.e.c = Math.max(d.e.c, iCol);
 		ws['!ref'] = encode_range(d);
 	}
-	let rPath = dfile.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
-	let rStr = getzipstr(zip, rPath, true);
+	const rStr = getzipstr(zip, convertToRelPath(dfile), true);
 	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
 	if (rels) {
-		let rs = {};
+		const rs = {};
 		if (!Array.isArray(rels)) rels = [rels];
 		rels.forEach(r => {
-			rs[r.Id] = getMedia(zip, wb, r)
+			const m = rs[r.Id] = getMedia(zip, wb, r);
+			if (m?.chart) {
+				const subRStr = getzipstr(zip, convertToRelPath(resolve_path(r.Target, dfile)), true);
+				let subRels = subRStr ? parse_xml(subRStr)?.Relationship : null;
+				if (subRels) {
+					const subRs = {};
+					if (!Array.isArray(subRels)) subRels = [subRels];
+					subRels.forEach(s => {
+						subRs[s.Id] = getMedia(zip, wb, s);
+					});
+					m.chart.rels = subRs;
+				}
+			}
 		});
 		for (let n in rs) {
 			const r = rs[n];
