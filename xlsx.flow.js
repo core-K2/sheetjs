@@ -4781,7 +4781,7 @@ function analyzeImageData(bstr) {
 		for (let i = 0; i < blob.length - 9; i++) {
 			if (blob[i] === 0xFF && (blob[i + 1] === 0xC0 || blob[i + 1] === 0xC1 || blob[i + 1] === 0xC2)) {
 				t = 'jpeg';
-				blobMsb(blob, 5);
+				blobMsb(blob, i + 5);
 				h = blob.numb2();
 				w = blob.numb2();
 				break;
