@@ -1419,7 +1419,7 @@ function analyzeImageData(bstr) {
 		// Note: EMF is a vector format, so width/height are derived from the bounds rectangle in pixels.
 		// Additional validation could check if the header size (bytes 4-7) is at least 40, but kept simple here.
 		t = 'emf';
-		blobLsb(blob, 18);
+		blobLsb(blob, 8);
 		const left = blob.numb4();
 		const top = blob.numb4();
 		const right = blob.numb4();
