@@ -106,26 +106,9 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		d.e.c = Math.max(d.e.c, iCol);
 		ws['!ref'] = encode_range(d);
 	}
-	const rStr = getzipstr(zip, convertToRelPath(dfile), true);
-	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
+	const rels = getRels(zip, dfile);
 	if (rels) {
-		const rs = {};
-		if (!Array.isArray(rels)) rels = [rels];
-		rels.forEach(r => {
-			const m = rs[r.Id] = getMedia(zip, wb, r);
-			if (m?.chart) {
-				const subRStr = getzipstr(zip, convertToRelPath(resolve_path(r.Target, dfile)), true);
-				let subRels = subRStr ? parse_xml(subRStr)?.Relationship : null;
-				if (subRels) {
-					const subRs = {};
-					if (!Array.isArray(subRels)) subRels = [subRels];
-					subRels.forEach(s => {
-						subRs[s.Id] = getMedia(zip, wb, s);
-					});
-					m.chart.rels = subRs;
-				}
-			}
-		});
+		const rs = getRelsObject(zip, wb, rels);
 		for (let n in rs) {
 			const r = rs[n];
 			if (r?.diagramData) {
@@ -147,6 +130,23 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		ws['!drawRels'] = rs;
 	}
 	return draws;
+}
+// get path referrences
+function getRels(zip, path) {
+	const rStr = getzipstr(zip, convertToRelPath(path), true);
+	if (rStr) {
+		const rels = parse_xml(rStr)?.Relationship;
+		return Array.isArray(rels) ? rels : [rels];
+	}
+	return null;
+}
+// get referrnce objects
+function getRelsObject(zip, wb, rels) {
+	const rs = {};
+	rels.forEach(r => {
+		rs[r.Id] = getMedia(zip, wb, r);
+	});
+	return rs;
 }
 // find same name shape from array
 function findExistShape(ar, shape) {
@@ -204,7 +204,13 @@ function getMedia(zip, wb, rel) {
 			default:
 				if (findRelsType(type)) {
 					m = {};
-					m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+					const obj = m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path, true));
+					switch (type) {
+					case RELS.CHART:
+						const rels = getRels(zip, path);
+						if (rels) m.$rels = getRelsObject(zip, wb, rels);
+						break;
+					}
 				} else {
 					console.warn('Not implement rels type:', rel.Type);
 				}

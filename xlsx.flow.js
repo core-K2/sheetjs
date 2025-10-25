@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251022';
+XLSX.version = '0.20.3.20251025';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4871,6 +4871,11 @@ function bytesToBase64(bytes, chunkSize) {
 		result += String.fromCharCode(...chunk);
 	}
 	return btoa(result);
+}
+
+// convert path to referrence path
+function convertToRelPath(path) {
+	return path.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
 }
 
 /**
@@ -15641,15 +15646,9 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		d.e.c = Math.max(d.e.c, iCol);
 		ws['!ref'] = encode_range(d);
 	}
-	let rPath = dfile.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
-	let rStr = getzipstr(zip, rPath, true);
-	let rels = rStr ? parse_xml(rStr)?.Relationship : null;
+	const rels = getRels(zip, dfile);
 	if (rels) {
-		let rs = {};
-		if (!Array.isArray(rels)) rels = [rels];
-		rels.forEach(r => {
-			rs[r.Id] = getMedia(zip, wb, r)
-		});
+		const rs = getRelsObject(zip, wb, rels);
 		for (let n in rs) {
 			const r = rs[n];
 			if (r?.diagramData) {
@@ -15671,6 +15670,23 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		ws['!drawRels'] = rs;
 	}
 	return draws;
+}
+// get path referrences
+function getRels(zip, path) {
+	const rStr = getzipstr(zip, convertToRelPath(path), true);
+	if (rStr) {
+		const rels = parse_xml(rStr)?.Relationship;
+		return Array.isArray(rels) ? rels : [rels];
+	}
+	return null;
+}
+// get referrnce objects
+function getRelsObject(zip, wb, rels) {
+	const rs = {};
+	rels.forEach(r => {
+		rs[r.Id] = getMedia(zip, wb, r);
+	});
+	return rs;
 }
 // find same name shape from array
 function findExistShape(ar, shape) {
@@ -15728,7 +15744,13 @@ function getMedia(zip, wb, rel) {
 			default:
 				if (findRelsType(type)) {
 					m = {};
-					m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path));
+					const obj = m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path, true));
+					switch (type) {
+					case RELS.CHART:
+						const rels = getRels(zip, path);
+						if (rels) m.$rels = getRelsObject(zip, wb, rels);
+						break;
+					}
 				} else {
 					console.warn('Not implement rels type:', rel.Type);
 				}
@@ -28355,17 +28377,19 @@ function drawing2SVG(draws, ass, dss, wb, ws, zip, styles, fonts) {
 	return draws;
 }
 function analyzeObject(draw, wb, ws, zip) {
-	let path = draw.object?.href;
-	if (!path) return;
-	path = path.replace(/^\.\//, 'Root Entry/');
+	let href = draw.object?.href;
+	if (!href) return;
+	path = href.replace(/^\.\//, 'Root Entry/');
 	let obj = {};
 	zip.FullPaths.forEach((p, i) => {
 		if (!p.startsWith(path)) return;
 		try {
 			const file = zip.FileIndex[i];
-			const data = getdata(file);
-			if (data) {
-				obj[file.name.split('.')[0]] = parse_xml(data);
+			const ns = file.name.split('.');
+			switch (String(ns[1]).toLowerCase()) {
+			case 'xml':
+				obj[ns[0]] = parse_xml(getdata(file));
+				break;
 			}
 		} catch (e) {
 			console.warn(e);
@@ -28373,6 +28397,14 @@ function analyzeObject(draw, wb, ws, zip) {
 	});
 	if (!isEmpty(obj)) {
 		draw.$obj = obj;
+		const imgs = obj.styles?.styles?.['fill-image'];
+		if (imgs) {
+			if (!Array.isArray(imgs)) imgs = [imgs];
+			imgs.forEach(img => {
+				img.href = href + '/' + img.href;
+				makeDrawImage(img, wb, zip, img.name);
+			});
+		}
 	}
 }/* OpenDocument */
 function write_styles_ods(wb/*:any*/, opts/*:any*/)/*:string*/ {
