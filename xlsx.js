@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251025';
+XLSX.version = '0.20.3.20251026';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -15583,7 +15583,7 @@ function getRels(zip, path) {
 	const rStr = getzipstr(zip, convertToRelPath(path), true);
 	if (rStr) {
 		const rels = parse_xml(rStr)?.Relationship;
-		return Array.isArray(rels) ? rels : [rels];
+		if (rels) return Array.isArray(rels) ? rels : [rels];
 	}
 	return null;
 }
@@ -28287,7 +28287,7 @@ function analyzeObject(draw, wb, ws, zip) {
 	});
 	if (!isEmpty(obj)) {
 		draw.$obj = obj;
-		const imgs = obj.styles?.styles?.['fill-image'];
+		let imgs = obj.styles?.styles?.['fill-image'];
 		if (imgs) {
 			if (!Array.isArray(imgs)) imgs = [imgs];
 			imgs.forEach(img => {
