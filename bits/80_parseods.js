@@ -1969,7 +1969,7 @@ function analyzeObject(draw, wb, ws, zip) {
 	});
 	if (!isEmpty(obj)) {
 		draw.$obj = obj;
-		const imgs = obj.styles?.styles?.['fill-image'];
+		let imgs = obj.styles?.styles?.['fill-image'];
 		if (imgs) {
 			if (!Array.isArray(imgs)) imgs = [imgs];
 			imgs.forEach(img => {
