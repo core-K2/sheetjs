@@ -136,7 +136,7 @@ function getRels(zip, path) {
 	const rStr = getzipstr(zip, convertToRelPath(path), true);
 	if (rStr) {
 		const rels = parse_xml(rStr)?.Relationship;
-		return Array.isArray(rels) ? rels : [rels];
+		if (rels) return Array.isArray(rels) ? rels : [rels];
 	}
 	return null;
 }
