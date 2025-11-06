@@ -1314,8 +1314,6 @@ function formatNumber(f, v, opts) {
 	}
 	const n = Number(v);
 	f = normalizeFormat(fs[sz > 2 && !n ? 2 : sz > 1 && n < 0 ? 1 : 0]);
-	const pad = f.indexOf('*');
-	if (pad >= 0) f = f.substring(0, pad) + f.substring(pad + 1);
 	f = f.replace(/\"([^\"]+)\"/g, (m, p1) => {
 		return p1;
 	});
@@ -1324,8 +1322,10 @@ function formatNumber(f, v, opts) {
 		sts.push(m.substring(1, m.length - 1));
 		return '';
 	});
+	const pad = f.indexOf('*');
+	if (pad >= 0) f = f.substring(0, pad) + f.substring(pad + 1);
 	if (typeof opts === 'object') {
-		opts.padding = pad >= 0;
+		if (pad >= 0) opts.padding = pad;
 		if (sts.length > 0) opts.style = sts.join(';');
 	}
 	const minus = n < 0 && f.indexOf('-') >= 0;
