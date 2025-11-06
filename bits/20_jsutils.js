@@ -1305,15 +1305,30 @@ function formatDateVariable(f, dt, opts) {
 		return datePart(key, dt, opts);
 	});
 }
+const normalizeFormat = f => f.replace(/[\\_](.{1})/g, '$1');
 function formatNumber(f, v, opts) {
-	if (isNaN(v)) return '';
-	let n = Number(v);
-	let fs = f.split(';');
-	f = fs[fs.length > 1 && n < 0 ? 1 : 0];
+	const fs = f.split(';');
+	const sz = fs.length;
+	if (isNaN(v)) {
+		return sz > 3 ? (fs[3] || '@').replace('@', v) : v;
+	}
+	const n = Number(v);
+	f = normalizeFormat(fs[sz > 2 && !n ? 2 : sz > 1 && n < 0 ? 1 : 0]);
+	const pad = f.indexOf('*');
+	if (pad >= 0) f = f.substring(0, pad) + f.substring(pad + 1);
 	f = f.replace(/\"([^\"]+)\"/g, (m, p1) => {
 		return p1;
 	});
-	f = f.replace(/\[.*\]|\_.{1}$/, '');
+	const sts = [];
+	f = f.replace(/\[([^\]]+)\]/, m => {
+		sts.push(m.substring(1, m.length - 1));
+		return '';
+	});
+	if (typeof opts === 'object') {
+		opts.padding = pad >= 0;
+		if (sts.length > 0) opts.style = sts.join(';');
+	}
+	const minus = n < 0 && f.indexOf('-') >= 0;
 	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
 		let i = p2.indexOf('0');
 		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
@@ -1322,12 +1337,13 @@ function formatNumber(f, v, opts) {
 			i = p3.indexOf('#');
 			mdot = i >= 0 ? i : dot;
 		}
-		return n.toLocaleString(opts?.loc || navigator.language, {
+		const s = n.toLocaleString(opts?.loc || navigator.language, {
 			minimumIntegerDigits: dig || 1,
 			minimumFractionDigits: mdot || 0,
 			maximumFractionDigits: dot || 0,
 			useGrouping: grp || false,
 		});
+		return minus ? s.replace('-', '') : s;
 	});
 }
 function applyFormatValue(c, v, opts) {
