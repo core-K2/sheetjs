@@ -26128,7 +26128,7 @@ function make_html_row(ws, r, R, o) {
 		}
 		/* TODO: html entities */
 		var w = (cell && cell.v != null) && (cell.h || cell.w || (format_cell(cell), cell.w)) || "";
-		if (w.includes('<span')) {
+		if (w?.includes('<span')) {
 			let ar = w.split('\n');
 			if (ar.length > 1) {
 				let s = '';
