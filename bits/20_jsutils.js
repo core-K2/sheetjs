@@ -1305,7 +1305,7 @@ function formatDateVariable(f, dt, opts) {
 		return datePart(key, dt, opts);
 	});
 }
-const normalizeFormat = f => f.replace(/[\\_](.{1})/g, '$1');
+const normalizeFormat = f => f.replace(/\\(.{1})/g, '$1').replace(/_(.{1})/g, ' ');
 function formatNumber(f, v, opts) {
 	const fs = f.split(';');
 	const sz = fs.length;
