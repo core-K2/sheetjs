@@ -1346,24 +1346,28 @@ function formatNumber(f, v, opts) {
 		return minus ? s.replace('-', '') : s;
 	});
 }
+function formatValue(v, f, opts) {
+	let df = analyzeDateFormat(f);
+	if (df.flag) {
+		let n, dt;
+		if (typeof v === 'number') {
+			dt = v >= 1000000 ? new Date(v) : toDate(numdate(v), 6);
+			n = v;
+		} else {
+			dt = parseDateJp(v);
+			n = validTypeNumber(df.type, dt);
+		}
+		c.v = n;
+		return formatDateVariable(df.text, dt, opts);
+	} else if (df.text) {
+		return formatNumber(f, v, opts);
+	}
+	return f ? SSF.format(f, v) : v;
+}
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
 	if (c.t === 'n' && f) {
-		let df = analyzeDateFormat(f);
-		if (df.flag) {
-			let n, dt;
-			if (typeof v === 'number') {
-				dt = v >= 1000000 ? new Date(v) : toDate(numdate(v), 6);
-				n = v;
-			} else {
-				dt = parseDateJp(v);
-				n = validTypeNumber(df.type, dt);
-			}
-			c.v = n;
-			return formatDateVariable(df.text, dt, opts);
-		} else if (df.text) {
-			return formatNumber(f, v, opts);
-		}
+		formatValue(v, f, opts);
 	}
 	return f ? SSF.format(f, v) : v;
 }
@@ -1737,4 +1741,6 @@ var CK2 = {
 	getInputFormat: getInputFormat,
 	validNumber: validNumber,
 	applyFormatValue: applyFormatValue,
+	formatValue: formatValue,
+	formatNumber: formatNumber,
 };

@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251106';
+XLSX.version = '0.20.3.20251107';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4657,24 +4657,28 @@ function formatNumber(f, v, opts) {
 		return minus ? s.replace('-', '') : s;
 	});
 }
+function formatValue(v, f, opts) {
+	let df = analyzeDateFormat(f);
+	if (df.flag) {
+		let n, dt;
+		if (typeof v === 'number') {
+			dt = v >= 1000000 ? new Date(v) : toDate(numdate(v), 6);
+			n = v;
+		} else {
+			dt = parseDateJp(v);
+			n = validTypeNumber(df.type, dt);
+		}
+		c.v = n;
+		return formatDateVariable(df.text, dt, opts);
+	} else if (df.text) {
+		return formatNumber(f, v, opts);
+	}
+	return f ? SSF.format(f, v) : v;
+}
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
 	if (c.t === 'n' && f) {
-		let df = analyzeDateFormat(f);
-		if (df.flag) {
-			let n, dt;
-			if (typeof v === 'number') {
-				dt = v >= 1000000 ? new Date(v) : toDate(numdate(v), 6);
-				n = v;
-			} else {
-				dt = parseDateJp(v);
-				n = validTypeNumber(df.type, dt);
-			}
-			c.v = n;
-			return formatDateVariable(df.text, dt, opts);
-		} else if (df.text) {
-			return formatNumber(f, v, opts);
-		}
+		formatValue(v, f, opts);
 	}
 	return f ? SSF.format(f, v) : v;
 }
@@ -5048,6 +5052,8 @@ var CK2 = {
 	getInputFormat: getInputFormat,
 	validNumber: validNumber,
 	applyFormatValue: applyFormatValue,
+	formatValue: formatValue,
+	formatNumber: formatNumber,
 };
 function getdatastr(data) {
 	if(!data) return null;
