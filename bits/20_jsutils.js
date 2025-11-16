@@ -437,25 +437,28 @@ var Xml = {
 		this.pushOpts();
 		if (typeof v === 'object') {
 			for (let n in v) {
-				this.opts[n] = v[n];
+				this.setOptsValue(n, v[n]);
 			}
 		} else {
 			for (let i = 0; i < arguments.length; i++) {
 				let n = arguments[i];
 				if (this.opts.hasOwnProperty(n)) {
-					this.opts[n] = arguments[++i];
+					this.setOptsValue(n, arguments[++i]);
 				}
 			}
 		}
-		this.setOptsAsArray('asSeqArray', 'asText');
 	},
-	setOptsAsArray: function() {
-		for (let n in arguments) {
-			let as = this.opts[n];
-			if (as && !Array.isArray(as)) {
-				this.opts[n] = typeof as === 'string' ? as.split(',') : [as];
+	// set option value
+	setOptsValue: function(n, v) {
+		if (['asSeqArray', 'asText'].includes(n)) {
+			if (typeof v === 'string') v = v.split(',');
+			let old = this.opts[n];
+			if (old) {
+				if (typeof old === 'string') old = old.split(',');
+				v = old.concat(v);
 			}
 		}
+		this.opts[n] = v;
 	},
 	// get property name
 	getName: function(n) {
@@ -505,19 +508,20 @@ var Xml = {
 	// convert value
 	toValue: function(v, bTrim) {
 		if (v) {
-			let asV;
-			if ((asV = this.opts.asValue)) {
+			const asV = this.opts.asValue;
+			if (asV) {
+				const vt = v.trim();
 				if (bTrim && asV & 8) {
-					v = v.trim();
-				}
-				if (asV & 1 && !isNaN(v) && v.trim().length > 0) {
-					return Number(v);
+					v = vt;
 				}
 				if (asV & 2) {
-					switch (v.toLowerCase()) {
+					switch (vt.toLowerCase()) {
 					case 'true': return true;
 					case 'false': return false;
 					}
+				}
+				if (asV & 1 && /^[+-]?\d+(\.\d+)?$/.test(v)) {
+					return Number(v);
 				}
 				if (asV & 4) {
 					let dt
