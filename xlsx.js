@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251116';
+XLSX.version = '0.20.3.20251119';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4404,8 +4404,11 @@ function applyDataStyle(ds, v, t) {
 	}
 	return v;
 }
-function analyzeDateFormat(f) {
-	if (f.includes('General')) return {};
+function getGeneralFormat(opts) {
+	return opts?.isPercent ? '0%' : '';
+}
+function analyzeDateFormat(f, opts) {
+	if (f.includes('General')) return {text: getGeneralFormat(opts)};
 	let blk = 0;
 	let quote = 0;
 	let time = 0;
@@ -4540,8 +4543,8 @@ function analyzeDateFormat(f) {
 			'datetime-local',
 	};
 }
-function analyzeFormat(f, val) {
-	let df = analyzeDateFormat(f);
+function analyzeFormat(f, val, opts) {
+	let df = analyzeDateFormat(f, opts);
 	if (!df.flag && !isNaN(Number(val))) {
 		df.flag = 0x100;
 	}
@@ -4627,8 +4630,13 @@ function formatNumber(f, v, opts) {
 	if (isNaN(v)) {
 		return sz > 3 ? (fs[3] || '@').replace('@', v) : v;
 	}
-	const n = Number(v);
+	let n = Number(v);
 	f = normalizeFormat(fs[sz > 2 && !n ? 2 : sz > 1 && n < 0 ? 1 : 0]);
+	if (f.includes('General')) {
+		const gf = getGeneralFormat(opts);
+		if (!gf) return v;
+		f = gf;
+	}
 	f = f.replace(/\"([^\"]+)\"/g, (m, p1) => {
 		return p1;
 	});
@@ -4644,6 +4652,11 @@ function formatNumber(f, v, opts) {
 		if (sts.length > 0) opts.style = sts.join(';');
 	}
 	const minus = n < 0 && f.indexOf('-') >= 0;
+	let suffix = '';
+	if (f.includes('%')) {
+		n *= 100;
+		suffix = '%';
+	}
 	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
 		let i = p2.indexOf('0');
 		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
@@ -4659,10 +4672,10 @@ function formatNumber(f, v, opts) {
 			useGrouping: grp || false,
 		});
 		return minus ? s.replace('-', '') : s;
-	});
+	}) + suffix;
 }
 function formatValue(v, f, opts) {
-	let df = analyzeDateFormat(f);
+	let df = analyzeDateFormat(f, opts);
 	if (df.flag) {
 		let n, dt;
 		if (typeof v === 'number') {
