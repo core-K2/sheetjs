@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251119';
+XLSX.version = '0.20.3.20251120';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -13729,7 +13729,11 @@ function char2width(chr) { return (Math.round((chr * MDW + 5)/MDW*256))/256; }
 //function char2width_(chr) { return (((chr * MDW + 5)/MDW*256))/256; }
 function cycle_width(collw) { return char2width(px2char(width2px(collw))); }
 /* XLSX/XLSB/XLS specify width in units of MDW */
-function find_mdw_colw(collw) {
+function find_mdw_colw(collw, opts) {
+	if (opts?.ck2Ex) {
+		MDW = 7;
+		return;
+	}
 	var delta = Math.abs(collw - cycle_width(collw)), _MDW = MDW;
 	if(delta > 0.005) for(MDW=MIN_MDW; MDW<MAX_MDW; ++MDW) if(Math.abs(collw - cycle_width(collw)) <= delta) { delta = Math.abs(collw - cycle_width(collw)); _MDW = MDW; }
 	MDW = _MDW;
@@ -19329,7 +19333,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	if(opts.cellStyles) {
 		/* 18.3.1.13 col CT_Col */
 		var cols = data1.match(colregex);
-		if(cols) parse_ws_xml_cols(columns, cols, d.e);
+		if(cols) parse_ws_xml_cols(columns, cols, d.e, opts);
 	}
 
 	/* 18.3.1.2  autoFilter CT_AutoFilter */
@@ -19465,7 +19469,7 @@ function write_ws_xml_margins(margin)/*:string*/ {
 	return writextag('pageMargins', null, margin);
 }
 
-function parse_ws_xml_cols(columns, cols, endCell) {
+function parse_ws_xml_cols(columns, cols, endCell, opts) {
 	var seencol = false;
 	for(var coli = 0; coli != cols.length; ++coli) {
 		var coll = parsexmltag(cols[coli], true);
@@ -19473,7 +19477,7 @@ function parse_ws_xml_cols(columns, cols, endCell) {
 		var colm=parseInt(coll.min, 10)-1, colM=parseInt(coll.max,10)-1;
 		if(coll.outlineLevel) coll.level = (+coll.outlineLevel || 0);
 		delete coll.min; delete coll.max; coll.width = +coll.width;
-		if(!seencol && coll.width) { seencol = true; find_mdw_colw(coll.width); }
+		if(!seencol && coll.width) { seencol = true; find_mdw_colw(coll.width, opts); }
 		process_col(coll);
 		let iMaxCol = endCell.c;
 		if (iMaxCol > 0 && iMaxCol < colM) colM = iMaxCol;
