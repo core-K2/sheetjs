@@ -4478,11 +4478,14 @@ function applyDataStyle(ds, v, t) {
 	}
 	return v;
 }
+function isGeneral(v) {
+	return /general/i.test(v);
+}
 function getGeneralFormat(opts) {
 	return opts?.isPercent ? '0%' : '';
 }
 function analyzeDateFormat(f, opts) {
-	if (/general/i.test(f)) return {text: getGeneralFormat(opts)};
+	if (isGeneral(f)) return {text: getGeneralFormat(opts)};
 	let blk = 0;
 	let quote = 0;
 	let time = 0;
@@ -4706,7 +4709,7 @@ function formatNumber(f, v, opts) {
 	}
 	let n = Number(v);
 	f = normalizeFormat(fs[sz > 2 && !n ? 2 : sz > 1 && n < 0 ? 1 : 0]);
-	if (f.includes('General')) {
+	if (isGeneral(f)) {
 		const gf = getGeneralFormat(opts);
 		if (!gf) return v;
 		f = gf;
@@ -4727,10 +4730,11 @@ function formatNumber(f, v, opts) {
 	}
 	const minus = n < 0 && f.indexOf('-') >= 0;
 	if (f.includes('%')) n *= 100;
-	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
+	return f.replace(/(([0-9#,]+)(\.[0-9#]+)?)/, (m, p1, p2, p3) => {
 		let i = p2.indexOf('0');
 		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
 		if (p3) {
+			p3 = p3.substring(1);
 			dot = p3.length;
 			i = p3.indexOf('#');
 			mdot = i >= 0 ? i : dot;
