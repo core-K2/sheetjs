@@ -1363,7 +1363,7 @@ function formatNumber(f, v, opts) {
 		return minus ? s.replace('-', '') : s;
 	}) + suffix;
 }
-function formatValue(v, f, opts) {
+function formatValue(v, f, opts, c) {
 	let df = analyzeDateFormat(f, opts);
 	if (df.flag) {
 		let n, dt;
@@ -1374,7 +1374,7 @@ function formatValue(v, f, opts) {
 			dt = parseDateJp(v);
 			n = validTypeNumber(df.type, dt);
 		}
-		c.v = n;
+		if (c) c.v = n;
 		return formatDateVariable(df.text, dt, opts);
 	} else if (df.text) {
 		return formatNumber(f, v, opts);
@@ -1384,7 +1384,7 @@ function formatValue(v, f, opts) {
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
 	if (c.t === 'n' && f) {
-		formatValue(v, f, opts);
+		return formatValue(v, f, opts, c);
 	}
 	return f ? SSF.format(f, v) : v;
 }
