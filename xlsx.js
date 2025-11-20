@@ -4652,11 +4652,7 @@ function formatNumber(f, v, opts) {
 		if (sts.length > 0) opts.style = sts.join(';');
 	}
 	const minus = n < 0 && f.indexOf('-') >= 0;
-	let suffix = '';
-	if (f.includes('%')) {
-		n *= 100;
-		suffix = '%';
-	}
+	if (f.includes('%')) n *= 100;
 	return f.replace(/(([0-9#,]+).?([0-9#]*))/, (m, p1, p2, p3) => {
 		let i = p2.indexOf('0');
 		let dig = i >= 0 ? p2.length - i : 1, mdot, dot, grp = p2.includes(',');
@@ -4672,7 +4668,7 @@ function formatNumber(f, v, opts) {
 			useGrouping: grp || false,
 		});
 		return minus ? s.replace('-', '') : s;
-	}) + suffix;
+	});
 }
 function formatValue(v, f, opts, c) {
 	let df = analyzeDateFormat(f, opts);
