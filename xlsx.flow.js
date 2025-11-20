@@ -4482,7 +4482,7 @@ function getGeneralFormat(opts) {
 	return opts?.isPercent ? '0%' : '';
 }
 function analyzeDateFormat(f, opts) {
-	if (f.includes('General')) return {text: getGeneralFormat(opts)};
+	if (/general/i.test(f)) return {text: getGeneralFormat(opts)};
 	let blk = 0;
 	let quote = 0;
 	let time = 0;
@@ -19480,7 +19480,6 @@ function parse_ws_xml_cols(columns, cols, endCell, opts) {
 			}
 			ar.push(c);
 		});
-		MDW = 7;
 	} else {
 		for(var coli = 0; coli != cols.length; ++coli) {
 			var coll = parsexmltag(cols[coli], true);

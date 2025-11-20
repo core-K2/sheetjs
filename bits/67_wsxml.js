@@ -224,7 +224,6 @@ function parse_ws_xml_cols(columns, cols, endCell, opts) {
 			}
 			ar.push(c);
 		});
-		MDW = 7;
 	} else {
 		for(var coli = 0; coli != cols.length; ++coli) {
 			var coll = parsexmltag(cols[coli], true);
