@@ -61,11 +61,12 @@ function cycle_width(collw) { return char2width(px2char(width2px(collw))); }
 /* XLSX/XLSB/XLS specify width in units of MDW */
 function find_mdw_colw(collw, opts) {
 	if (opts?.ck2Ex) {
-		MDW = 7;
-		return;
+		DEF_MDW = MDW = 7;
+		MIN_MDW = 6;
+		MAX_MDW = 9;
 	}
 	var delta = Math.abs(collw - cycle_width(collw)), _MDW = MDW;
-	if(delta > 0.005) for(MDW=MIN_MDW; MDW<MAX_MDW; ++MDW) if(Math.abs(collw - cycle_width(collw)) <= delta) { delta = Math.abs(collw - cycle_width(collw)); _MDW = MDW; }
+	if(delta > 0.0039) for(MDW=MIN_MDW; MDW<MAX_MDW; ++MDW) if(Math.abs(collw - cycle_width(collw)) <= delta) { delta = Math.abs(collw - cycle_width(collw)); _MDW = MDW; }
 	MDW = _MDW;
 }
 /* XLML specifies width in terms of pixels */
@@ -94,7 +95,7 @@ function process_col(coll/*:ColInfo*/) {
 		coll.wpx = width2px(coll.width);
 		coll.MDW = MDW;
 	}
-	if(coll.customWidth) delete coll.customWidth;
+	// if(coll.customWidth) delete coll.customWidth;
 }
 
 var DEF_PPI = 96, PPI = DEF_PPI;

@@ -4748,7 +4748,7 @@ function formatNumber(f, v, opts) {
 		return minus ? s.replace('-', '') : s;
 	}) + suffix;
 }
-function formatValue(v, f, opts) {
+function formatValue(v, f, opts, c) {
 	let df = analyzeDateFormat(f, opts);
 	if (df.flag) {
 		let n, dt;
@@ -4759,7 +4759,7 @@ function formatValue(v, f, opts) {
 			dt = parseDateJp(v);
 			n = validTypeNumber(df.type, dt);
 		}
-		c.v = n;
+		if (c) c.v = n;
 		return formatDateVariable(df.text, dt, opts);
 	} else if (df.text) {
 		return formatNumber(f, v, opts);
@@ -4769,7 +4769,7 @@ function formatValue(v, f, opts) {
 function applyFormatValue(c, v, opts) {
 	let f = c.z;
 	if (c.t === 'n' && f) {
-		formatValue(v, f, opts);
+		return formatValue(v, f, opts, c);
 	}
 	return f ? SSF.format(f, v) : v;
 }
@@ -13731,11 +13731,12 @@ function cycle_width(collw) { return char2width(px2char(width2px(collw))); }
 /* XLSX/XLSB/XLS specify width in units of MDW */
 function find_mdw_colw(collw, opts) {
 	if (opts?.ck2Ex) {
-		MDW = 7;
-		return;
+		DEF_MDW = MDW = 7;
+		MIN_MDW = 6;
+		MAX_MDW = 9;
 	}
 	var delta = Math.abs(collw - cycle_width(collw)), _MDW = MDW;
-	if(delta > 0.005) for(MDW=MIN_MDW; MDW<MAX_MDW; ++MDW) if(Math.abs(collw - cycle_width(collw)) <= delta) { delta = Math.abs(collw - cycle_width(collw)); _MDW = MDW; }
+	if(delta > 0.0039) for(MDW=MIN_MDW; MDW<MAX_MDW; ++MDW) if(Math.abs(collw - cycle_width(collw)) <= delta) { delta = Math.abs(collw - cycle_width(collw)); _MDW = MDW; }
 	MDW = _MDW;
 }
 /* XLML specifies width in terms of pixels */
@@ -13764,7 +13765,7 @@ function process_col(coll/*:ColInfo*/) {
 		coll.wpx = width2px(coll.width);
 		coll.MDW = MDW;
 	}
-	if(coll.customWidth) delete coll.customWidth;
+	// if(coll.customWidth) delete coll.customWidth;
 }
 
 var DEF_PPI = 96, PPI = DEF_PPI;
@@ -19281,11 +19282,13 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	var refguess/*:Range*/ = ({s: {r:2000000, c:2000000}, e: {r:0, c:0} }/*:any*/);
 
 	// core-K2 expansion(copy parse xml object properties)
-	let obj = Xml.xmlStrToObject(data);
-	['sheetViews', 'sheetFormatPr', 'AlternateContent'].forEach(n => {
-		let o = obj[n];
-		if (o) s['$' + n] = o;
-	});
+	const obj = opts?.ck2Ex ? Xml.xmlStrToObject(data) : null;
+	if (obj) {
+		['sheetViews', 'sheetFormatPr', 'AlternateContent'].forEach(n => {
+			const o = obj[n];
+			if (o) s['$' + n] = o;
+		});
+	}
 
 	var data1 = "", data2 = "";
 	var mtch/*:?any*/ = str_match_xml_ns(data, "sheetData");
@@ -19332,7 +19335,7 @@ function parse_ws_xml(data/*:?string*/, opts, idx/*:number*/, rels, wb/*:WBWBPro
 	var columns/*:Array<ColInfo>*/ = [];
 	if(opts.cellStyles) {
 		/* 18.3.1.13 col CT_Col */
-		var cols = data1.match(colregex);
+		const cols = obj?.cols?.col ?? data1.match(colregex);
 		if(cols) parse_ws_xml_cols(columns, cols, d.e, opts);
 	}
 
@@ -19470,19 +19473,41 @@ function write_ws_xml_margins(margin)/*:string*/ {
 }
 
 function parse_ws_xml_cols(columns, cols, endCell, opts) {
-	var seencol = false;
-	for(var coli = 0; coli != cols.length; ++coli) {
-		var coll = parsexmltag(cols[coli], true);
-		if(coll.hidden) coll.hidden = parsexmlbool(coll.hidden);
-		var colm=parseInt(coll.min, 10)-1, colM=parseInt(coll.max,10)-1;
-		if(coll.outlineLevel) coll.level = (+coll.outlineLevel || 0);
-		delete coll.min; delete coll.max; coll.width = +coll.width;
-		if(!seencol && coll.width) { seencol = true; find_mdw_colw(coll.width, opts); }
-		process_col(coll);
-		let iMaxCol = endCell.c;
-		if (iMaxCol > 0 && iMaxCol < colM) colM = iMaxCol;
-		while(colm <= colM) columns[colm++] = dup(coll);
+	const ar = [];
+	if (typeof cols === 'object') {
+		// core-K2 extend
+		if (!Array.isArray(cols)) cols = [cols];
+		cols.forEach(c => {
+			if (c.outlineLevel != null) {
+				c.level = c.outlineLevel;
+				delete c.outlineLevel;
+			}
+			ar.push(c);
+		});
+		MDW = 7;
+	} else {
+		for(var coli = 0; coli != cols.length; ++coli) {
+			var coll = parsexmltag(cols[coli], true);
+			if(coll.hidden) coll.hidden = parsexmlbool(coll.hidden);
+			if(coll.outlineLevel) coll.level = (+coll.outlineLevel || 0);
+			coll.width = +coll.width;
+			ar.push(coll);
+		}
 	}
+	const iMaxCol = endCell.c;
+	ar.forEach(c => {
+		let colm = parseInt(c.min, 10)-1,
+			colM = parseInt(c.max, 10)-1,
+			seencol = false;
+		delete c.min; delete c.max;
+		if(!seencol && c.width) {
+			seencol = true;
+			find_mdw_colw(c.width, opts);
+		}
+		process_col(c);
+		if (iMaxCol > 0 && iMaxCol < colM) colM = iMaxCol;
+		while(colm <= colM) columns[colm++] = dup(c);
+	});
 }
 function write_ws_xml_cols(ws, cols)/*:string*/ {
 	var o = ["<cols>"], col;
