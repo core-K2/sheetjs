@@ -1530,6 +1530,30 @@ function convertToRelPath(path) {
 	return path.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
 }
 
+// get directory name
+function getDirName(path) {
+	const i = path.lastIndexOf('/');
+	return i > 0 ? path.substring(0, i) : null;
+}
+
+// get relative path from parent
+function getRelativePath(path, parent) {
+	const ar = path.split('/');
+	let dir, i;
+	for (i = 0; i < ar.length; i++) {
+		if (ar[i] !== '..') break;
+	}
+	if (i > 0) ar.splice(0, i);
+	if (parent) {
+		const dirs = parent.split('/');
+		if (i > 0) dirs.splice(dirs.length - i, i);
+		dir = dirs.join('/') + '/';
+	} else {
+		dir = i > 0 ? 'xl/' : '';
+	}
+	return dir + ar.join('/');
+}
+
 /**
  * XLSX text parser contain rPr
  */

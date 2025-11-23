@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251120';
+XLSX.version = '0.20.3.20251123';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4915,6 +4915,30 @@ function convertToRelPath(path) {
 	return path.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
 }
 
+// get directory name
+function getDirName(path) {
+	const i = path.lastIndexOf('/');
+	return i > 0 ? path.substring(0, i) : null;
+}
+
+// get relative path from parent
+function getRelativePath(path, parent) {
+	const ar = path.split('/');
+	let dir, i;
+	for (i = 0; i < ar.length; i++) {
+		if (ar[i] !== '..') break;
+	}
+	if (i > 0) ar.splice(0, i);
+	if (parent) {
+		const dirs = parent.split('/');
+		if (i > 0) dirs.splice(dirs.length - i, i);
+		dir = dirs.join('/') + '/';
+	} else {
+		dir = i > 0 ? 'xl/' : '';
+	}
+	return dir + ar.join('/');
+}
+
 /**
  * XLSX text parser contain rPr
  */
@@ -7214,6 +7238,8 @@ var RELS = ({
 	THEME: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
 	CHART: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
 	CHARTEX: "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+	CHART_COLOR: "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
+	CHART_STYLE: "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
 	CS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
 	WS: [
 		"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
@@ -15725,10 +15751,10 @@ function getRels(zip, path) {
 	return null;
 }
 // get referrnce objects
-function getRelsObject(zip, wb, rels) {
+function getRelsObject(zip, wb, rels, parent) {
 	const rs = {};
 	rels.forEach(r => {
-		rs[r.Id] = getMedia(zip, wb, r);
+		rs[r.Id] = getMedia(zip, wb, r, parent);
 	});
 	return rs;
 }
@@ -15767,12 +15793,12 @@ function findRelsType(type) {
 			const found = v.find(x => x === type);
 			if (found) return found;
 		} else if (v === type) {
-			return v;
+			return n;
 		}
 	}
 	return null;
 }
-function getMedia(zip, wb, rel) {
+function getMedia(zip, wb, rel, parent) {
 	let media = wb['$media'];
 	if (!media) media = wb['$media'] = {};
 	const t = rel.Target;
@@ -15780,24 +15806,26 @@ function getMedia(zip, wb, rel) {
 	if (!m) {
 		try {
 			const type = rel.Type;
-			const path = t.replace('..', 'xl');
-			switch (type) {
-			case RELS.IMG:
+			const path = getRelativePath(t, parent);
+			const n = findRelsType(type);
+			switch (n) {
+			case 'IMG':
 				m = getImageAsBase64(zip, path);
 				break;
-			default:
-				if (findRelsType(type)) {
-					m = {};
-					const obj = m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path, true));
-					switch (type) {
-					case RELS.CHART:
-						const rels = getRels(zip, path);
-						if (rels) m.$rels = getRelsObject(zip, wb, rels);
-						break;
-					}
-				} else {
-					console.warn('Not implement rels type:', rel.Type);
+			case 'CHART':
+				const rels = getRels(zip, path);
+				m = {};
+				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path, true));
+				if (rels) {
+					m.$rels = getRelsObject(zip, wb, rels, getDirName(path));
 				}
+				break;
+			case 'CHART_COLOR':
+			case 'CHART_STYLE':
+				m = {[n]: parse_xml(getzipdata(zip, path, true))};
+				break;
+			default:
+				console.warn('Not implement rels type:', type);
 				break;
 			}
 		} catch (e) {

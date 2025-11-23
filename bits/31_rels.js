@@ -18,6 +18,8 @@ var RELS = ({
 	THEME: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
 	CHART: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
 	CHARTEX: "http://schemas.microsoft.com/office/2014/relationships/chartEx",
+	CHART_COLOR: "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle",
+	CHART_STYLE: "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
 	CS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
 	WS: [
 		"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
