@@ -15721,23 +15721,18 @@ function getMedia(zip, wb, rel, parent) {
 			const path = getRelativePath(t, parent);
 			const n = findRelsType(type);
 			switch (n) {
+			case null:
+				console.warn('Not implement rels type:', type);
+				break;
 			case 'IMG':
 				m = getImageAsBase64(zip, path);
 				break;
-			case 'CHART':
+			default:
+				m = {[type.split('/').at(-1)]: parse_xml(getzipdata(zip, path, true))};
 				const rels = getRels(zip, path);
-				m = {};
-				m[type.split('/').at(-1)] = parse_xml(getzipdata(zip, path, true));
 				if (rels) {
 					m.$rels = getRelsObject(zip, wb, rels, getDirName(path));
 				}
-				break;
-			case 'CHART_COLOR':
-			case 'CHART_STYLE':
-				m = {[n]: parse_xml(getzipdata(zip, path, true))};
-				break;
-			default:
-				console.warn('Not implement rels type:', type);
 				break;
 			}
 		} catch (e) {
