@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251123';
+XLSX.version = '0.20.3.20251124';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4922,21 +4922,26 @@ function getDirName(path) {
 }
 
 // get relative path from parent
-function getRelativePath(path, parent) {
+function getRelativePath(path, parent, root = 'xl') {
 	const ar = path.split('/');
-	let dir, i;
-	for (i = 0; i < ar.length; i++) {
-		if (ar[i] !== '..') break;
+	const dirs = parent ? parent.split('/').concat(ar) : ar;
+	for (let i = dirs.length; i >= 0; i--) {
+		const d = dirs[i];
+		if (!d || d === '.') {
+			dirs.splice(i, 1);
+		} else if (d === '..') {
+			if (i > 1) {
+				dirs.splice(--i, 2);
+			} else {
+				if (i === 1)
+					dirs.splice(0, i, root);
+				else
+					dirs[i] = root;
+				break;
+			}
+		}
 	}
-	if (i > 0) ar.splice(0, i);
-	if (parent) {
-		const dirs = parent.split('/');
-		if (i > 0) dirs.splice(dirs.length - i, i);
-		dir = dirs.join('/') + '/';
-	} else {
-		dir = i > 0 ? 'xl/' : '';
-	}
-	return dir + ar.join('/');
+	return dirs.join('/');
 }
 
 /**
