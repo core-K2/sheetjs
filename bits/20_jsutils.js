@@ -1098,8 +1098,9 @@ function isGeneral(v) {
 }
 function getGeneralFormat(opts) {
 	if (opts) {
-		if (opts.isPercent) return '0%';
-		if (opts.isNumber) return '#,##0';
+		if (opts.gf) return opts.gf;
+		else if (opts.isPercent) return '0%';
+		else if (opts.isNumber) return '#,##0';
 	}
 	return '';
 }
