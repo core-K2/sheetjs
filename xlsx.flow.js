@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251124';
+XLSX.version = '0.20.3.20251205';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4482,7 +4482,11 @@ function isGeneral(v) {
 	return /general/i.test(v);
 }
 function getGeneralFormat(opts) {
-	return opts?.isPercent ? '0%' : '';
+	if (opts) {
+		if (opts.isPercent) return '0%';
+		if (opts.isNumber) return '#,##0';
+	}
+	return '';
 }
 function analyzeDateFormat(f, opts) {
 	if (isGeneral(f)) return {text: getGeneralFormat(opts)};

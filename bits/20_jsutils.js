@@ -1097,7 +1097,11 @@ function isGeneral(v) {
 	return /general/i.test(v);
 }
 function getGeneralFormat(opts) {
-	return opts?.isPercent ? '0%' : '';
+	if (opts) {
+		if (opts.isPercent) return '0%';
+		if (opts.isNumber) return '#,##0';
+	}
+	return '';
 }
 function analyzeDateFormat(f, opts) {
 	if (isGeneral(f)) return {text: getGeneralFormat(opts)};
