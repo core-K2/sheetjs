@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251205';
+XLSX.version = '0.20.3.20251209';
 var current_codepage = 1200, current_ansi = 1252;
 /*:: declare var cptable:any; */
 /*global cptable:true, window */
@@ -4723,7 +4723,7 @@ function formatNumber(f, v, opts) {
 		return p1;
 	});
 	const sts = [];
-	f = f.replace(/\[([^\]]+)\]/, m => {
+	f = f.replace(/\[([^\]]+)\]/g, m => {
 		sts.push(m.substring(1, m.length - 1));
 		return '';
 	});

@@ -1338,7 +1338,7 @@ function formatNumber(f, v, opts) {
 		return p1;
 	});
 	const sts = [];
-	f = f.replace(/\[([^\]]+)\]/, m => {
+	f = f.replace(/\[([^\]]+)\]/g, m => {
 		sts.push(m.substring(1, m.length - 1));
 		return '';
 	});
