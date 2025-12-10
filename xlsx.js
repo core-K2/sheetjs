@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251209';
+XLSX.version = '0.20.3.20251210';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -27651,13 +27651,19 @@ function makeRowStyles(rows, ass, iRowMax) {
 	}
 	return rss;
 }
+function isHidden(o) {
+	return ['collapse', 'hidden'].indexOf(o?.visibility) >= 0;
+}
 function makeRowStyle(r, ass) {
-	let n = r['style-name'];
-	let ret = {ods: n.substring(2)};
-	let s = ass[n];
+	const n = r['style-name'];
+	const ret = {ods: n.substring(2)};
+	if (isHidden(r)) {
+		ret.hidden = true;
+	}
+	const s = ass[n];
 	if (s) {
-		let rps = s['table-row-properties'];
-		let h = rps && getPixelSize(rps['row-height']);
+		const rps = s['table-row-properties'];
+		const h = rps && getPixelSize(rps['row-height']);
 		if (h) ret.hpx = h;
 	}
 	return ret;
@@ -27690,10 +27696,13 @@ function makeColStyles(cols, ass, oss, iColMax, styles, Styles, fonts) {
 }
 function makeColStyle(c, ass, oss, styles, Styles, fonts) {
 	let n = c['style-name'];
-	let ret = {ods: n.substring(2)};
+	const ret = {ods: n.substring(2)};
+	if (isHidden(c)) {
+		ret.hidden = true;
+	}
 	let s = ass[n];
 	if (s) {
-		let cps = s['table-column-properties'];
+		const cps = s['table-column-properties'];
 		ret.wpx = cps && getPixelSize(cps['column-width']) || 0;
 	}
 	n = c['default-cell-style-name'];
@@ -27701,12 +27710,12 @@ function makeColStyle(c, ass, oss, styles, Styles, fonts) {
 	if (styles) {
 		s = ass[n];
 		if (s) {
-			let st = getDefaultStyle(styles, s['family']);
+			const st = getDefaultStyle(styles, s['family']);
 			if (st) {
-				let tc = getStyleObject(null, 'table-cell-properties', st, oss);
-				let pp = getStyleObject(null, 'paragraph-properties', st, oss);
-				let tp = getStyleObject(null, 'text-properties', st, oss);
-				let style = {};
+				const tc = getStyleObject(null, 'table-cell-properties', st, oss);
+				const pp = getStyleObject(null, 'paragraph-properties', st, oss);
+				const tp = getStyleObject(null, 'text-properties', st, oss);
+				const style = {};
 				applyStyle(style, Styles, fonts, tc, pp, tp);
 				ret.si = getOrAddObject(Styles.CellXf, style);
 			}
