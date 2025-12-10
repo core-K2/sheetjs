@@ -4440,6 +4440,17 @@ function formatDate(v, df, opts) {
 		return datePart(key, dt, opts);
 	});
 }
+function getNumberDataStyle(ds, n) {
+	const map = ds?.map;
+	if (map) {
+		for (let f in map) {
+			if (Function('return ' + f.replace('?', n))()) {
+				return map[f];	
+			}
+		}
+	}
+	return ds;
+}
 function applyDataStyle(ds, v, t) {
 	switch (t) {
 	case '':
@@ -4448,6 +4459,7 @@ function applyDataStyle(ds, v, t) {
 		if (v === undefined) return '';
 		let n = Number(v);
 		if (!isNaN(n)) {
+			ds = getNumberDataStyle(ds, n);
 			let s = '';
 			let text = ds?.text;
 			let sign = '';
