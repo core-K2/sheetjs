@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20251210';
+XLSX.version = '0.20.3.20251211';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4366,18 +4366,21 @@ function formatDate(v, df, opts) {
 		return datePart(key, dt, opts);
 	});
 }
+function convertOdsCondition(cond) {
+	return cond.replace(/(value\(\))(\=\d+)?/g, (m, p1, p2) => 'arguments[0]' + (p2 ? '=' + p2 : ''));
+}
 function getNumberDataStyle(ds, n) {
 	const map = ds?.map;
 	if (map) {
 		for (let f in map) {
-			if (Function('return ' + f.replace('?', n))()) {
+			if (Function('return ' + f)(n)) {
 				return map[f];	
 			}
 		}
 	}
 	return ds;
 }
-function applyDataStyle(ds, v, t) {
+function applyDataStyle(ds, v, t, opts) {
 	switch (t) {
 	case '':
 		if (!v || isNaN(v)) break;
@@ -4386,6 +4389,9 @@ function applyDataStyle(ds, v, t) {
 		let n = Number(v);
 		if (!isNaN(n)) {
 			ds = getNumberDataStyle(ds, n);
+			if (ds && opts && typeof opts === 'object') {
+				opts.rgb = ds.rgb;
+			}
 			let s = '';
 			let text = ds?.text;
 			let sign = '';
@@ -28212,11 +28218,8 @@ function setDfMap(c, ds, v, ass, oss) {
 	let ds2 = getDataStyle(c, a, ass, oss);
 	if (ds2) {
 		let map = ds?.map;
-		if (!map) {
-			map = ds.map = {};
-		}
-		cond = cond.replace('value()', '?');
-		map[cond] = ds2;
+		if (!map) map = ds.map = {};
+		map[convertOdsCondition(cond)] = ds2;
 	}
 }
 function getProp(name) {

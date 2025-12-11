@@ -1782,11 +1782,8 @@ function setDfMap(c, ds, v, ass, oss) {
 	let ds2 = getDataStyle(c, a, ass, oss);
 	if (ds2) {
 		let map = ds?.map;
-		if (!map) {
-			map = ds.map = {};
-		}
-		cond = cond.replace('value()', '?');
-		map[cond] = ds2;
+		if (!map) map = ds.map = {};
+		map[convertOdsCondition(cond)] = ds2;
 	}
 }
 function getProp(name) {
