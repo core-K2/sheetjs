@@ -4131,7 +4131,7 @@ function toOdsDateTime(v) {
 }
 const JAPANESE_DATE_KEYS = '年月日時分秒';
 function parseDateJp(dt) {
-	if (dt instanceof Date) return dt;
+	if (!dt || dt instanceof Date) return dt;
 	let d = new Date(dt);
 	if (!isNaN(d.getTime())) return d;
 	d = new Date(null);
@@ -4381,6 +4381,7 @@ function getNumberDataStyle(ds, n) {
 	return ds;
 }
 function applyDataStyle(ds, v, t, opts) {
+	if (v == null) return '';
 	switch (t) {
 	case '':
 		if (!v || isNaN(v)) break;
@@ -28070,80 +28071,83 @@ function getDataStyle(c, dst, ass, oss) {
 		}
 		let s = '';
 		let bAP = false;
-		dst.forEach(d => {
-			if (bDate) {
-				for (let n in d) {
-					let v = d[n];
-					let cal = v?.calendar;
-					if (cal === 'gregorian') cal = '';
-					switch (n) {
-					case 'text':
-						s += v;
+		const analyzeDate = d => {
+			for (let n in d) {
+				let v = d[n];
+				let cal = v?.calendar;
+				if (cal === 'gregorian') cal = '';
+				switch (n) {
+				case 'text':
+					s += v;
+					break;
+				case 'era':
+					let g = 'GE';
+					switch (v?.style) {
+					case 'long':
+						g = 'GG' + g;
 						break;
-					case 'era':
-						let g = 'GE';
-						switch (v?.style) {
-						case 'long':
-							g = 'GG' + g;
-							break;
-						case 'short':
-							g = 'G' + g;
-							break;
-						case 'narrow':
-						default:
-							break;
-						}
-						s += g;
+					case 'short':
+						g = 'G' + g;
 						break;
-					case 'year':
-						if (cal) {
-							s += 'YY';
-						} else {
-							s += 'yy';
-							if (v?.style === 'long') s += 'yy';
-						}
-						break;
-					case 'month':
-						if (v?.textual) {
-							s += 'MMM';
-						} else {
-							s += 'M';
-						}
-						if (v?.style === 'long') s += 'M';
-						break;
-					case 'day':
-						s += 'd';
-						if (v?.style === 'long') s += 'd';
-						break;
-					case 'day-of-week':
-						s += 'W';
-						switch (v?.style) {
-						case 'long':
-							s += 'WW';
-							break;
-						case 'short':
-							s += 'W';
-							break;
-						}
-						break;
-					case 'hours':
-						s += 'H';
-						if (v?.style === 'long') s += 'H';
-						break;
-					case 'minutes':
-						s += 'm';
-						if (v?.style === 'long') s += 'm';
-						break;
-					case 'seconds':
-						s += 's';
-						if (v?.style === 'long') s += 's';
-						break;
-					case 'am-pm':
-						s += 'ap';
-						bAP = true;
+					case 'narrow':
+					default:
 						break;
 					}
+					s += g;
+					break;
+				case 'year':
+					if (cal) {
+						s += 'YY';
+					} else {
+						s += 'yy';
+						if (v?.style === 'long') s += 'yy';
+					}
+					break;
+				case 'month':
+					if (v?.textual) {
+						s += 'MMM';
+					} else {
+						s += 'M';
+					}
+					if (v?.style === 'long') s += 'M';
+					break;
+				case 'day':
+					s += 'd';
+					if (v?.style === 'long') s += 'd';
+					break;
+				case 'day-of-week':
+					s += 'W';
+					switch (v?.style) {
+					case 'long':
+						s += 'WW';
+						break;
+					case 'short':
+						s += 'W';
+						break;
+					}
+					break;
+				case 'hours':
+					s += 'H';
+					if (v?.style === 'long') s += 'H';
+					break;
+				case 'minutes':
+					s += 'm';
+					if (v?.style === 'long') s += 'm';
+					break;
+				case 'seconds':
+					s += 's';
+					if (v?.style === 'long') s += 's';
+					break;
+				case 'am-pm':
+					s += 'ap';
+					bAP = true;
+					break;
 				}
+			}
+		};
+		dst.forEach(d => {
+			if (bDate) {
+				analyzeDate(d);
 				return;
 			}
 			for (let n in d) {
@@ -28173,6 +28177,19 @@ function getDataStyle(c, dst, ass, oss) {
 					if (pre) ds.padding = pre.join('').length;
 					break;
 				case 'text-content':	// ignore
+					break;
+				case 'year':
+				case 'month':
+				case 'day':
+				case 'hours':
+				case 'minutes':
+				case 'seconds':
+					if (!bDate) {
+						bDate = true;
+						c.t = 'd';
+						analyzeDate(d);
+						return;
+					}
 					break;
 				default:
 					console.warn('Not implement data style', n, d[n]);

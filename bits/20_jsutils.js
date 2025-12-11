@@ -820,7 +820,7 @@ function toOdsDateTime(v) {
 }
 const JAPANESE_DATE_KEYS = '年月日時分秒';
 function parseDateJp(dt) {
-	if (dt instanceof Date) return dt;
+	if (!dt || dt instanceof Date) return dt;
 	let d = new Date(dt);
 	if (!isNaN(d.getTime())) return d;
 	d = new Date(null);
@@ -1070,6 +1070,7 @@ function getNumberDataStyle(ds, n) {
 	return ds;
 }
 function applyDataStyle(ds, v, t, opts) {
+	if (v == null) return '';
 	switch (t) {
 	case '':
 		if (!v || isNaN(v)) break;
