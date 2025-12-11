@@ -593,11 +593,8 @@ function parse_sty_xml_ck2(data, themes, opts) {
 }
 function makeNumberFmt(v, themes) {
 	const ar = [];
-	switch (navigator.language) {
-	case 'ja':
-		table_fmt[14] = 'yyyy/mm/dd';
-		break;
-	}
+	const loc = locale[navigator.language];
+	if (loc) Object.assign(table_fmt, loc);
 	for (let n in table_fmt) {
 		ar[n] = table_fmt[n];
 	}

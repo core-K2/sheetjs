@@ -99,6 +99,18 @@ var table_fmt = {
 	// 56: '"上午/下午 "hh"時"mm"分"ss"秒 "'
 };
 
+// for language customization
+var locale = {
+	ja: {
+		14: 'yyyy/mm/dd',
+		15: 'ggge年m月d日',
+		16: 'm月d日',
+		17: 'yyyy年m月',
+		18: 'hh:mm',
+		19: 'hh:mm:ss',
+		22: 'yyyy/mm/dd hh:mm',
+	}
+}
 /* Defaults determined by systematically testing in Excel 2019 */
 
 /* These formats appear to default to other formats in the table */
