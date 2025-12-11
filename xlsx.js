@@ -14352,6 +14352,11 @@ function parse_sty_xml_ck2(data, themes, opts) {
 function makeNumberFmt(v, themes) {
 	let ar = [];
 	for (let n in table_fmt) {
+		if (n == 14) {
+			switch (navigator.language) {
+			case 'ja':	table_fmt[n] = 'yyyy/mm/dd';
+			}
+		}
 		ar[n] = table_fmt[n];
 	}
 	let dt = v?.numFmt;
