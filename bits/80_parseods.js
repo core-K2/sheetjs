@@ -1716,10 +1716,8 @@ function getDataStyle(c, dst, ass, oss) {
 					break;
 				case 'text':
 					let text = ds?.text;
-					if (!text) {
-						text = ds.text = {};
-					}
-					let prop = bn ? 'suf' : 'pre';
+					if (!text) text = ds.text = {};
+					const prop = bn ? 'suf' : 'pre';
 					if (!text?.[prop]) text[prop] = [];
 					text[prop].push(d[n]);
 					break;
@@ -1732,6 +1730,15 @@ function getDataStyle(c, dst, ass, oss) {
 					break;
 				case 'map':
 					setDfMap(c, ds, d[n], ass, oss);
+					break;
+				case 'fill-character':
+					const pre = ds?.text?.pre;
+					if (pre) ds.padding = pre.join('').length;
+					break;
+				case 'text-content':	// ignore
+					break;
+				default:
+					console.warn('Not implement data style', n, d[n]);
 					break;
 				}
 			}

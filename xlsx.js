@@ -4389,9 +4389,6 @@ function applyDataStyle(ds, v, t, opts) {
 		let n = Number(v);
 		if (!isNaN(n)) {
 			ds = getNumberDataStyle(ds, n);
-			if (ds && opts && typeof opts === 'object') {
-				opts.rgb = ds.rgb;
-			}
 			let s = '';
 			let text = ds?.text;
 			let sign = '';
@@ -4400,6 +4397,10 @@ function applyDataStyle(ds, v, t, opts) {
 				if (n < 0) sign = '-';
 			}
 			s += ds?.symbol || '';
+			if (ds && opts && typeof opts === 'object') {
+				opts.rgb = ds.rgb;
+				opts.padding = ds.padding;
+			}
 			let sn = n.toLocaleString(ds?.loc || navigator.language, {
 				minimumIntegerDigits: ds?.dig || 1,
 				minimumFractionDigits: ds?.mdot || 0,
@@ -28152,10 +28153,8 @@ function getDataStyle(c, dst, ass, oss) {
 					break;
 				case 'text':
 					let text = ds?.text;
-					if (!text) {
-						text = ds.text = {};
-					}
-					let prop = bn ? 'suf' : 'pre';
+					if (!text) text = ds.text = {};
+					const prop = bn ? 'suf' : 'pre';
 					if (!text?.[prop]) text[prop] = [];
 					text[prop].push(d[n]);
 					break;
@@ -28168,6 +28167,15 @@ function getDataStyle(c, dst, ass, oss) {
 					break;
 				case 'map':
 					setDfMap(c, ds, d[n], ass, oss);
+					break;
+				case 'fill-character':
+					const pre = ds?.text?.pre;
+					if (pre) ds.padding = pre.join('').length;
+					break;
+				case 'text-content':	// ignore
+					break;
+				default:
+					console.warn('Not implement data style', n, d[n]);
 					break;
 				}
 			}

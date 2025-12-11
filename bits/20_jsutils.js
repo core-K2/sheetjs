@@ -1078,9 +1078,6 @@ function applyDataStyle(ds, v, t, opts) {
 		let n = Number(v);
 		if (!isNaN(n)) {
 			ds = getNumberDataStyle(ds, n);
-			if (ds && opts && typeof opts === 'object') {
-				opts.rgb = ds.rgb;
-			}
 			let s = '';
 			let text = ds?.text;
 			let sign = '';
@@ -1089,6 +1086,10 @@ function applyDataStyle(ds, v, t, opts) {
 				if (n < 0) sign = '-';
 			}
 			s += ds?.symbol || '';
+			if (ds && opts && typeof opts === 'object') {
+				opts.rgb = ds.rgb;
+				opts.padding = ds.padding;
+			}
 			let sn = n.toLocaleString(ds?.loc || navigator.language, {
 				minimumIntegerDigits: ds?.dig || 1,
 				minimumFractionDigits: ds?.mdot || 0,
