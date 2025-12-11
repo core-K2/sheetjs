@@ -14350,13 +14350,13 @@ function parse_sty_xml_ck2(data, themes, opts) {
 	return styles;
 }
 function makeNumberFmt(v, themes) {
-	let ar = [];
+	const ar = [];
+	switch (navigator.language) {
+	case 'ja':
+		table_fmt[14] = 'yyyy/mm/dd';
+		break;
+	}
 	for (let n in table_fmt) {
-		if (n == 14) {
-			switch (navigator.language) {
-			case 'ja':	table_fmt[n] = 'yyyy/mm/dd';
-			}
-		}
 		ar[n] = table_fmt[n];
 	}
 	let dt = v?.numFmt;
