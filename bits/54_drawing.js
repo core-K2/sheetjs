@@ -63,7 +63,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 			addOrExShape(d, a);
 			a = d;
 		}
-		draws[cn] = a;
+		draws[cn] = setGraphicFrame(a);
 	});
 	const cn = 'A1';
 	ar2.forEach(a => {
@@ -98,7 +98,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 			addOrExShape(d, a);
 			a = d;
 		}
-		draws[cn] = a;
+		draws[cn] = setGraphicFrame(a);
 	});
 	let d = decode_range(ws['!ref']);
 	if (d.e.r < iRow || d.e.c < iCol) {
@@ -130,6 +130,25 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		ws['!drawRels'] = rs;
 	}
 	return draws;
+}
+// set graphic frame
+function setGraphicFrame(a) {
+	if (!a.graphicFrame) {
+		const ac = a.AlternateContent;
+		if (typeof ac === 'object') {
+			for (let n in ac) {
+				const o = ac[n];
+				if (typeof o === 'object') {
+					const gf = o.graphicFrame;
+					if (gf) {
+						a.graphicFrame = gf;
+						break;
+					}
+				}
+			}
+		}
+	}
+	return a;
 }
 // get path referrences
 function getRels(zip, path) {
