@@ -15593,7 +15593,7 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 		asSeqArray: [/^a:path$/],
 	};
 	let draw = parse_xml(getzipdata(zip, dfile, true), xmlOpts);
-	let ar = draw?.twoCellAnchor;
+	let ar = draw?.twoCellAnchor ?? draw?.oneCellAnchor;
 	let ar2 = draw?.absoluteAnchor;
 	if (typeof ar !== 'object') ar = [];
 	else if (!Array.isArray(ar)) ar = [ar];
@@ -15610,8 +15610,9 @@ function parseDrawings(zip, dfile, ws, wb, styles, opts) {
 	ar.forEach(a => {
 		let from = a.from;
 		if (!from) return;
-		iRow = Math.max(a.to.row, iRow);
-		iCol = Math.max(a.to.col, iCol);
+		const to = a.to ?? from;	// for oneCellAnchor
+		iRow = Math.max(to.row, iRow);
+		iCol = Math.max(to.col, iCol);
 		let cn = encode_col(from.col) + (from.row + 1);
 		let sp = a.sp;
 		if (sp?.style) {
