@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20260329';
+XLSX.version = '0.20.3.20260430';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -4945,7 +4945,8 @@ var XlsxTextParser = {
 	},
 	transparentColor: function(c, tp) {
 		if (/^#[a-f0-9]{6}$/i.test(c)) {
-			let n = Math.floor(tp * 255) % 256;
+			if (tp < 0) tp = 1 - tp;
+			const n = Math.floor(tp * 255) % 256;
 			return c + n.toString(16).padStart(2, '0');
 		}
 		return c;

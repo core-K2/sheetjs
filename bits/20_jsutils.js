@@ -1622,7 +1622,8 @@ var XlsxTextParser = {
 	},
 	transparentColor: function(c, tp) {
 		if (/^#[a-f0-9]{6}$/i.test(c)) {
-			let n = Math.floor(tp * 255) % 256;
+			if (tp < 0) tp = 1 - tp;
+			const n = Math.floor(tp * 255) % 256;
 			return c + n.toString(16).padStart(2, '0');
 		}
 		return c;
