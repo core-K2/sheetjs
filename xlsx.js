@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20260430';
+XLSX.version = '0.20.3.20260505';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -3976,7 +3976,7 @@ var Xml = {
 				if (!name) continue;
 				let n = prefix + name;
 				if (obj.hasOwnProperty(n)) n = prefix + attr.name;
-				obj[n] = this.toValue(attr.value);
+				obj[n] = this.isText(n) ? attr.value : this.toValue(attr.value);
 			}
 		}
 		return obj;
@@ -14342,7 +14342,9 @@ function writeCellStyles(dt, opts) {
 
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
-	let dt = parse_xml(data);
+	let dt = parse_xml(data,{
+		asText: ['formatCode'],
+	});
 	let colors = dt.colors?.indexedColors || opts?.indexedColors;
 	if (!colors) colors = XLSIndexedColors.concat(opts?.addIndexedColors || []);
 	else if (Array.isArray(colors?.rgbColor)) {

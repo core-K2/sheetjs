@@ -653,7 +653,7 @@ var Xml = {
 				if (!name) continue;
 				let n = prefix + name;
 				if (obj.hasOwnProperty(n)) n = prefix + attr.name;
-				obj[n] = this.toValue(attr.value);
+				obj[n] = this.isText(n) ? attr.value : this.toValue(attr.value);
 			}
 		}
 		return obj;

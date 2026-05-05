@@ -571,7 +571,9 @@ function writeCellStyles(dt, opts) {
 
 function parse_sty_xml_ck2(data, themes, opts) {
 	let styles = {};
-	let dt = parse_xml(data);
+	let dt = parse_xml(data,{
+		asText: ['formatCode'],
+	});
 	let colors = dt.colors?.indexedColors || opts?.indexedColors;
 	if (!colors) colors = XLSIndexedColors.concat(opts?.addIndexedColors || []);
 	else if (Array.isArray(colors?.rgbColor)) {
