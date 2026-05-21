@@ -281,6 +281,6 @@ function write_theme(Themes, opts)/*:string*/ {
 
 function parseThemeXml(data, opts) {
 	return parse_xml(data, {
-		asSeqArray: [/^a:clrScheme$/]
+		asSeqArray: [/(^a:clrScheme|StyleLst)$/]
 	});
 }

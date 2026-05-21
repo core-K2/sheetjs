@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20260505';
+XLSX.version = '0.20.3.20260521';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -15171,7 +15171,7 @@ function write_theme(Themes, opts) {
 
 function parseThemeXml(data, opts) {
 	return parse_xml(data, {
-		asSeqArray: [/^a:clrScheme$/]
+		asSeqArray: [/(^a:clrScheme|StyleLst)$/]
 	});
 }/* [MS-XLS] 2.4.326 TODO: payload is a zip file */
 function parse_Theme(blob, length, opts) {
