@@ -4,7 +4,7 @@
 /*global global, exports, module, require:false, process:false, Buffer:false, ArrayBuffer:false, DataView:false, Deno:false, Set:false, Float32Array:false */
 var XLSX = {};
 function make_xlsx_lib(XLSX){
-XLSX.version = '0.20.3.20260521';
+XLSX.version = '0.20.3.20260708';
 var current_codepage = 1200, current_ansi = 1252;
 /*global cptable:true, window */
 var $cptable;
@@ -27468,7 +27468,7 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 			let repRow = row['number-rows-repeated'] || 1;
 			for (let r = 0; r < repRow; r++, iRow++) {
 				let beRow = 0;
-				let iCol = -1;
+				let iCol = 0;
 				let iCols = cells.length;
 				while (iCols > 0) {
 					if (Object.keys(cells[iCols - 1]).length > 0) break;
@@ -27480,15 +27480,14 @@ function convert_content(wb, content, styles, opts, zip, settings) {
 					let be = 0;
 					if (c) {
 						if (drawings) be |= addDraws(drawings, cell, iCol, iRow);
-						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, j), ass, oss, fonts);
+						be |= setCellStyle(c, Styles, cell, getTableColumn(cols, iCol), ass, oss, fonts);
 						if (!!c.v) be |= 2;
 					}
 					let rep = cell['number-columns-repeated'] || 1;
 					if (rep > 1 && rep < 40 && j < iCols - 1 && iCol + rep > iColMax) iColMax = iCol + rep;
 					let cspan = cell['number-columns-spanned'] || 0;
 					let rspan = cell['number-rows-spanned'] || 0;
-					for (k = 0; k < rep; k++) {
-						iCol++;
+					for (k = 0; k < rep; k++, iCol++) {
 						if (be & 4 && iCol > iColMax) iColMax = iCol;
 						if (iCol > iColMax) break;
 						if (c) {
